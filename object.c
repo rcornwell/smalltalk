@@ -3,6 +3,10 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.3  2000/02/01 18:09:57  rich
+ * Increased size of root objects.
+ * reclaimSpace now global since it should be called after image load.
+ *
  * Revision 1.2  2000/01/03 16:23:22  rich
  * Moved object pointer out to a new structure to reduce access cost.
  *
@@ -14,7 +18,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.2 2000/01/03 16:23:22 rich Exp rich $";
+	"$Id: object.c,v 1.3 2000/02/01 18:09:57 rich Exp rich $";
 
 #endif
 
@@ -483,8 +487,12 @@ object_decr_ref(Objptr op)
 void
 Set_object(Objptr op, int offset, Objptr newvalue)
 {
-    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0)
+    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
+	void dump_stack(Objptr);
+
+	dump_stack(NilPtr);
 	error("Out of bounds set");
+    }
     object_incr_ref(newvalue);
     object_decr_ref(get_pointer(op, offset));
     set_pointer(op, offset, newvalue);
@@ -494,8 +502,12 @@ Set_object(Objptr op, int offset, Objptr newvalue)
 void
 Set_integer(Objptr op, int offset, int value)
 {
-    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0)
+    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
+	void dump_stack(Objptr);
+
+	dump_stack(NilPtr);
 	error("Out of bounds set");
+    }
     object_decr_ref(get_pointer(op, offset));
     set_pointer(op, offset, as_integer_object(value));
 }
