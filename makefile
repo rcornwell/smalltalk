@@ -24,21 +24,21 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 	     code.$(O) symbols.$(O) parse.$(O) smallobjs.$(O) $(PROJ).res \
 	     largeint.$(O) graphic.$(O) xwin.$(O) win32.$(O)
 
-BOOTSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
-	   behavior.st object.st boottail.st
-SMALLSRC = stream.st collection.st magnitude.st misc.st compile.st \
-	   behavior.st object.st
+BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
+	   behavior.st system.st boottail.st
+SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
+	   behavior.st process.st system.st graphic.st
 
 all:	$(PROJ).sti 
 
-$(PROJ).sti: $(PROJ).exe $(PROJ).st boot.st
+$(PROJ).sti: $(PROJ).exe source.st boot.st
 	./$(PROJ).exe boot.st
 
 boot.st: $(BOOTSRC)
 	cat $(BOOTSRC) > boot.st
 
-$(PROJ).st: $(SMALLSRC)
-	cat $(SMALLSRC) > $(PROJ).st
+sourse.st: $(SMALLSRC)
+	cat $(SMALLSRC) > source.st
 
 $(PROJ).exe: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) 

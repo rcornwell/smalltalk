@@ -6,7 +6,7 @@ PROJ = smalltalk
 CC = gcc 
 CFLAGS = -g -O2 -Wall -DINLINE_OBJECT_MEM -DINLINE=inline
 LDFLAGS = -g 
-LIBS=-lm
+LIBS=-lm -L/usr/X11/lib -lX11
 
 
 SRCS = $(PROJ).c about.c image.c object.c interp.c primitive.c fileio.c \
@@ -17,21 +17,21 @@ OBJS = $(PROJ).o about.o image.o object.o interp.o primitive.o fileio.o \
  		init.o dump.o lex.o code.o symbols.o parse.o smallobjs.o \
 		largeint.o graphic.o xwin.o win32.o
 
-BOOTSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
-	behavior.st process.st object.st boottail.st
-SMALLSRC = stream.st collection.st magnitude.st misc.st compile.st \
-	behavior.st process.st graphic.st object.st
+BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
+	behavior.st system.st boottail.st
+SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
+	behavior.st process.st system.st graphic.st
 
 all:	$(PROJ).sti 
 
-$(PROJ).sti: $(PROJ) $(PROJ).st boot.st
+$(PROJ).sti: $(PROJ) source.st boot.st
 	$(PROJ) boot.st
 
 boot.st: $(BOOTSRC)
 	cat $(BOOTSRC) > boot.st
 
-$(PROJ).st: $(SMALLSRC)
-	cat $(SMALLSRC) > $(PROJ).st
+source.st: $(SMALLSRC)
+	cat $(SMALLSRC) > source.st
 
 $(PROJ): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) 
