@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.5  2000/08/19 17:40:15  rich
+ * Make sure bytes are returned unsigned.
+ *
  * Revision 1.4  2000/03/08 01:36:19  rich
  * Dump stack on Set out of bounds error.
  *
@@ -21,7 +24,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.4 2000/03/08 01:36:19 rich Exp rich $";
+	"$Id: object.c,v 1.5 2000/08/19 17:40:15 rich Exp rich $";
 
 #endif
 
@@ -45,7 +48,7 @@ static char        *rcsid =
 #include "dump.h"
 #include "fileio.h"
 
-int                 growsize = 64;		/* Region grow rate */
+int                 growsize = 512;		/* Region grow rate */
 Region              regions = NULL;		/* Memory regions */
 Region              curregion = NULL;		/* Pointer to current region */
 Otentry             otable = NULL;		/* Pointer to object info */
@@ -530,7 +533,7 @@ set_class_of(Objptr op, Objptr newClass)
 INLINE int
 canbe_integer(int value)
 {
-    int                 temp = value << 1;	/* So as not to be optimized out. */
+    int                 temp = value << 1; /* So as not to be optimized out. */
 
     return (value == (temp >> 1));
 }
@@ -919,6 +922,14 @@ new_region(int size)
     new_reg->next = regions;
     regions = new_reg;
     curregion = new_reg;
+ 
+#ifdef DUMP_OBJMEM
+    {
+        char		buffer[100];
+        sprintf(buffer, "New Region %d bytes", size);
+        dump_objstring(buffer);
+    };
+#endif
     return TRUE;
 }
 
@@ -941,8 +952,10 @@ attempt_to_allocate(int size)
        /* Try to allocate from region */
 	if ((new_ptr = attempt_to_allocate_incurrent(size)) != NULL)
 	    return new_ptr;
-       /* Would we get enough if we compacted? */
-	if (curregion->freespace > (size + sizeof(objhdr)))
+       /* Would we get enough if we compacted? 
+          Don't bother compacting a region that has less than 10% free */
+	if (curregion->freespace > (size + sizeof(objhdr)) &&
+	    (curregion->totalspace / 10) < curregion->freespace)
 	    compactflag = TRUE;
     }
 
@@ -952,8 +965,10 @@ attempt_to_allocate(int size)
 
    /* Scan regions again */
     for (curregion = regions; curregion != NULL; curregion = curregion->next) {
-       /* Would we get enough if we compacted? */
-	if (curregion->freespace > (size + sizeof(objhdr)))
+       /* Would we get enough if we compacted? 
+          Don't bother compacting a region that has less than 10% free */
+	if (curregion->freespace > (size + sizeof(objhdr)) &&
+	    (curregion->totalspace / 10) < curregion->freespace)
 	    compact_region();
        /* Try again */
 	if ((new_ptr = attempt_to_allocate_incurrent(size)) != NULL)
@@ -979,7 +994,14 @@ compact_region()
     if (curregion->freespace == 0)
 	return;
 
-    dump_objstring("Compacting");
+#ifdef DUMP_OBJMEM
+    {
+        char		buffer[100];
+        sprintf(buffer, "Compacting %x %d bytes %d free", curregion, 
+		curregion->totalspace, curregion->freespace);
+        dump_objstring(buffer);
+    };
+#endif
 
    /* 
     * Find lowest free area, also clear out freelist.
@@ -1053,13 +1075,12 @@ compact_region()
     ((Objhdr) dst)->u.next = 0;
     i = freebin(((Objhdr) dst)->size);
     curregion->freeptrs[i] = (Objhdr) dst;
-    dump_objstring("Compacting done"); 
 }
 
 /*
  * Return the last pointer of a object.
  */
-static INLINE int
+static int
 last_pointer_of(Objptr op)
 {
     int                 size;
@@ -1184,7 +1205,7 @@ free_all_other_objects(Objptr op)
 
 	   /* Reverse pointers */
 	    prior = get_pointer(current, offset - 2);
-	    set_pointer(current, offset - 2, next);
+	    set_pointer(current, offset - 2, NilPtr);
 	}
     }
 }
@@ -1198,11 +1219,21 @@ reclaimSpace()
     int                 i, j;
     int                 cnt;
     Objptr		op;
+    int			before = 0, after = 0;
+    int			total = 0;
+    Region              best_reg;
 
     if (noreclaim)
 	return;
 
-    dump_objstring("Reclaim"); 
+#ifdef DUMP_OBJMEM
+   /* Sum up free space. */
+    for (curregion = regions; curregion != NULL; curregion = curregion->next) {
+	total += curregion->totalspace;
+	before += curregion->freespace;
+    }
+#endif
+
    /* zero all object reference counts */
     for (i = 1; i < otsize; i++)
 	set_object_refcnt(i * 2, 0);
@@ -1216,6 +1247,9 @@ reclaimSpace()
 	}
     }
 
+   /* Check if any of freed objects are a file */
+    check_files();
+
    /* Free all unreferenced objects now */
     for (i = 1; i < otsize; i++) {
 	if ((cnt = get_object_refcnt(i*2)) == 0)
@@ -1227,6 +1261,7 @@ reclaimSpace()
 		object_incr_ref(get_pointer(i*2, j - 2));
 	}
     }
+
    /* go through list of known objects */
     for (i = 0; i < (sizeof(rootObjects) / sizeof(Objptr)); i++)
 	if (rootObjects[i] != NilPtr)
@@ -1235,6 +1270,27 @@ reclaimSpace()
    /* Make sure null never gets freed */
     set_object_refcnt(NilPtr, MAXREFCNT);
 
-   /* Set current region, any region as good as any other now */
-    curregion = regions;
+   /* Sum up free space. and compact the regions for most free space */
+    best_reg = regions;
+    for (curregion = regions; curregion != NULL; curregion = curregion->next) {
+#ifdef DUMP_OBJMEM
+	after += curregion->freespace;
+#endif
+	if ((curregion->totalspace / 5) < curregion->freespace)
+		compact_region();
+	if (best_reg->freespace < curregion->freespace)
+		best_reg = curregion;
+    }
+
+   /* Set current region, use region with most free space */
+    curregion = best_reg;
+
+#ifdef DUMP_OBJMEM
+    {
+        char		buffer[100];
+        sprintf(buffer, "Reclaim ran %d total, before %d after %d freed %d",
+		total, before, after, after - before);
+        dump_objstring(buffer); 
+    };
+#endif
 }
