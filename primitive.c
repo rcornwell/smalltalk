@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.8  2001/08/29 20:16:35  rich
+ * Fixed bugs in Float floor and ceil function.
+ *
  * Revision 1.7  2001/08/18 16:17:02  rich
  * Added support for graphics system and largeinteger.
  * Finished directory management primitives.
@@ -36,7 +39,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.7 2001/08/18 16:17:02 rich Exp rich $";
+	"$Id: primitive.c,v 1.8 2001/08/29 20:16:35 rich Exp rich $";
 
 #endif
 
@@ -1104,11 +1107,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveScanCharacter:
-	res = character_scanword(reciever, argument);
-	if (res == FALSE || res == NilPtr)
-		success = FALSE;
-	else
-		success = TRUE;
+	success = character_scanword(reciever, argument, &res);
 	break;
 
     case primitiveDrawLoop:
