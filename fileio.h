@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Id: fileio.h,v 1.4 2001/07/31 14:09:48 rich Exp rich $
+ * $Id: fileio.h,v 1.5 2001/08/18 16:17:01 rich Exp rich $
  *
  * $Log: fileio.h,v $
+ * Revision 1.5  2001/08/18 16:17:01  rich
+ * Moved os specific definitions to system.h
+ *
  * Revision 1.4  2001/07/31 14:09:48  rich
  * Removed unused element of file_buffer.
  *
@@ -20,7 +23,8 @@
  */
 
 /* Smalltalk level functions */
-Objptr              new_file(char *, char *);
+void		    parsefile(Objptr);
+void 	            load_source(char *);
 char               *get_chunk(Objptr);
 int                 peek_for(Objptr, char);
 int                 open_buffer(Objptr op);

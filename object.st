@@ -1,9 +1,12 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: object.st,v 1.8 2001/08/29 20:16:35 rich Exp rich $ "
+" $Id: object.st,v 1.9 2002/01/29 16:40:38 rich Exp rich $ "
 
 "
  $Log: object.st,v $
+ Revision 1.9  2002/01/29 16:40:38  rich
+ Added object dependency methods to Object.
+
  Revision 1.8  2001/08/29 20:16:35  rich
  Added class definitions.
  Moved System class to it's own file.
@@ -292,28 +295,28 @@ error: aString
 !
 
 doesNotUnderstand: aMessage
-	self error:  (self class name) , ' does not understand #',
+	^ self error:  (self class name) , ' does not understand #',
 		aMessage selector asString.
 !
 
 primitiveFailed
-	self error: 'Primitive Failed'
+	^ self error: 'Primitive Failed'
 !
 
 shouldNotImpliment
-	self error: 'Should not impliment'
+	^ self error: 'Should not impliment'
 !
 
 subclassResonsibility
-	self error: 'Subclass Responsablity'
+	^ self error: 'Subclass Responsablity'
 !
 
 interpStackFault
-	self error: 'Attempt to access outside stack'
+	^ self error: 'Attempt to access outside stack'
 !
 
 mustBeBoolean
-	self error: 'ifTrue: or ifFalse: require boolean value'
+	^ self error: 'ifTrue: or ifFalse: require boolean value'
 ! !
 
 ! Object methodsFor: 'printing' !
@@ -503,7 +506,7 @@ storeString
 
 storeOn: aStream
 	"Store the object onto the stream."
-	aStream put: 'nil'.
+	aStream nextPutAll: 'nil'.
 ! !
 
 ! Undefined methodsFor: 'class hierarchy' !

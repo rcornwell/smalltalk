@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Image reader/writer.
  *
  * $Log: image.c,v $
+ * Revision 1.6  2002/02/07 04:21:04  rich
+ * Extract path on image load and change to it's directory before starting it.
+ *
  * Revision 1.5  2001/08/29 20:16:35  rich
  * Added support for graphics system.
  *
@@ -23,7 +26,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: image.c,v 1.5 2001/08/29 20:16:35 rich Exp rich $";
+	"$Id: image.c,v 1.6 2002/02/07 04:21:04 rich Exp $";
 
 #endif
 

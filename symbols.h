@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: symbols.h,v 1.2 2000/02/01 18:10:05 rich Exp rich $
+ * $Id: symbols.h,v 1.3 2001/08/01 16:44:08 rich Exp $
  *
  * $Log: symbols.h,v $
+ * Revision 1.3  2001/08/01 16:44:08  rich
+ * Added thisContext variable.
+ *
  * Revision 1.2  2000/02/01 18:10:05  rich
  * Added Operand Class for sendSpec
  *

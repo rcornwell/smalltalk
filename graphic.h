@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Interface to graphics system
  *
- * $Id: graphic.h,v 1.1 2001/08/18 16:20:57 rich Exp rich $
+ * $Id: graphic.h,v 1.2 2002/01/16 19:11:51 rich Exp $
  *
  * $Log: graphic.h,v $
+ * Revision 1.2  2002/01/16 19:11:51  rich
+ * Return exception code in place holder of scanword.
+ *
  * Revision 1.1  2001/08/18 16:20:57  rich
  * Initial revision
  *

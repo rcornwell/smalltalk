@@ -1,9 +1,15 @@
 " Basic GUI applications for Smalltalk. "
 
-" $Id: guiapps.st,v 1.1 2002/01/29 16:41:50 rich Exp rich $ "
+" $Id: guiapps.st,v 1.2 2002/02/17 13:41:59 rich Exp rich $ "
 
 "
  $Log: guiapps.st,v $
+ Revision 1.2  2002/02/17 13:41:59  rich
+ Added new methods to Browser class.
+ Made DisplayScreen initSystem method work.
+ Fixed Notifier.
+ Added Workspace window.
+
  Revision 1.1  2002/01/29 16:41:50  rich
  Initial revision
 
@@ -30,7 +36,7 @@ isControlActive
 controlActivity
   self viewHasCursor
       ifTrue: [ super controlActivity ]
-!
+! !
 
 ! NotifyController methodsFor: 'blue button menu items' !
 
@@ -52,7 +58,7 @@ traceDump
   model isNil
       ifTrue: [ ^nil ].
   model traceDump
-!
+! !
 
 Object subclass: 'Notifier'
 instanceVariableNames: 'status theMessage backtraceList'
@@ -70,7 +76,7 @@ message: aString
 ! Notifier methodsFor: 'initialising' !
 
 message: aString
-    | width height x y aStream contentsList topView subView extent |
+    | aStream contentsList topView subView |
 	stderr nextPutAll: 'Notifier: '.
 	stderr nextPutAll: aString.
 	stderr nl.

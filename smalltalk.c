@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main routine.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.7  2001/08/29 20:16:35  rich
+ * Added support for X.
+ * Added endSystem() function to cleanup before exiting.
+ *
  * Revision 1.6  2001/08/18 16:17:02  rich
  * Moved windows code to win32.c.
  * Made main generic between windows and unix.
@@ -26,7 +30,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smalltalk.c,v 1.6 2001/08/18 16:17:02 rich Exp rich $";
+	"$Id: smalltalk.c,v 1.7 2001/08/29 20:16:35 rich Exp rich $";
 #endif
 
 #include "smalltalk.h"
@@ -52,7 +56,19 @@ main(int argc, char *argv[])
 
    /* Process arguments */
     progname = *argv;
-    while ((str = *++argv) != NULL) {
+
+   /* Remove quotes around name which windows seem to like to 
+    * do under Visual C.
+    */
+    if (*progname == '"') {
+	progname++;
+	for(str = progname; str[1] != '\0'; str++);
+	if (*str == '"')
+	    *str = '\0';
+    }
+
+    while (--argc > 0) {
+	str = *++argv;
 	if (*str == '=') {
 	    geometry = str;
 	} else if (*str == '-') {
@@ -62,14 +78,17 @@ main(int argc, char *argv[])
 		    if (imagename != NULL)
 			goto error;
 		    imagename = *++argv;
+		    argc--;
 		    break;
 		case 'o':	/* Object table size */
 		    if (!getnum(*++argv, &defotsize))
 			goto error;
+		    argc--;
 		    break;
 		case 'g':	/* Grow size */
 		    if (!getnum(*++argv, &growsize)) 
 		        goto error;
+		    argc--;
 		    break;
 		default:
 		    goto error;
@@ -111,7 +130,7 @@ main(int argc, char *argv[])
 		*ptr = '\0';
 	    }
 	    if (*ptr == '\\' || *ptr == '/') {
-		last = ptr;
+		last = ++ptr;
 		/* advance to end of string */
 		while (*ptr != '\0')
 		    ptr++;
@@ -143,7 +162,7 @@ main(int argc, char *argv[])
         smallinit(defotsize);
        /* Compile into system */
 	if (loadfile != NULL)
-	    parsefile(loadfile);
+	    load_source(loadfile);
 	else {
 	    errorStr("No image found", NULL);
 	    endSystem();

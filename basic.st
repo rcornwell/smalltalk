@@ -1,9 +1,13 @@
 " Bootstrap methods to define classes"
 
-" $Id: basic.st,v 1.5 2001/07/31 14:09:47 rich Exp rich $ "
+" $Id: basic.st,v 1.6 2001/08/29 20:16:34 rich Exp $ "
         
 "
  $Log: basic.st,v $
+ Revision 1.6  2001/08/29 20:16:34  rich
+ Added negated method to Number.
+ Always add subclass to set of subclasses.
+
  Revision 1.5  2001/07/31 14:09:47  rich
  Code cleanup
  Make methods consitent with rest of system.

@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.9  2001/08/29 20:16:35  rich
+ * Make sure we don't have any events waiting when we start a new image.
+ *
  * Revision 1.8  2001/08/18 16:17:01  rich
  * Added support for graphics system.
  * Added support for large integers.
@@ -40,7 +43,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
+	"$Id: init.c,v 1.9 2001/08/29 20:16:35 rich Exp rich $";
 
 #endif
 
@@ -122,6 +125,8 @@ struct _class_template {
     { AssociationClass, CLASS_PTRS, 2, ObjectClass, "Association",
 		 "key value" },
     { SSetClass, CLASS_PTRS | CLASS_INDEX, 1, ObjectClass, "Set", "tally" },
+    { FileClass, CLASS_PTRS, 3, ObjectClass, "File", 
+	     "name mode position" },
 };
 
 char               *specialSelector[32] =
@@ -140,10 +145,10 @@ struct _prims {
      char		*cat;
 } prims[] = {
     { ClassClass, "comment:", 1, primitiveClassComment, "accessing"},
-    { ClassClass, "methodsFor:", 1, primitiveMethodsFor, "creating"}
+    { ClassClass, "methodsFor:", 1, primitiveMethodsFor, "creating"},
+/*    { FileClass,  "loadFile:", 1, primitiveFileLoad, "loading"} */
 };
 
-void fileinMethods(Objptr);
 
 /*
  * Initialize the classes from template.
@@ -306,7 +311,7 @@ loadPrimitives()
 		 as_oop(METH_EXTEND | (METH_NUMLITS & (1<<1))));
         Set_object(method, METH_LITSTART,
 		 as_oop((EMETH_PRIM & (prims[i].primnum << 1)) |
-			(EMETH_ARGS & (prims[i].args << 16))));
+			(EMETH_ARGS & (prims[i].args << 17))));
 
         /* Add it to class */
         AddSelectorToClass(prims[i].class, prims[i].selector,
@@ -407,10 +412,19 @@ smallinit(int otsize)
 	create_association(internString("Processor"),
 				 SchedulerAssociationPointer)); 
     AddSelectorToDictionary(SmalltalkPointer,
-	create_association(internString("initSourceFile"),
-				 create_new_object(ArrayClass, 3)));
-    AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("charsymbols"), CharacterTable));
+
+    /* Create a object to old initial source file name. */
+    AddSelectorToDictionary(SmalltalkPointer,
+	create_association(internString("initSourceFile"), 
+    		create_new_object(FileClass, 0)));
+
+#if 0
+    /* Create a object to hold currently loading source file */
+    AddSelectorToDictionary(SmalltalkPointer,
+	create_association(internString("currentSourceFile"),
+				 create_new_object(FileClass, 0)));
+#endif
 
     for (i = 0; i < 32; i++)
 	if (specialSelector[i] != NULL)
@@ -498,80 +512,4 @@ load_file(char *str)
 
     interp();
 }
-
-void
-parsefile(char *str)
-{
-    Objptr              fp;
-    Objptr		meth;
-    Objptr		newContext;
-    int			header;
-    int			stacksize;
-    char               *ptr;
-    int			filein = FALSE;
-
-    if ((fp = new_file(str, "r")) == NilPtr)
-	return;
-
-    while (TRUE) {
-	filein = peek_for(fp, '!');
-        ptr = get_chunk(fp);
-	if (ptr == NULL || *ptr == '\0') {
-	    if (ptr != NULL)
-		free(ptr);
-	    break;
-	}
-	show_source(ptr);
-        meth = CompileForExecute(ptr);
-
-        header = get_pointer(meth, METH_HEADER);
-        stacksize = StackOf(header) + TempsOf(header);
-
-        /* Initialize a new method. */
-        newContext = create_new_object(MethodContextClass, stacksize);
-	object_incr_ref(newContext);
-    	rootObjects[CURCONT] = newContext;
-        Set_object(newContext, BLOCK_SENDER, NilPtr);
-        Set_integer(newContext, BLOCK_IP, 
-		sizeof(Objptr) *(LiteralsOf(header) + METH_LITSTART));
-        Set_integer(newContext, BLOCK_SP,
-            	size_of(newContext) / sizeof(Objptr));
-        Set_object(newContext, BLOCK_METHOD, meth);
-        Set_integer(newContext, BLOCK_IIP, 0);
-        Set_object(newContext, BLOCK_REC, fp);
-        Set_integer(newContext, BLOCK_ARGCNT, 0);
-        current_context = newContext;
-        newContextFlag = 1;
-	rootObjects[TEMP1] = NilPtr;
-        interp();
-	/* Break cycle */
-        Set_object(newContext, BLOCK_SENDER, NilPtr);
-	object_decr_ref(newContext);
-	if (filein) 
-	    fileinMethods(fp);
-	free(ptr);
-    }
-    close_buffer(fp);
-}
-
-void
-fileinMethods(Objptr fp)
-{
-    char	*ptr;
-    int		position;
-
-    position = get_integer(fp, FILEPOS);
-    ptr = get_chunk(fp);
-    while (ptr != NULL && *ptr != '\0') {
-	show_source(ptr);
-	CompileForClass(ptr, compClass, compCatagory, position);
-	free(ptr);
-        position = get_integer(fp, FILEPOS);
-	ptr = get_chunk(fp);
-    }
-    if (ptr != NULL)
-	free(ptr);
-}
-
-
 

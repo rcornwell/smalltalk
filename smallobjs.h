@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.6 2001/08/18 16:17:02 rich Exp rich $
+ * $Id: smallobjs.h,v 1.7 2001/08/29 20:16:35 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.7  2001/08/29 20:16:35  rich
+ * Added cursor support.
+ *
  * Revision 1.6  2001/08/18 16:17:02  rich
  * Added support for LargeInteger and graphics system.
  *
@@ -199,6 +202,7 @@
 
 
 /* Class Filename */
+#define FileClass		((Objptr)86)
 #define FILENAME		0
 #define FILEMODE		1
 #define FILEPOS			2

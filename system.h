@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Interface to system
  *
- * $Id: system.h,v 1.2 2001/08/29 20:16:35 rich Exp rich $
+ * $Id: system.h,v 1.3 2002/02/07 04:21:05 rich Exp $
  *
  * $Log: system.h,v $
+ * Revision 1.3  2002/02/07 04:21:05  rich
+ * Added function to change directory.
+ *
  * Revision 1.2  2001/08/29 20:16:35  rich
  * Added endSystem method to shut graphics system down.
  *

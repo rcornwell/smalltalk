@@ -1,7 +1,10 @@
-" $Id: collection.st,v 1.7 2001/08/29 20:16:34 rich Exp rich $ "
+" $Id: collection.st,v 1.8 2001/09/17 20:19:55 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.8  2001/09/17 20:19:55  rich
+ Fixed bug in Collection::includes:
+
  Revision 1.7  2001/08/29 20:16:34  rich
  Added class definitions
 
@@ -370,6 +373,7 @@ indexOfSubCollection: aSubCollection startingAt: anIndex
 !
 
 replaceFrom: start to: stop with: replacementCollection startingAt: repStart
+   <primitive 142>
     (self == replacementCollection and: [ repStart ~= 1 ])
         ifTrue: [ ^self error: 'replaceFrom:to:with:startingAt: called for 
 in-place replacement, but starting index was not 1' ].
@@ -2276,7 +2280,7 @@ includesKey: key
 
 removeKey: key ifAbsent: aBlock
     | index value|
-    index <- self findKeyIndexNoGrow: key ifAbsent: [ ^aBlock value ].
+    index <- self findKeyIndex: key ifFull: [ ^aBlock value ].
     value <- values basicAt: index.
     self basicAt: index put: nil.
     values basicAt: index put: nil.

@@ -1,9 +1,12 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.8 2002/01/16 19:11:51 rich Exp rich $ "
+" $Id: process.st,v 1.9 2002/02/17 13:41:59 rich Exp $ "
 
 "
  $Log: process.st,v $
+ Revision 1.9  2002/02/17 13:41:59  rich
+ Fixed bugs in generating stack trace.
+
  Revision 1.8  2002/01/16 19:11:51  rich
  Added willBlock method to Semaphore class.
  Fixed priority returns for ProcessScheduler.

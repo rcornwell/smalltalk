@@ -1,0 +1,69 @@
+
+Status:
+#about.c	Working.
+#code.c		Working.
+#dump.c		Working.
+#fileio.c	Working.
+#image.c	Working.
+#init.c		Working
+#interp.c	Working
+#lex.c		Working
+#object.c	Working
+#parse.c	Working.
+#primitive.c	Working.
+#smalltalk.c	Working
+#symbols.c	Working.
++largint.c	Debuging, bugs in large_divide and maybe large_mult.
+#graphic.c	Working.
+#xwin.c		Working.
+#win32.c	Working.
+
+
+#boottail.st	Working.
+#basic.st	Working.
+#behavior.st	Working.
+#collection.st	Working.
+#compile.st	Working.
+#magnitude.st	Working.
+misc.st		Untested.
+#object.st	Working.
+#process.st	Working.
+#stream.st	Working.
+#graphic.st	Working.
++system.st	Working, need to add more methods to System.
++font.st	Working.
++mvc.st		Alot of work, fix TextView, write more widgets.
++guiapps.st	Alot of work, write applications.
+
+ Fix bug in one event delay for mouse and keyboard events.
+
+Impliment GUI widgets.
+   TextView undo, again.
+   SwitchView.
+   BooleanView.
+   DisplayTextView.
+   PromptView.
+   TextCollector.
+   CodeView.
+   FormView.
+Impliment Gui applications.
+   WorkSpace started.
+   Notifier sort of working.
+   Prompter.
+   Confirmer.
+   Browser.
+   Transcript.
+   Add debuging information into compiler.
+   Debugger.
+   FormEditor.
+   Project Support.
+Write *RunArray, *TextStyle, *Text.
+Fix floor and ceiling and float to integer conversion to work with
+ largeintegers.
+Add code to count operations, and estimate preformace.
+Profile code and improve preformace.
+Redo object representation to improve preformace.
+Write help file.
+Write Readme file.
+*Package as product.
+

@@ -1,9 +1,12 @@
 " Methods for Class magnitude and all it's subclasses"
 
-" $Id: magnitude.st,v 1.7 2002/01/29 16:40:38 rich Exp rich $ "
+" $Id: magnitude.st,v 1.8 2002/02/17 13:41:59 rich Exp $ "
 
 "
  $Log: magnitude.st,v $
+ Revision 1.8  2002/02/17 13:41:59  rich
+ Fixed bug in value of CR.
+
  Revision 1.7  2002/01/29 16:40:38  rich
  Fixed bug in Integer quo:
 

@@ -1,0 +1,182 @@
+/*
+ *
+ *  SmallEdit
+ *
+ *  Smalledit resources.
+ *
+ * Copyright 1999 Richard P. Cornwell All Rights Reserved,
+ *
+ * The software is provided "as is", without warranty of any kind, express
+ * or implied, including but not limited to the warranties of
+ * merchantability, fitness for a particular purpose and non-infringement.
+ * In no event shall Richard Cornwell be liable for any claim, damages
+ * or other liability, whether in an action of contract, tort or otherwise,
+ * arising from, out of or in connection with the software or the use or other
+ * dealings in the software.
+ *
+ * Permission to use, copy, and distribute this software and its
+ * documentation for non commercial use is hereby granted,
+ * provided that the above copyright notice appear in all copies and that
+ * both that copyright notice and this permission notice appear in
+ * supporting documentation.
+ *
+ * The sale, resale, or use of quick installer for profit without the
+ * express written consent of the author Richard Cornwell is forbidden.
+ * Please see attached License file for information about using this
+ * package in commercial applications, or for commercial software distribution.
+ *
+ */
+
+/*
+ * $Id: smalledit.rc,v 1.1 2002/02/17 13:43:17 rich Exp $
+ *
+ * $Log: smalledit.rc,v $
+ * Revision 1.1  2002/02/17 13:43:17  rich
+ * Initial revision
+ *
+ *
+ */
+
+#include <windows.h>
+#include <winver.h>
+#include "smalledit.h"
+#include "about.h"
+
+#ifndef SS_PATHELLIPSIS
+#define SS_PATHELLIPSIS 0x00008000L
+#endif
+
+SMALLEDIT ICON smalledit.ico
+2 ICON smallfile.ico
+
+VS_VERSION_INFO	VERSIONINFO
+	FILEVERSION	1,0,2,0
+	PRODUCTVERSION	1,0,2,0
+	FILEFLAGSMASK	VS_FFI_FILEFLAGSMASK
+	FILEFLAGS	VS_FF_PRERELEASE|VS_FF_DEBUG
+	FILEOS		VOS_DOS_WINDOWS32
+	FILETYPE	VFT_APP
+	FILESUBTYPE	VFT_UNKNOWN
+	BEGIN
+	   BLOCK "StringFileInfo"
+	   BEGIN
+	      BLOCK "040904e4"
+	      BEGIN
+		VALUE  "CompanyName",	"Richard Cornwell\0"
+		VALUE  "FileDescription", "Small Edit\0"
+		VALUE  "FileVersion",	VERSION "\0"
+		VALUE  "InternalName",  APPNAME "\0"
+		VALUE  "LegalCopyright", "2001 Richard Cornwell\0"
+		VALUE  "OriginalFilename", APPNAME "\0"
+		VALUE  "ProductName", "Smalltalk\0"
+		VALUE  "ProductVersion", VERSION "\0" 
+		VALUE  "Email", "skyvis@best.com\0"
+	      END
+	   END
+	   BLOCK "VarFileInfo"
+	   BEGIN
+		VALUE	"Translation", 0x409, 1252
+           END
+       END
+
+Smalledit MENU
+    BEGIN
+	POPUP	"&File"
+	   BEGIN
+		MENUITEM "&New	Ctrl+N",	IDM_NEW
+		MENUITEM "&Open	Ctrl+O",	IDM_OPEN
+		MENUITEM "&Save	Ctrl+S",	IDM_SAVE
+		MENUITEM "Save &As...",		IDM_SAVEAS
+		MENUITEM SEPARATOR
+		MENUITEM "&Print	Ctrl+P", IDM_PRINT
+		MENUITEM SEPARATOR
+		MENUITEM "E&xit", 		IDM_EXIT
+	   END
+	POPUP	"&Edit"
+	BEGIN
+		MENUITEM "&Undo	Ctrl+Z",	IDM_UNDO
+		MENUITEM SEPARATOR
+		MENUITEM "Cu&t	Ctrl+X",	IDM_CUT
+		MENUITEM "&Copy	Ctrl+C",	IDM_COPY
+		MENUITEM "&Paste	Ctrl+V",	IDM_PASTE
+		MENUITEM "De&lete	Del",	IDM_CLEAR
+		MENUITEM SEPARATOR
+		MENUITEM "&Select All", 	IDM_SELALL
+	END
+	POPUP	"&Search"
+	BEGIN
+		MENUITEM "&Find	Ctrl+F",	IDM_FIND
+		MENUITEM "Find &Next	F3",	IDM_NEXT
+		MENUITEM "R&eplace	Ctrl+R", IDM_REPLACE
+	END
+	POPUP	"&Help"
+	BEGIN
+		MENUITEM "&Help	F1",IDM_HELP
+		MENUITEM SEPARATOR
+		MENUITEM "&About Smalledit...",	IDM_ABOUT
+	END
+    END
+
+SMALLEDIT ACCELERATORS
+    BEGIN
+	"^N",		IDM_NEW
+	"^O",		IDM_OPEN
+	"^S",		IDM_SAVE
+	"^P",		IDM_PRINT
+	"^Z",		IDM_UNDO
+	VK_BACK,	IDM_UNDO, VIRTKEY, ALT
+	"^X",		IDM_CUT
+	VK_DELETE,	IDM_CUT, VIRTKEY, SHIFT
+	"^C",		IDM_COPY
+	VK_INSERT,	IDM_COPY, VIRTKEY, CONTROL
+	"^V",		IDM_PASTE
+	VK_INSERT,	IDM_PASTE, VIRTKEY, SHIFT
+	VK_DELETE, 	IDM_CLEAR, VIRTKEY
+	"^F",		IDM_FIND
+	VK_F3,		IDM_NEXT, VIRTKEY
+	"^R",		IDM_REPLACE
+	VK_F1,		IDM_HELP, VIRTKEY
+    END
+
+
+PrintDlgBox DIALOG 20, 20, 100, 76
+	STYLE	WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_VISIBLE
+	CAPTION	"Small Edit"
+	FONT	8, "MS Shell Dlg"
+	BEGIN
+	CTEXT	"Sending",			-1, 0, 10, 100, 8
+	CTEXT	"",			 IDD_FNAME, 0, 20, 100, 8
+	CTEXT	"to Print Spooler.",		-1, 0, 30, 100, 8
+	DEFPUSHBUTTON "Cancel",		 IDCANCEL, 34, 50, 32, 14, WS_GROUP
+	END
+
+STRINGTABLE BEGIN
+	IDS_SAVEFILE,	"Save current changes in %s?"
+	IDS_READERR	"File %s cannot be read!"
+	IDS_WRITERR	"Could not write file %s"
+	IDS_PRINTERR	"Could not print file %s"
+	IDS_HELPERR	"Help not implmented yet!"
+	IDS_TEXTNOTFND	"Text not Found!"
+
+	IDS_TNEW	"New"
+	IDS_TOPEN	"Open"
+	IDS_TSAVE	"Save"
+	IDS_TSAVEAS	"Save As..."
+	IDS_TPRINT	"Print"
+	IDS_TEXIT	"Exit"
+	
+	IDS_TUNDO	"Undo"
+	IDS_TCUT	"Cut"
+	IDS_TCOPY	"Copy"
+	IDS_TPASTE	"Paste"
+	IDS_TCLEAR	"Clear"
+	IDS_TSELALL	"Select All"
+	
+	IDS_TFIND	"Find"
+	IDS_TNEXT	"Find Next"
+	IDS_TREPLACE	"Replace"
+
+	IDS_THELP	"Help"
+	IDS_TABOUT	"About"
+END
+

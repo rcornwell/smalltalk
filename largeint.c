@@ -1,13 +1,16 @@
 /*
  * Smalltalk largeint: Routines for handling large integers.
  *
- * $Log: $
+ * $Log: largeint.c,v $
+ * Revision 1.1  2001/08/18 16:18:12  rich
+ * Initial revision
+ *
  *
  *
  */
 
 #ifndef lint
-static char        *rcsid = "$Id: $";
+static char        *rcsid = "$Id: largeint.c,v 1.1 2001/08/18 16:18:12 rich Exp $";
 
 #endif
 

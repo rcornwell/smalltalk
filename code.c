@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.8  2001/08/18 16:17:00  rich
+ * Moved error routines to system.h
+ *
  * Revision 1.7  2001/08/01 16:42:31  rich
  * Added Pshint instruction.
  * Moved sendsuper to group 2.
@@ -35,7 +38,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
+	"$Id: code.c,v 1.8 2001/08/18 16:17:00 rich Exp $";
 
 #endif
 

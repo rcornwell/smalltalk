@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Interface for large integer routines.
  *
- * $Id: $
+ * $Id: largeint.h,v 1.1 2001/08/18 16:18:12 rich Exp $
  *
- * $Log: $
+ * $Log: largeint.h,v $
+ * Revision 1.1  2001/08/18 16:18:12  rich
+ * Initial revision
+ *
  *
  */
 

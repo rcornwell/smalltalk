@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.8  2001/08/18 16:17:01  rich
+ * Moved system error routines to system.h
+ *
  * Revision 1.7  2001/08/01 16:42:31  rich
  * Added Pshint instruction.
  * Moved sendsuper to group 2.
@@ -35,7 +38,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
+"$Id: dump.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -90,6 +93,10 @@ dump_object_value(Objptr op)
 
     if (is_integer(op)) {
 	sprintf(buffer, "Integer %d", as_integer(op));
+	return buffer;
+    }
+    if (!notFree(op)) {
+	sprintf(buffer, "***FREE OBJECT %d*****", as_integer(op));
 	return buffer;
     }
     class = class_of(op);
@@ -714,7 +721,10 @@ dump_getinst(Objptr op, int inst, Objptr value)
     strcat(buffer, dump_object_value(value));
     dump_string(buffer);
 }
+#endif
 
+
+#ifdef TRACE_SEND
 /*
  * Report on success or failure of a primitive.
  */
@@ -726,10 +736,7 @@ dump_primitive(int flag, int number)
    strcat(buffer, (flag)?"Success":"Failed");
    dump_string(buffer);
 }
-#endif
 
-
-#ifdef TRACE_SEND
 /*
  * Dump message send information.
  */

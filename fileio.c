@@ -2,6 +2,12 @@
  * Smalltalk interpreter: File IO routines.
  *
  * $Log: fileio.c,v $
+ * Revision 1.6  2001/08/18 16:17:01  rich
+ * Moved system specific routines to their own file.
+ * Added rest of directory management routines.
+ * Made sure write-only files work correctly.
+ * Redid console reading routines.
+ *
  * Revision 1.5  2001/07/31 14:09:48  rich
  * Fixed to compile with new cygwin
  * Made sure open append mode under windows works correctly.
@@ -28,7 +34,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: fileio.c,v 1.5 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: fileio.c,v 1.6 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -42,31 +48,63 @@ static char        *rcsid =
 struct file_buffer *files = NULL;
 struct file_buffer console;
 
-Objptr
-new_file(char *name, char *mode)
+void
+load_source(char *str)
 {
     Objptr              fp;
 
     /* Locate file name vector */
     fp = FindSelectorInDictionary(SmalltalkPointer,
 				internString("initSourceFile"));
-    if (fp == NilPtr)
-	return NilPtr;
+    if (fp == NilPtr) {
+	error("Unable to open initial file");
+        return;
+    }
 
     fp = get_pointer(fp, ASSOC_VALUE);
-    if (fp == NilPtr)
-      return NilPtr;
-
-    Set_object(fp, FILENAME, MakeString(name));
-    Set_object(fp, FILEMODE, MakeString(mode));;
+    Set_object(fp, FILENAME, MakeString(str));
+    Set_object(fp, FILEMODE, MakeString("r"));;
     Set_integer(fp, FILEPOS, 0);
 
    /* Try opening it */
     if (open_buffer(fp)) {
 	object_incr_ref(fp);
-	return fp;
-    } else
-	return NilPtr;
+    	parsesource(fp);
+        close_buffer(fp);
+    }
+}
+
+void
+parsefile(Objptr src)
+{
+    Objptr              fp;
+
+    /* Locate file name vector */
+#if 0
+    fp = FindSelectorInDictionary(SmalltalkPointer,
+				internString("currentSourceFile"));
+    if (fp == NilPtr) {
+	error("Unable to open source file");
+        return;
+    }
+
+    fp = get_pointer(fp, ASSOC_VALUE);
+#endif
+    fp = create_new_object(FileClass, 0);
+#if 0
+    AddSelectorToDictionary(SmalltalkPointer,
+        create_association(internString("currentSourceFile"), fp));          
+#endif
+    Set_object(fp, FILENAME, src);
+    Set_object(fp, FILEMODE, MakeString("r"));;
+    Set_integer(fp, FILEPOS, 0);
+
+   /* Try opening it */
+    if (open_buffer(fp)) {
+	object_incr_ref(fp);
+	parsesource(fp);
+	close_buffer(fp);
+    } 
 }
 
 /*

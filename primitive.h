@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: primitive.h,v 1.5 2001/01/17 01:40:54 rich Exp rich $
+ * $Id: primitive.h,v 1.6 2001/08/18 16:17:02 rich Exp rich $
  *
  * $Log: primitive.h,v $
+ * Revision 1.6  2001/08/18 16:17:02  rich
+ * Added primitives for largeinteger and graphics system.
+ *
  * Revision 1.5  2001/01/17 01:40:54  rich
  * Added primitives to flush method cache.
  *
@@ -163,6 +166,8 @@
 #define primitiveBitAt			138
 #define primitiveBitAtPut		139
 #define primitiveIdleWait		140
+#define primitiveFileLoad		141
+#define primitiveReplaceFromTo		142
 
 int                 arrayAt(Objptr, int, Objptr *);
 int                 arrayPutAt(Objptr, int, Objptr);

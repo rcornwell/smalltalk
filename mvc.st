@@ -1,9 +1,12 @@
 " Model View Controller methods for Smalltalk. "
 
-" $Id: mvc.st,v 1.1 2002/01/29 16:41:34 rich Exp rich $ "
+" $Id: mvc.st,v 1.2 2002/02/17 13:41:59 rich Exp rich $ "
 
 "
  $Log: mvc.st,v $
+ Revision 1.2  2002/02/17 13:41:59  rich
+ Major rewrite of TextView to be a full fledged editor.
+
  Revision 1.1  2002/01/29 16:41:34  rich
  Initial revision
 
@@ -183,6 +186,7 @@ unschedule: aScheduledController
         ifTrue: [ ^nil ].
     newControllers <- OrderedCollection new: controllers basicSize.
     1 to: index - 1 do: [ :i | newControllers add: (controllers at: i) ].
+    index + 1 to: controllers size do:
         [ :i | newControllers add: (controllers at: i) ].
     controllers become: newControllers.
     aScheduledController = activeController
@@ -1080,11 +1084,7 @@ subViewWantingControl
 !
 
 update
-    ^self update: self
-!
-
-update: aParameter
-    ^nil
+    ^self update: name
 !
 
 offset

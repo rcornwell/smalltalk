@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Lexiconal Scanner.
  *
- * $Id: lex.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: lex.h,v 1.2 2000/02/01 18:09:54 rich Exp $
  *
  * $Log: lex.h,v $
+ * Revision 1.2  2000/02/01 18:09:54  rich
+ * Pushback now just single character.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *

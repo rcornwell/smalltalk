@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Image saveing/loading routines.
  *
- * $Id: $
+ * $Id: image.h,v 1.1 1999/09/02 15:57:59 rich Exp $
  *
- * $Log: $
+ * $Log: image.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 

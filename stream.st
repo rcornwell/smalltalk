@@ -1,9 +1,13 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: stream.st,v 1.6 2001/08/18 16:17:02 rich Exp rich $ "
+" $Id: stream.st,v 1.7 2001/09/17 20:19:55 rich Exp $ "
 
 "
  $Log: stream.st,v $
+ Revision 1.7  2001/09/17 20:19:55  rich
+ Added upToAny:
+ Fixed bug in open:mode:ifFail:
+
  Revision 1.6  2001/08/18 16:17:02  rich
  Changed classes and methods to correct categories.
  Finished directory management primitives.

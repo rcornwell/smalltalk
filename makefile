@@ -27,8 +27,8 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
 	   behavior.st system.st boottail.st
 SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
-	   behavior.st process.st system.st graphic.st font.st mvc.st \
-	   guiapps.st
+	   behavior.st process.st system.st graphic.st #font.st mvc.st \
+#	   guiapps.st
 
 all:	smalledit.exe $(PROJ).sti 
 

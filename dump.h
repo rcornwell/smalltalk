@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Object Dumper.
  *
- * $Id: dump.h,v 1.3 2000/03/05 17:25:31 rich Exp rich $
+ * $Id: dump.h,v 1.4 2001/02/05 03:44:37 rich Exp rich $
  *
  * $Log: dump.h,v $
+ * Revision 1.4  2001/02/05 03:44:37  rich
+ * Code cleanup
+ *
  * Revision 1.3  2000/03/05 17:25:31  rich
  * Exported dump_class_name
  *
@@ -62,17 +65,17 @@ void		    dump_code(void *);
 #define trace_inst(a, b, c, d, e, f) dump_inst(a, b, c, d, e, f)
 #define trace_getinst(a, b, c)	dump_getinst(a, b, c)
 #define trace_setinst(a, b, c)	dump_setinst(a, b, c)
-#define trace_primitive(a, b)	dump_primitive(a, b)
 #else
 #define trace_inst(a, b, c, d, e, f)
 #define trace_getinst(a, b, c)
 #define trace_setinst(a, b, c)
-#define trace_primitive(a, b)
 #endif
 #ifdef TRACE_SEND
 #define trace_send(a, b, c) dump_send(a, b, c)
+#define trace_primitive(a, b)	dump_primitive(a, b)
 #else
 #define trace_send(a, b, c)
+#define trace_primitive(a, b)
 #endif
 #ifdef DUMP_OBJMEM
 #define dump_objstring(a)	dump_string(a)

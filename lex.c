@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Lexiconal Scanner.
  *
  * $Log: lex.c,v $
+ * Revision 1.5  2001/08/18 16:17:01  rich
+ * Moved error routines to system.h
+ *
  * Revision 1.4  2001/07/31 14:09:48  rich
  * Fixed to compile with new cygwin.
  *
@@ -24,7 +27,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: lex.c,v 1.4 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: lex.c,v 1.5 2001/08/18 16:17:01 rich Exp $";
 
 #endif
 

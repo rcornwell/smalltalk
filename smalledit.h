@@ -29,9 +29,12 @@
  */ 
 
 /*
- * $Id: $
+ * $Id: smalledit.h,v 1.1 2002/02/17 13:46:24 rich Exp $
  *
- * $Log: $
+ * $Log: smalledit.h,v $
+ * Revision 1.1  2002/02/17 13:46:24  rich
+ * Initial revision
+ *
  *
  *
  */ 

@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.8  2002/01/29 16:40:38  rich
+ * Removed dead code.
+ *
  * Revision 1.7  2001/08/18 16:17:02  rich
  * Removed section generating incorrect categories.
  *
@@ -36,12 +39,14 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.7 2001/08/18 16:17:02 rich Exp rich $";
+	"$Id: parse.c,v 1.8 2002/01/29 16:40:38 rich Exp rich $";
 
 #endif
 
 #include "smalltalk.h"
 #include "object.h"
+#include "interp.h"
+#include "primitive.h"
 #include "smallobjs.h"
 #include "lex.h"
 #include "symbols.h"
@@ -60,6 +65,7 @@ int                 inBlock;
 int                 optimBlk;
 
 static void         initcompile();
+static void	    fileinMethods(Objptr);
 static void         messagePattern();
 static void         keyMessage();
 static void         doTemps();
@@ -98,6 +104,58 @@ initcompile()
 }
 
 /*
+ * Load a file into the sytem using native compiler.
+ */
+void
+parsesource(Objptr fp)
+{
+    Objptr		meth;
+    char               *ptr;
+    int			filein = FALSE;
+
+    while (TRUE) {
+	/* Get next chunk */
+	filein = peek_for(fp, '!');
+        ptr = get_chunk(fp);
+	if (ptr == NULL)
+	    break;
+	if (*ptr == '\0') {
+	    free(ptr);
+	    break;
+	}
+	show_source(ptr);
+        meth = CompileForExecute(ptr);
+	free(ptr);
+
+	execute(meth, fp);
+	if (filein) 
+	    fileinMethods(fp);
+    }
+}
+
+/*
+ * Compile a block of definitions for a given class.
+ */
+static void
+fileinMethods(Objptr fp)
+{
+    char	*ptr;
+    int		position;
+
+    position = get_integer(fp, FILEPOS);
+    ptr = get_chunk(fp);
+    while (ptr != NULL && *ptr != '\0') {
+	show_source(ptr);
+	CompileForClass(ptr, compClass, compCatagory, position);
+	free(ptr);
+        position = get_integer(fp, FILEPOS);
+	ptr = get_chunk(fp);
+    }
+    if (ptr != NULL)
+	free(ptr);
+}
+
+/*
  * Add a selector to a class and catagory.
  */
 void
@@ -121,7 +179,11 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     /* Add Category */
     rootObjects[TEMP2] = methinfo = create_new_object(MethodInfoClass, 0);
     Set_object(aMethod, METH_DESCRIPTION, methinfo);
+#if 0
     Set_integer(methinfo, METHINFO_SOURCE, 1);
+#else
+    Set_object(methinfo, METHINFO_SOURCE, NilPtr);
+#endif
     Set_integer(methinfo, METHINFO_POS, pos);
     Set_object(methinfo, METHINFO_CAT, aCatagory);
     rootObjects[TEMP2] = NilPtr;
@@ -266,6 +328,7 @@ CompileForExecute(char *text)
     }
     size = ((cstate->code->len) + (sizeof(Objptr) - 1)) / sizeof(Objptr);
     method = create_new_object(CompiledMethodClass, size + litsize);
+    /* Make sure this object does not get freed until we are done with it */
     rootObjects[TEMP1] = method;
     /* Build header */
     Set_object(method, METH_HEADER, as_oop(header));

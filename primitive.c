@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.9  2002/01/16 19:11:51  rich
+ * character_scanword now returns exception in place holder.
+ *
  * Revision 1.8  2001/08/29 20:16:35  rich
  * Fixed bugs in Float floor and ceil function.
  *
@@ -39,7 +42,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.8 2001/08/29 20:16:35 rich Exp rich $";
+	"$Id: primitive.c,v 1.9 2002/01/16 19:11:51 rich Exp rich $";
 
 #endif
 
@@ -585,12 +588,11 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveNext:
 	argument = get_pointer(reciever, STREAMARRAY);
+	otemp = class_of(argument);
+	if (otemp != ArrayClass && otemp != StringClass)
+	    break;
 	IntValue(reciever, STREAMINDEX, index);
 	IntValue(reciever, STREAMREADL, temp);
-	index++;
-	otemp = class_of(argument);
-	if (otemp != ArrayClass || otemp != StringClass)
-	    break;
 	if (index > temp || !arrayAt(argument, index, &res))
 	    break;
 	if (otemp == StringClass) {
@@ -599,21 +601,16 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    } else
 		break;
 	}
+	index++;
 	Set_integer(reciever, STREAMINDEX, index);
 	success = TRUE;
 	break;
 
     case primitiveNextPut:
 	res = get_pointer(reciever, STREAMARRAY);
-	IntValue(reciever, STREAMINDEX, index);
-	IntValue(reciever, STREAMREADL, temp);
-	IntValue(reciever, STREAMWRITEL, iarg);
-	/* Check if room left in collection for insert */
-	if (temp > iarg)
-	   break;
-	index++;
+	/* Check if we can understand this type of stream */
 	otemp = class_of(res);
-	if (otemp != ArrayClass || otemp != StringClass)
+	if (otemp != ArrayClass && otemp != StringClass)
 	    break;
 	if (otemp == StringClass) {
 	    if (IsChar(argument)) 
@@ -621,10 +618,20 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    else
 		 break;
  	}
+	/* Fetch pointers of stream */
+	IntValue(reciever, STREAMINDEX, index);
+	IntValue(reciever, STREAMREADL, temp);
+	IntValue(reciever, STREAMWRITEL, iarg);
+	/* Check if room left in collection for insert */
+	if (index > iarg)
+	   break;
+	/* Store item */
 	if (!arrayPutAt(res, index, argument))
 	    break;
+	/* Update endPtr if we need too */
 	if (index > temp)
-	   Set_integer(reciever, STREAMREADL, index - 1);
+	   Set_integer(reciever, STREAMREADL, index);
+	index++;
 	Set_integer(reciever, STREAMINDEX, index);
 	success = TRUE;
 	break;
@@ -1126,6 +1133,37 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveIdleWait:
 	WaitEvent(1);
+	success = TRUE;
+	break;
+
+    case primitiveFileLoad:
+	parsefile(argument);
+	success = TRUE;
+	break;
+
+    case primitiveReplaceFromTo:
+	IsInteger(argument, index);
+	IsInteger(otemp, iarg);
+	IsInteger(GetStack(4), temp);
+	/* Check class of reciever first. */
+	otemp = class_of(reciever);
+	if (otemp != ArrayClass && otemp != StringClass)
+	    break;
+
+	/* Next check source of copy */
+	res = GetStack(3);
+	otemp = class_of(res);
+	if (otemp != ArrayClass && otemp != StringClass)
+	    break;
+	if (res == reciever && temp != 1)
+	    break;
+	/* Do main copy loop now. */
+	while(index <= iarg) {
+	    if (!arrayAt(res, temp++, &otemp) ||
+     		!arrayPutAt(reciever, index++, otemp))
+	       break;
+	}
+	res = reciever;
 	success = TRUE;
 	break;
 

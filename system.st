@@ -1,10 +1,13 @@
 
 " Last bits and peices of smalltalk system "
 
-" $Id: system.st,v 1.1 2001/08/29 20:17:07 rich Exp rich $ "
+" $Id: system.st,v 1.2 2002/01/29 16:40:38 rich Exp $ "
 
 "
  $Log: system.st,v $
+ Revision 1.2  2002/01/29 16:40:38  rich
+ Added object dependency methods.
+
  Revision 1.1  2001/08/29 20:17:07  rich
  Initial revision
 

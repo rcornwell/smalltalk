@@ -2,6 +2,9 @@
  * Smalltalk graphics: Routines for doing graphics primitive.
  *
  * $Log: graphic.c,v $
+ * Revision 1.5  2002/01/29 16:40:38  rich
+ * Fixed bugs in sizing cliping rectangle.
+ *
  * Revision 1.4  2002/01/16 19:11:51  rich
  * Fixed calculation of when to preload.
  * Fixed error when skew == 0.
@@ -26,7 +29,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: graphic.c,v 1.4 2002/01/16 19:11:51 rich Exp rich $";
+    "$Id: graphic.c,v 1.5 2002/01/29 16:40:38 rich Exp rich $";
 
 #endif
 
@@ -89,6 +92,12 @@ PostEvent(int type, unsigned long value)
 	    asynchronusSignal(tick_semaphore);
     } else {
 	if (input_semaphore != NilPtr) {
+#if 0
+	    char	buffer[1000];
+		wsprintf(buffer, "Posting %d %x", type, value);
+		dump_string(buffer);
+	    dump_char('[');
+#endif
 	    add_event(&input_queue,
 		      as_integer_object((value << 4) + type));
 	    asynchronusSignal(input_semaphore);

@@ -1,9 +1,13 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.8 2001/08/29 20:16:34 rich Exp rich $ "
+" $Id: compile.st,v 1.9 2002/02/17 13:41:59 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.9  2002/02/17 13:41:59  rich
+ Added SyntaxError class.
+ Started adding error handling for GUI subsystem.
+
  Revision 1.8  2001/08/29 20:16:34  rich
  Added class definitions
  Fixed bug with floating point numbers.
@@ -65,6 +69,58 @@ error: aMessage at: aPosition on: aString
 	 i <- i + 1.
     ].
 ! !
+
+Object subclass: 'SmallTalkCodePosition'
+       instanceVariableNames: 'start end'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Compiler' !
+
+! SmallTalkCodePosition class methodsFor: 'creation' !
+
+start: position1 end: position2
+	^ self new start: position1 end: position2 
+!
+
+start: position1
+	^ self new start: position1 
+! !
+
+! SmallTalkCodePosition methodsFor: 'access' !
+
+start
+	^ start
+!
+
+end
+	^ end
+! !
+
+! SmallTalkCodePosition methodsFor: 'modifying' !
+
+start: position1 end: position2
+	start <- position1.
+	end <- position2
+!
+
+start: position1
+	start <- position1
+!
+
+end: position2
+	end <- position2
+! !
+
+! SmallTalkCodePosition methodsFor: 'printing' !
+
+printOn: aStream
+	aStream nextPut: $(.
+	start printOn: aStream.
+	aStream nextPutAll: ', '.
+	end printOn: aStream.
+	aStream nextPut: $)
+! !
+
 
 Object subclass: 'SmallTalkToken'
        instanceVariableNames: 'token stream value curchar pushback first'
@@ -694,7 +750,7 @@ init
 ! !
 
 Object subclass: 'SmallTalkParseNode'
-       instanceVariableNames: 'symbols node'
+       instanceVariableNames: 'symbols node pos'
        classVariableNames: 'ptmp rtmp stmp parg plit pins pint sins jpt jpf jmp sdspc sdsup snd blk rets ret rett retf retn retb pop pvar pself dup pt pf pn pc svar specs'
        poolDictionaries: ''
        category: 'Compiler' !
@@ -707,6 +763,18 @@ new: aTable
 
 new: aTree table: aTable 
 	^ self new init: aTree table: aTable
+!
+
+new: aTable start: aPosition
+	^self new init: aTable start: aPosition
+!
+
+new: aTree table: aTable  start: aPosition
+	^ self new init: aTree table: aTable start: aPosition
+!
+
+new: aTree table: aTable  start: aPosition end: aPosition2
+	^ self new init: aTree table: aTable start: aPosition end: aPosition2
 ! !
 
 ! SmallTalkParseNode class methodsFor: 'Initialize' !
@@ -753,11 +821,31 @@ initialize
 
 init: aTable
 	symbols <- aTable.
+	pos <- SmallTalkCodePosition new.
 	node <- nil
 !
 
 init: aTree table: aTable
 	symbols <- aTable.
+	pos <- SmallTalkCodePosition new.
+	node <- aTree
+!
+
+init: aTable start: aPosition
+	symbols <- aTable.
+	pos <- SmallTalkCodePosition start: aPosition.
+	node <- nil
+!
+
+init: aTree table: aTable start: aPosition
+	symbols <- aTable.
+	pos <- SmallTalkCodePosition start: aPosition.
+	node <- aTree
+!
+
+init: aTree table: aTable start: aPosition end: aPosition2
+	symbols <- aTable.
+	pos <- SmallTalkCodePosition start: aPosition end: aPosition2.
 	node <- aTree
 ! !
 
@@ -801,6 +889,14 @@ canCascade
 
 ! SmallTalkParseNode methodsFor: 'access' !
 
+start
+	^pos start
+!
+
+end
+	^pos end
+!
+
 node
 	^ node
 !
@@ -810,6 +906,14 @@ getInst
 ! !
 
 ! SmallTalkParseNode methodsFor: 'modifying' !
+
+start: aInteger
+	^ pos start: aInteger
+!
+
+end: aInteger
+	^ pos end: aInteger
+!
 
 node: aExpr
 	^ node <- aExpr
@@ -845,15 +949,18 @@ sizeJumpCond: dist
 	^ 2
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
+	self subclassResponsablity
 !
 
-emitForReturn: aStream
-	self emitOn: aStream forEffect: false.
+emitForReturn: aStream position: codePosition
+	self emitOn: aStream position: codePosition forEffect: false.
 	aStream nextPut: ret.
+	codePosition at: aStream position put: pos
 !
 
-emitStore: aStream
+emitStore: aStream position: codePosition
+	self subclassResponsablity
 !
 
 emitOpcode: aStream opc: opc offset: offset
@@ -902,16 +1009,21 @@ SmallTalkParseNode subclass: 'SmallTalkAssignNode'
 
 ! SmallTalkAssignNode class methodsFor: 'creation' !
 
-new: aSymbol expr: aExpr table: aTable
-	^ self new init: aSymbol expr: aExpr table: aTable
+new: aSymbol expr: aExpr table: aTable start: position1 end: position2
+	^ self new init: aSymbol 
+		   expr: aExpr 
+		   table: aTable
+		   start: position1
+		   end: position2
 ! !
 
 ! SmallTalkAssignNode methodsFor: 'modifying' !
 
-init: aSymbol expr: aExpr table: aTable
+init: aSymbol expr: aExpr table: aTable start: position1 end: position2
 	symbols <- aTable.
 	node <- aSymbol.
-	expr <- aExpr
+	expr <- aExpr.
+	pos <- SmallTalkCodePosition start: position1 end: position2
 ! !
 
 ! SmallTalkAssignNode methodsFor: 'accessing' !
@@ -944,10 +1056,14 @@ sizeForEffect: result
 	^ c
 !
 
-emitOn: aStream forEffect: result
-	expr emitOn: aStream forEffect: false.
-	result ifFalse: [ aStream nextPut: dup].
-	node emitStore: aStream
+emitOn: aStream position: codePosition forEffect: result
+	expr emitOn: aStream position: codePosition forEffect: false.
+	result ifFalse: [ 
+	      aStream nextPut: dup.
+	      codePosition at: aStream position put: pos
+	].
+	node emitStore: aStream position: codePosition.
+	codePosition at: aStream position put: pos
 ! !
 
 ! SmallTalkAssignNode methodsFor: 'printing' !
@@ -966,16 +1082,17 @@ SmallTalkParseNode subclass: 'SmallTalkBlockNode'
 
 ! SmallTalkBlockNode class methodsFor: 'creation' !
 
-new: aTable
-	^ self new init: aTable
+new: aTable start: aPosition
+	^ self new init: aTable start: aPosition
 ! !
 
 ! SmallTalkBlockNode methodsFor: 'private' !
 
-init: aTable
+init: aTable start: aPosition
 	symbols <- aTable.
 	node <- OrderedCollection new.
 	args <- OrderedCollection new.
+	pos <- SmallTalkCodePosition start: aPosition.
 	hasreturn <- false.
 ! !
 
@@ -1049,7 +1166,7 @@ sizeForEffect: result
 	^ c
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| c flag |
 	c <- 0.
 	" Count stores for arguments "
@@ -1063,6 +1180,7 @@ emitOn: aStream forEffect: result
 	" Now we know the size, put out block copy "
 	aStream nextPut: blk.
 	aStream nextPut: (args size).
+	codePosition at: aStream position put: pos.
 	" Now jump around the block "
 	self emitJump: aStream distance: c.
 	args do: [ :a | self emitOpcode: aStream opc: stmp offset: a offset ].
@@ -1071,9 +1189,11 @@ emitOn: aStream forEffect: result
 		[ :i | 
 		     c == i ifTrue: [ flag <- hasreturn or: [ result]]
 		 	    ifFalse: [ flag <- true].
-		  (node at: i) emitOn: aStream forEffect: flag.
-		    (c == i and: [ hasreturn not ]) ifTrue:
-		 			[ aStream nextPut: retb].
+		  (node at: i) emitOn: aStream position: codePosition forEffect: flag.
+		    (c == i and: [ hasreturn not ]) ifTrue: [
+			     aStream nextPut: retb.
+			     codePosition at: aStream position put: pos
+			].
 		].
 ! !
 
@@ -1109,7 +1229,102 @@ printOn: aStream
 	aStream nl.
 ! !
 
+SmallTalkParseNode subclass: 'SmallTalkTermNode'
+       instanceVariableNames: ''
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Compiler' !
 
+! SmallTalkTermNode class methodsFor: 'creation' !
+
+new: aNode start: start end: end
+	^self new node: aNode start: start end: end
+! !
+
+! SmallTalkTermNode methodsFor: 'accessing' !
+
+getInst
+	^ node getInst
+! !
+
+! SmallTalkTermNode methodsFor: 'modifying' !
+
+node: aNode start: start end: end
+	node <- aNode.
+	pos <- SmallTalkCodePosition start: start end: end.
+! !
+
+
+! SmallTalkTermNode methodsFor: 'printing' !
+
+printOn: aStream
+	node printOn: aStream
+! !
+
+! SmallTalkTermNode methodsFor: 'generation' !
+
+stack: stack forEffect: result
+	node stack: stack forEffect: result
+!
+
+sizeForEffect: result
+	^ node sizeForEffect: result
+!
+
+emitOn: aStream position: codePosition forEffect: result
+	result ifFalse: [ 
+		node emitOn: aStream position: codePosition forEffect: result.
+	        codePosition at: aStream position put: pos
+	]
+		
+!
+
+sizeForReturn
+	^ node sizeForReturn
+!
+
+emitForReturn: aStream position: codePosition
+	node emitForReturn: aStream position: codePosition.
+        codePosition at: aStream position put: pos
+!
+
+emitStore: aStream position: codePosition
+	node emitStore: aStream position: codePosition.
+        codePosition at: aStream position put: pos
+! !
+
+! SmallTalkTermNode methodsFor: 'testing' !
+
+isLeaf
+	^ node isLeaf
+!
+
+isGetInst
+	^ node isGetInst
+!
+
+isArgOne
+	^ node isArgOne
+!
+
+canStore
+	^ node canStore
+!
+
+canReturn
+	^ node canReturn
+!
+
+isSuper
+	^ node isSuper
+! !
+
+! SmallTalkTermNode methodsFor: 'testing' !
+
+optimize
+	node <- node optimize.
+	^ self
+! !
 
 SmallTalkParseNode subclass: 'SmallTalkLeafNode'
        instanceVariableNames: 'offset'
@@ -1119,8 +1334,12 @@ SmallTalkParseNode subclass: 'SmallTalkLeafNode'
 
 ! SmallTalkLeafNode class methodsFor: 'creation' !
 
-new: aValue offset: aOffset table: aTable
+new: aValue offset: aOffset table: aTable 
 	^self new init: aValue offset: aOffset table: aTable
+!
+
+new: aValue offset: aOffset table: aTable start: aPosition
+	^self new init: aValue offset: aOffset table: aTable start: aPosition
 ! !
 
 ! SmallTalkLeafNode methodsFor: 'testing' !
@@ -1141,6 +1360,14 @@ init: aSymbol offset: aOffset table: aTable
 	symbols <- aTable.
 	offset <- aOffset.
 	node <- aSymbol.
+	pos <- SmallTalkCodePosition new.
+!
+
+init: aSymbol offset: aOffset table: aTable start: aPosition
+	symbols <- aTable.
+	offset <- aOffset.
+	node <- aSymbol.
+	pos <- SmallTalkCodePosition start: aPosition.
 !
 
 offset: aOffset
@@ -1173,7 +1400,7 @@ sizeForEffect: result
 	       ifTrue: [ ^ 0 ].
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	result ifFalse: [ self emitOpcode: aStream opc: plit offset: offset ]
 ! !
 
@@ -1198,7 +1425,7 @@ sizeForEffect: result
 	       ifTrue: [ ^ 0 ].
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| operand |
 	result ifFalse: [ 
 		operand <- node.
@@ -1248,10 +1475,9 @@ getInst
 ! SmallTalkVariableNode methodsFor: 'modifying' !
 
 name: aString type: aSymbol offset: aNumber table: aTable
-	symbols <- aTable.
+	super init: aSymbol offset: aNumber table: aTable.
 	node <- aString.
-	type <- aSymbol.
-	offset <- aNumber.
+	type <- aSymbol
 ! !
 
 ! SmallTalkVariableNode methodsFor: 'testing' !
@@ -1287,14 +1513,15 @@ sizeForReturn
 		ifFalse: [ ^ 1 + (self sizeForEffect: false) ].
 !
 
-emitForReturn: aStream
+emitForReturn: aStream position: codePosition
 	type == #temp
 	    ifTrue: [ self emitOpcode: aStream opc: rtmp offset: offset ]
-	    ifFalse: [ self emitOn: aStream forEffect: false.
+	    ifFalse: [ self emitOn: aStream position: codePosition 
+					forEffect: false.
 		       aStream nextPut: ret ].
 !
 
-emitStore: aStream
+emitStore: aStream position: codePosition
 	| opc |
 	type == #var ifTrue: [
 		aStream nextPut: svar.
@@ -1306,7 +1533,7 @@ emitStore: aStream
 	self emitOpcode: aStream opc: opc offset: offset
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| opc |
 	result ifFalse: [
 		type == #var ifTrue: [
@@ -1353,7 +1580,7 @@ sizeForReturn
 	^ 1
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	result ifFalse: [
 		node == #super ifTrue: [ aStream nextPut: pself ].
 		node == #self ifTrue: [ aStream nextPut: pself ].
@@ -1364,7 +1591,7 @@ emitOn: aStream forEffect: result
 	]
 !
 
-emitForReturn: aStream
+emitForReturn: aStream position: codePosition
 	node == #self ifTrue: [ aStream nextPut: rets ].
 	node == #true ifTrue: [ aStream nextPut: rett ].
 	node == #false ifTrue: [ aStream nextPut: retf ].
@@ -1412,13 +1639,13 @@ sizeForEffect: result
 	^ c
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| flag |
 	1 to: node size do: 
 		[ :i | 
 		  node size == i ifTrue: [ flag <- hasreturn or: [ result]]
 				ifFalse: [ flag <- true].
-		  (node at: i) emitOn: aStream forEffect: flag ].
+		  (node at: i) emitOn: aStream position: codePosition forEffect: flag ].
 ! !
 
 
@@ -1430,15 +1657,16 @@ SmallTalkParseNode subclass: 'SmallTalkCondNode'
 
 ! SmallTalkCondNode class methodsFor: 'creation' !
 
-new: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable
- ^ super new init: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable
+new: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable pos: aPosition
+ ^ super new init: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable pos: aPosition
 ! !
 
 ! SmallTalkCondNode methodsFor: 'modifying' !
 
-init: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable
+init: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable pos: aPosition
 	symbols <- aTable.
 	node <- aExpr.
+        pos <- aPosition.
 	aTBlock isNil 
 	     ifTrue: [ trueClause <- nil ]
 	     ifFalse: [ trueClause <- SmallTalkValueNode newFrom: aTBlock].
@@ -1493,10 +1721,10 @@ sizeForEffect: result
 	^ cc + ce + ct
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| ct ce jmptype joff rt |
 	" Emit condtional part first. "
-	node emitOn: aStream forEffect: false.
+	node emitOn: aStream position: codePosition forEffect: false.
 	trueClause isNil
 		ifTrue: [ ct <- 0.
 			 rt <- false ]
@@ -1515,14 +1743,20 @@ emitOn: aStream forEffect: result
 		 ].
 	" Now jump around body. "
 	self emitJump: aStream distance: joff cond: jmptype.
+	codePosition at: aStream position put: pos.
 	trueClause isNil ifFalse: [
-		 trueClause emitOn: aStream forEffect: result.
+		 trueClause emitOn: aStream
+		            position: codePosition
+			    forEffect: result.
 		 (ce == 0 or: [ rt ]) ifFalse: [
-			self emitJump: aStream distance: ce
+			self emitJump: aStream distance: ce.
+			codePosition at: aStream position put: pos
 		]
 	].
 	falseClause isNil ifFalse:
-		 [ falseClause emitOn: aStream forEffect: result ].
+		 [ falseClause emitOn: aStream
+			       position: codePosition
+			       forEffect: result ]
 ! !
 
 ! SmallTalkCondNode methodsFor: 'printing' !
@@ -1550,17 +1784,18 @@ SmallTalkParseNode subclass: 'SmallTalkLoopNode'
 
 ! SmallTalkLoopNode class methodsFor: 'creation' !
 
-new: aExpr type: aBoolean body: aBlock table: aTable
-   ^ super new init: aExpr type: aBoolean body: aBlock table: aTable
+new: aExpr type: aBoolean body: aBlock table: aTable pos: aPosition
+   ^ super new init: aExpr type: aBoolean body: aBlock table: aTable pos: aPosition
 ! !
 
 ! SmallTalkLoopNode methodsFor: 'modifying' !
 
-init: aExpr type: aBoolean body: aBlock table: aTable
+init: aExpr type: aBoolean body: aBlock table: aTable pos: aPosition
 	symbols <- aTable.
 	node <- SmallTalkValueNode newFrom: aExpr.
 	type  <- aBoolean.
 	body <- SmallTalkValueNode newFrom: aBlock.
+	pos <- aPosition.
 ! !
 
 ! SmallTalkLoopNode methodsFor: 'generation' !
@@ -1585,7 +1820,7 @@ sizeForEffect: result
 	^ cc + cb
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| cb cc |
 	" Cond plus short jump "
 	cc <- 1 + (node sizeForEffect: false).
@@ -1598,12 +1833,14 @@ emitOn: aStream forEffect: result
 	(cc + cb) > 127 ifTrue: [ cb <- cb + 1 ].
 	" Now that we know sizes, generate actual code. "
 	" Emit condition. "
-	node emitOn: aStream forEffect: false.
+	node emitOn: aStream position: codePosition forEffect: false.
 	" Now jump around body. "
+	codePosition at: aStream position put: pos.
 	self emitJump: aStream distance: cb cond: type not.
 	" Now we can output body "
-	body emitOn: aStream forEffect: true.
+	body emitOn: aStream position: codePosition forEffect: true.
 	" Lastly put a jump back to very begining. "
+	codePosition at: aStream position put: pos.
 	self emitJump: aStream distance: ((cb + cc) negated).
 ! !
 
@@ -1625,17 +1862,18 @@ SmallTalkParseNode subclass: 'SmallTalkAndOrNode'
 
 ! SmallTalkAndOrNode class methodsFor: 'creation' !
 
-new: aExpr second: aBlock type: aBoolean table: aTable
-   ^ self new init: aExpr second: aBlock type: aBoolean table: aTable
+new: aExpr second: aBlock type: aBoolean table: aTable pos: aPosition
+   ^ self new init: aExpr second: aBlock type: aBoolean table: aTable pos: aPosition
 ! !
 
 ! SmallTalkAndOrNode methodsFor: 'modifying' !
 
-init: aExpr second: aBlock type: aBoolean  table: aTable
+init: aExpr second: aBlock type: aBoolean  table: aTable pos: aPosition
 	symbols <- aTable.
 	node <- aExpr.
 	second <- SmallTalkValueNode newFrom: aBlock.
-	type <- aBoolean
+	type <- aBoolean.
+	pos <- aPosition
 ! !
 
 ! SmallTalkAndOrNode methodsFor: 'generation' !
@@ -1657,16 +1895,22 @@ sizeForEffect: result
 	^ cc + c2
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| c2 |
-	node emitOn: aStream forEffect: false.
+	node emitOn: aStream position: codePosition forEffect: false.
 	aStream nextPut: dup.
+	codePosition at: aStream position put: pos.
 	c2 <- 1 + (second sizeForEffect: false).
 	" Now jump around body. "
 	self emitJump: aStream distance: c2 cond: type.
+	codePosition at: aStream position put: pos.
 	aStream nextPut: pop.
-	second emitOn: aStream forEffect: false.
-	result ifTrue: [ aStream nextPut: pop ].
+	codePosition at: aStream position put: pos.
+	second emitOn: aStream position: codePosition forEffect: false.
+	result ifTrue: [ 
+		aStream nextPut: pop 
+		codePosition at: aStream position put: pos.
+	].
 ! !
 
 ! SmallTalkAndOrNode methodsFor: 'printing' !
@@ -1686,23 +1930,24 @@ SmallTalkParseNode subclass: 'SmallTalkMessageNode'
 
 ! SmallTalkMessageNode class methodsFor: 'creation' !
 
-new: aExpr table: aTable
-	^ self new init: aExpr selector: nil table: aTable
+new: aExpr table: aTable start: aPosition
+	^ self new init: aExpr selector: nil table: aTable start: aPosition
 
 !
 
-new: aExpr selector: aSymbol table: aTable
-	^ self new init: aExpr selector: aSymbol table: aTable
+new: aExpr selector: aSymbol table: aTable start: aPosition
+	^ self new init: aExpr selector: aSymbol table: aTable start: aPosition
 ! !
 
 ! SmallTalkMessageNode methodsFor: 'modifying' !
 
-init: aExpr selector: aSymbol table: aTable
+init: aExpr selector: aSymbol table: aTable start: aPosition
 	symbols <- aTable.
 	args <- OrderedCollection new.
 	node <- aExpr.
 	selector <- aSymbol.
-	type <- #simple
+	type <- #simple.
+	pos <- SmallTalkCodePosition start: aPosition
 !
 
 selector: aSymbol
@@ -1739,7 +1984,8 @@ optimize
 			^ SmallTalkLoopNode new: node
 				 type: selector == #whileTrue:
 				 body: (args at: 1) 
-				 table: symbols ]
+				 table: symbols
+				 pos: pos ]
 	].
 	" Single clause if or and/or "
 	(argc == 1 and: [ b1 ]) ifTrue: [
@@ -1748,24 +1994,28 @@ optimize
 				    trueClause: (args at: 1)
 				    falseClause: nil
 				    table: symbols
+				    pos: pos
 		].
 		selector == #ifFalse: ifTrue: [
 			^ SmallTalkCondNode new: node
 				    trueClause: nil
 				    falseClause: (args at: 1)
 				    table: symbols
+				    pos: pos
 		].
 		selector == #and: ifTrue: [
 			^ SmallTalkAndOrNode new: node
 				    second: (args at: 1)
 				    type: false
 				    table: symbols
+				    pos: pos
 		].
 		selector == #or: ifTrue: [
 			^ SmallTalkAndOrNode new: node
 				    second: (args at: 1)
 				    type: true
 				    table: symbols
+				    pos: pos
 		].
 	].
 	" Full if/else. "
@@ -1775,12 +2025,14 @@ optimize
 				    trueClause: (args at: 1)
 				    falseClause: (args at: 2)
 				    table: symbols
+				    pos: pos
 		].
 		selector == #ifFalse:ifTrue: ifTrue: [
 			^ SmallTalkCondNode new: node
 				    trueClause: (args at: 2)
 				    falseClause: (args at: 1)
 				    table: symbols
+				    pos: pos
 		].
 	].
 	
@@ -1823,10 +2075,10 @@ sizeForEffect: result
 	^ c
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| opc off |
-	node emitOn: aStream forEffect: false.
-	args do: [ :a | a emitOn: aStream forEffect: false ].
+	node emitOn: aStream position: codePosition forEffect: false.
+	args do: [ :a | a emitOn: aStream position: codePosition forEffect: false ].
 	off <- selector offset.
 	opc <- snd.
 	type == #super
@@ -1838,7 +2090,11 @@ emitOn: aStream forEffect: result
 			self emitOpcode: aStream opc: opc offset: off
 		].
 	aStream nextPut: args size.
-	result ifTrue: [ aStream nextPut: pop ].
+	codePosition at: aStream position put: pos.
+	result ifTrue: [
+		aStream nextPut: pop.
+		codePosition at: aStream position put: pos
+	].
 ! !
 
 ! SmallTalkMessageNode methodsFor: 'printing' !
@@ -1899,7 +2155,9 @@ optimize
     		   selector <- SmallTalkLiteralNode 
 						new: sp key
 						offset: sp value
-						table: self ].
+						table: self
+						start: pos start
+						end: pos end ].
 	^ self
 ! !
 
@@ -1943,12 +2201,6 @@ SmallTalkParseNode subclass: 'SmallTalkMethodNode'
        poolDictionaries: ''
        category: 'Compiler' !
 
-! SmallTalkMethodNode class methodsFor: 'creation' !
-
-new: aTable
-	^ self new init: aTable
-! !
-
 ! SmallTalkMethodNode methodsFor: 'accessing' !
 
 getInst
@@ -1958,8 +2210,7 @@ getInst
 ! SmallTalkMethodNode methodsFor: 'modifying' !
 
 init: aTable
-	symbols <- aTable.
-	node <- OrderedCollection new.
+	super init: OrderedCollection new table: aTable.
 	hasreturn <- false.
 !
 
@@ -2008,18 +2259,18 @@ sizeForEffect: result
 	^ c
 !
 
-emitOn: aStream forEffect: result
+emitOn: aStream position: codePosition forEffect: result
 	| s |
 	s <- node size.
 	s > 1 ifTrue: [
 		1 to: s - 1 do: 
-			[ :i | (node at: i) emitOn: aStream forEffect: true ]
+			[ :i | (node at: i) emitOn: aStream position: codePosition forEffect: true ]
 	].
 	hasreturn ifTrue:
-		 [ (node at: s) emitOn: aStream forEffect: true ]
+		 [ (node at: s) emitOn: aStream position: codePosition forEffect: true ]
 		  ifFalse: 
 		 [ s > 0 ifTrue: [
-			(node at: s) emitOn: aStream forEffect: result].
+			(node at: s) emitOn: aStream position: codePosition forEffect: result].
 		   result ifTrue: [ aStream nextPut: rets]
 			  ifFalse: [ aStream nextPut: ret ]
 		].
@@ -2077,12 +2328,12 @@ sizeForEffect: result
 	^ node sizeForReturn
 !
 
-emitForReturn: aStream
-	^ node emitForReturn: aStream
+emitForReturn: aStream position: codePosition
+	^ node emitForReturn: aStream position: codePosition
 !
 
-emitOn: aStream forEffect: result
-	^ node emitForReturn: aStream
+emitOn: aStream position: codePosition forEffect: result
+	^ node emitForReturn: aStream position: codePosition
 ! !
 
 ! SmallTalkReturnNode methodsFor: 'printing' !
@@ -2094,7 +2345,7 @@ printOn: aStream
 
 
 Object subclass: 'SmallTalkSymbolTable'
-       instanceVariableNames: 'syms tempcount argcount litcount class nilnode lits parser superSeen'
+       instanceVariableNames: 'syms tempcount argcount litcount class nilnode lits parser superSeen temps args'
        classVariableNames: ''
        poolDictionaries: ''
        category: 'Compiler' !
@@ -2112,6 +2363,8 @@ on: aClass using: aParser
     parser <- aParser.
     syms <- Dictionary new.
     class <- aClass.
+    temps <- OrderedCollection new.
+    args <- OrderedCollection new.
 
     " Add in builtin objects "
     self addSym: (SmallTalkBuiltinNode new: #self table: self).
@@ -2161,6 +2414,7 @@ addTemp: aSym
 				  offset: tempcount
 				  table: self.
      tempcount <- tempcount + 1.
+     temps add: aSym.
      ^ self addSym: sym.
 !
 
@@ -2172,6 +2426,7 @@ addArg: aSym
 				  offset: argcount
 				  table: self.
      argcount <- argcount + 1.
+     args add: aSym.
      ^ self addSym: sym.
 !
 
@@ -2245,6 +2500,14 @@ findSymbol: aSym
 
 ! SmallTalkSymbolTable methodsFor: 'accessing' !
 
+tempvars
+	^ temps
+!
+
+arguments
+	^ args
+!
+
 nilnode
 	^ nilnode
 !
@@ -2273,7 +2536,7 @@ literals
 ! !
 
 Object subclass: 'SmallTalkParser'
-       instanceVariableNames: 'table token class primitive pattern inBlock method error notifier compileString'
+       instanceVariableNames: 'table token class primitive pattern inBlock method error notifier compileString codePosition'
        classVariableNames: ''
        poolDictionaries: ''
        category: 'Compiler' !
@@ -2298,6 +2561,7 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
     method <- nil.
     primitive <- 0.
     notifier <- aBlock.
+    codePosition <- Dictionary new.
 
     " Initialize token stream "
     token <- SmallTalkToken on: aString.
@@ -2319,6 +2583,7 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
     tree <- SmallTalkMethodNode new: table.
     (self doBody: tree) isNil ifTrue: [  ^ self ].
     token <- nil.
+
 
     " Check if we can shortcut this method "
     table tempcount = 0 ifTrue: [
@@ -2350,7 +2615,8 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
 
     " Convert code into byte codes. "
     bytecodes <- WriteStream on: (ByteArray new: 0).
-    tree emitOn: bytecodes forEffect: patFlag.
+    tree emitOn: bytecodes position: codePosition forEffect: patFlag.
+    tree <- nil.	" Clean it up since we don't need it anymore "
     bytecodes <- bytecodes contents.
 
     " Build method "
@@ -2372,6 +2638,18 @@ parseError: aMessage
 ! !
 
 ! SmallTalkParser methodsFor: 'access'!
+
+tempvars
+    ^ table tempvars
+!
+
+arguments
+    ^ table arguments
+!
+
+codePosition
+    ^ codePosition
+!
 
 method
     ^ method
@@ -2444,16 +2722,22 @@ parsePrimitive
 
 " Parse body of definition. "
 doBody:	nodes
-    | result sawperiod |
+    | result sawperiod start |
     result <- true.
     [ result isNil ] whileFalse: [
         sawperiod <- false.
 	token isKeyReturn ifTrue: [
+		start <- token first.
 		token next.
 		result <- self doExpression.
 		result isNil ifTrue: [ 
 			^self parseError: 'Return needs expression' ].
-		nodes add: (SmallTalkReturnNode new: result table: table).
+		result end: token first.
+		nodes add: (SmallTalkReturnNode
+				 new: result 
+				 table: table
+				 start: start
+				 end: token first).
 		nodes returned
 	] ifFalse: [
 		result <- self doExpression.
@@ -2477,9 +2761,10 @@ doBody:	nodes
 
 " Parse Expression. "
 doExpression
-    | asgname node |
+    | asgname node start |
 
     token isKeyName ifTrue: [
+    	start <- token first.
 	node <- token value.
 	asgname <- table findSymbol: token valueNext.
 	asgname isNil ifTrue: [
@@ -2493,7 +2778,11 @@ doExpression
 	    token next.
 	    node <- self doExpression.
 	    node isNil ifTrue: [ ^ nil ].
-	    node <- SmallTalkAssignNode new: asgname expr: node table: table.
+	    node <- SmallTalkAssignNode new: asgname 
+					expr: node	
+					table: table
+					start: start
+					end: token first.
  	    ^ node
         ] ifFalse: [
 	    node <- asgname
@@ -2507,16 +2796,26 @@ doExpression
 
 " Parse a term. "
 doTerm
-    | node |
+    | node start end |
 
-    token isKeyLiteral ifTrue: 
-			    [ ^  table addLit: token valueNext forTerm: true ].
-    token isKeyName ifTrue: [ ^ table findSymbol: token valueNext ].
+    token isKeyLiteral ifTrue: [  
+	  start <- token first.
+	  end <- token position.
+	  node <- table addLit: token valueNext forTerm: true.
+	  ^ SmallTalkTermNode new: node start: start end: end.
+	  ].
+    token isKeyName ifTrue: [ 
+	  start <- token first.
+	  end <- token position.
+	  node <- table findSymbol: token valueNext.
+	  ^ SmallTalkTermNode new: node start: start end: end.
+	  ].
     token isKeyLBrack ifTrue: [ ^self doBlock ].
     token isKeyRParen ifTrue: [
 	  token next.
           node <- self doExpression.
 	  node isNil ifTrue: [ ^ nil ].
+	  node end: token first.
 	  token isKeyLParen ifFalse: [ ^ self parseError: 'Missing )' ].
 	  token next.
 	  ^ node
@@ -2529,18 +2828,20 @@ doTerm
   message expression ; message expression "
 doContinue: aNode
    | node other |
-    node <- SmallTalkMessageNode new: aNode table: table.
+    node <- SmallTalkMessageNode new: aNode table: table start: token first.
     node <- self keyContinue: node.
     node isNil ifTrue: [ ^ nil ].
     node <- node node.
+    node end: token first.
     [ token isKeyCascade ] whileTrue: [
 	token next.
 	node canCascade ifFalse: [
 		^ self parseError: 'Unable to cascade message' ].
-	node <- SmallTalkCascadeNode new: node table: table.
+	node <- SmallTalkCascadeNode new: node table: table start: token first.
 	node <- self keyContinue: node.
         node isNil ifTrue: [ ^ nil ].
-	node <- node node
+	node <- node node.
+	node end: token first
     ].
     ^ node
 !
@@ -2558,15 +2859,19 @@ keyContinue: aNode
 	pat nextPutAll: (token valueNext).
 	arg <- self doTerm.
 	arg isNil ifTrue: [ ^ nil ].
-	arg <- SmallTalkMessageNode new: arg table: table.
+	arg end: token first.
+	arg <- SmallTalkMessageNode new: arg table: table start: token first.
 	arg <- self doBinaryContinue: arg.
 	node addArg: arg node
     ].
     flag ifTrue: [
 	    node selector: pat contents asSymbol.
+	    node end: token first.
 	    node <- node optimize.
 	    node <- SmallTalkMessageNode new: node table: table
+			 start: token first
     ].
+    node end: token first.
     ^ node
 !
 
@@ -2576,20 +2881,23 @@ doBinaryContinue: aNode
 
     node <- self doUnaryContinue: aNode.
     node isNil ifTrue: [ ^ nil ].
+    node end: token first.
     [ token isKeySpecial ] whileTrue: [
 	" Set nodes selector to current token "
 	node selector: token valueNext asSymbol.
 	" If there is any names following build messages "
 	arg <- self doTerm.
 	arg isNil ifTrue: [ ^ nil ].
-	arg <- SmallTalkMessageNode new: arg table: table.
+	arg <- SmallTalkMessageNode new: arg table: table start: token first.
 	arg <- self doUnaryContinue: arg.
 	" Add argument and optimize node. "
 	node addArg: arg node.
+	node end: token first.
 	node <- node optimize.
 	" Wrap in new message node "
-	node <- SmallTalkMessageNode new: node table: table 
+	node <- SmallTalkMessageNode new: node table: table start: token first
     ].
+    node end: token first.
     ^ node
 !
 
@@ -2597,20 +2905,22 @@ doBinaryContinue: aNode
 doUnaryContinue: aNode
     | node |
  
+    aNode isNil ifTrue: [ ^ nil ].
     node <- aNode.
-    node isNil ifTrue: [ ^ nil ].
     [ token isKeyName ] whileTrue: [
+	node end: token first.
 	node selector: token valueNext asSymbol.
 	node <- node optimize.
-	node <- SmallTalkMessageNode new: node table: table
+	node <- SmallTalkMessageNode new: node table: table start: token first
     ].
+    node end: token first.
     ^ node
 !
 
 " Parse a block of code. "
 doBlock
     | argc saveInblock node args |
-    node <- SmallTalkBlockNode new: table.
+    node <- SmallTalkBlockNode new: table start: token first.
 
     token next.
     [ token isKeyVariable ] whileTrue: [ 
@@ -2639,6 +2949,7 @@ doBlock
     " Make sure we consumed a correct block "
     token isKeyRBrack ifFalse:
 		 [ ^ self parseError: 'Block must end with ]' ].
+    node end: token first.
     token next.
     ^ node
 ! !

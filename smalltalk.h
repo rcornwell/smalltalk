@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Global Definitions.
  *
- * $Id: smalltalk.h,v 1.4 2001/08/29 20:16:35 rich Exp rich $
+ * $Id: smalltalk.h,v 1.5 2002/02/07 04:21:04 rich Exp rich $
  *
  * $Log: smalltalk.h,v $
+ * Revision 1.5  2002/02/07 04:21:04  rich
+ * Added change file icon to RC file.
+ *
  * Revision 1.4  2001/08/29 20:16:35  rich
  * Added support for X.
  *
@@ -57,7 +60,7 @@
 
 void                smallinit(int);
 void		    load_file(char *);
-void                parsefile(char *);
+void                load_source(char *);
 extern char	   *geometry;
 
 #endif

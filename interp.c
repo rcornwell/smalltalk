@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.8  2001/08/29 20:16:35  rich
+ * Initialize async event queue in InitSystem
+ *
  * Revision 1.7  2001/08/18 16:17:01  rich
  * Fixed process management code.
  * Added queue functions to improve communications from system to image.
@@ -42,7 +45,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.7 2001/08/18 16:17:01 rich Exp rich $";
+"$Id: interp.c,v 1.8 2001/08/29 20:16:35 rich Exp rich $";
 
 #endif
 
@@ -123,7 +126,13 @@ flushMethod(Objptr meth)
 }
 
 
-
+/*
+ * Dump out a error message, when we get stuck in a loop trying to send
+ * a message and we can't find DoesNotUnderstand selector in class chain.
+ * This is a fatal error since there is nothing else we can do since we
+ * got here trying to send a selector we don't know about and then could
+ * not find DoesNotUnderstand selector either.
+ */
 static void
 recurseError(Objptr class, Objptr selector)
 {
@@ -136,6 +145,9 @@ recurseError(Objptr class, Objptr selector)
     error(buf);
 }
 
+/*
+ * Helper function to send a selector to object on top of stack.
+ */
 void
 SendError(Objptr selector, int *stack)
 {
@@ -372,6 +384,43 @@ dump_stack(Objptr op)
 	dump_string(buffer);
         context = get_pointer(context, BLOCK_SENDER);
     }
+}
+
+/*
+ * Execute a method.
+ */
+void
+execute(Objptr meth, Objptr rec)
+{
+    Objptr		newContext;
+    int			header;
+    int			stacksize;
+//    int			oldrunning = running;
+
+    header = get_pointer(meth, METH_HEADER);
+    stacksize = StackOf(header) + TempsOf(header);
+
+    /* Initialize a new method. */
+    newContext = create_new_object(MethodContextClass, stacksize);
+    object_incr_ref(newContext);
+    rootObjects[CURCONT] = newContext;
+    Set_object(newContext, BLOCK_SENDER, NilPtr);
+    Set_integer(newContext, BLOCK_IP, 
+	sizeof(Objptr) *(LiteralsOf(header) + METH_LITSTART));
+    Set_integer(newContext, BLOCK_SP, size_of(newContext) / sizeof(Objptr));
+    Set_object(newContext, BLOCK_METHOD, meth);
+    Set_integer(newContext, BLOCK_IIP, 0);
+    Set_object(newContext, BLOCK_REC, rec);
+    Set_integer(newContext, BLOCK_ARGCNT, 0);
+    current_context = newContext;
+    newContextFlag = 1;
+    /* Ok we have a refernce to method, we can clear out holder */
+    rootObjects[TEMP1] = NilPtr;
+    interp();
+    /* Break cycle */
+    Set_object(newContext, BLOCK_SENDER, NilPtr);
+    object_decr_ref(newContext);
+ //   running = oldrunning;
 }
 
 /*
@@ -1029,7 +1078,13 @@ Objptr
 nxt_event(Event_queue queue)
 {
 	Objptr		res;
+#if 0
+	char		buffer[1000];
 
+	wsprintf(buffer, "Queue %x %x %x\n",
+		queue->rdptr, queue->wrptr, (*queue->rdptr)/2);
+	dump_string(buffer);
+#endif
 	/* Check if queue is empty */
 	if(queue->rdptr == queue->wrptr)
 	    return NilPtr;

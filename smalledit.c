@@ -29,13 +29,16 @@
 
 /*
  *
- * $Log: $
+ * $Log: smalledit.c,v $
+ * Revision 1.1  2002/02/17 13:43:17  rich
+ * Initial revision
+ *
  *
  */
 
 static char 
 __attribute__((unused)) rcsid[] =
-"$Id: $";
+"$Id: smalledit.c,v 1.1 2002/02/17 13:43:17 rich Exp $";
 
 #include <stddef.h>
 #include <windows.h>

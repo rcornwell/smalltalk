@@ -2,6 +2,9 @@
  * Smalltalk smallobjs: Routines for modifying smalltalk objects.
  *
  * $Log: smallobjs.c,v $
+ * Revision 1.2  2001/07/31 14:09:49  rich
+ * Fixed to compile under new cygwin.
+ *
  * Revision 1.1  2001/07/28 01:54:16  rich
  * Initial revision
  *
@@ -11,7 +14,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smallobjs.c,v 1.1 2001/07/28 01:54:16 rich Exp rich $";
+	"$Id: smallobjs.c,v 1.2 2001/07/31 14:09:49 rich Exp $";
 
 #endif
 

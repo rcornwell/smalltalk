@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.6 2001/08/18 16:17:01 rich Exp rich $
+ * $Id: object.h,v 1.7 2001/08/29 20:16:35 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.7  2001/08/29 20:16:35  rich
+ * Moved region definition to object.c
+ *
  * Revision 1.6  2001/08/18 16:17:01  rich
  * Added new rootObjects for graphics system.
  *
@@ -70,7 +73,7 @@ typedef unsigned int Objptr;
  * Information placed at head of object to indicate clase and size.
  */
 typedef struct _objhdr {
-    int             	    size;	/* Size of object */
+    unsigned int            size;	/* Size of object */
     union {				/* Second word */
 	Objptr              class;	/* Class of in use object */
 	struct _objhdr     *next;	/* Next free object in chain */
@@ -139,10 +142,10 @@ void		    reclaimSpace();
 /* Conversion Functions. */
 
 /* Get integer value of object */
-#define as_integer(value) ((int)(value) >> 1)
+#define as_integer(value) ((int)((unsigned int)value) >> 1)
 
 /* Return integer as a object */
-#define as_integer_object(value) (((value) << 1) | 1)
+#define as_integer_object(value) ((((unsigned int)value) << 1) | 1)
 
 /* Accessing Functions. */
 

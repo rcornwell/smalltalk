@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.9  2001/08/29 20:16:35  rich
+ * Moved region definition from object.h.
+ *
  * Revision 1.8  2001/08/18 16:17:01  rich
  * Moved error routines to system.h
  *
@@ -39,7 +42,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
+	"$Id: object.c,v 1.9 2001/08/29 20:16:35 rich Exp rich $";
 
 #endif
 
@@ -57,8 +60,8 @@ static char        *rcsid =
  */
 typedef struct _region {
     struct _region     *next;			/* Pointer to next region */
-    int                 freespace;		/* Space available */
-    int                 totalspace;		/* Size of region */
+    unsigned int        freespace;		/* Space available */
+    unsigned int        totalspace;		/* Size of region */
     Objhdr              base;			/* Pointer to first word */
     Objhdr              limit;			/* Pointer to last word */
     Objhdr              freeptrs[ALLOCSIZE + 1]; /* Free pointers. */
@@ -249,14 +252,14 @@ INLINE              Objptr
 class_of(Objptr op)
 {
     if (is_object(op) && !notFree(op)) {
-	fprintf(stderr, "Attempt to get class of free object\n");
+	error("Attempt to get class of free object");
     }
     return is_object(op)? get_object_pointer(op)->u.class :
 				SmallIntegerClass;
 }
 
 /* Size of an object in bytes. */
-INLINE int
+INLINE unsigned int
 size_of(Objptr op)
 {
     return get_object_pointer(op)->size;
@@ -266,7 +269,7 @@ size_of(Objptr op)
  * Return fixed size of object in bytes.
  */
 
-INLINE int
+INLINE unsigned int
 fixed_size(Objptr op)
 {
     Objptr              class = class_of(op);
@@ -502,7 +505,7 @@ new_objectable(int number)
 void
 Set_object(Objptr op, int offset, Objptr newvalue)
 {
-    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
+    if ((unsigned int)offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
 	void dump_stack(Objptr);
 
 	dump_stack(NilPtr);
@@ -517,7 +520,7 @@ Set_object(Objptr op, int offset, Objptr newvalue)
 void
 Set_integer(Objptr op, int offset, int value)
 {
-    if (offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
+    if ((unsigned int)offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
 	void dump_stack(Objptr);
 
 	dump_stack(NilPtr);
@@ -1007,12 +1010,12 @@ compact_region()
     if (curregion->freespace == 0)
 	return;
 
-#ifdef DUMP_OBJMEM
+#if 0
     {
         char		buffer[100];
         sprintf(buffer, "Compacting %x %d bytes %d free", curregion, 
 		curregion->totalspace, curregion->freespace);
-        dump_objstring(buffer);
+        dump_string(buffer);
     };
 #endif
 
@@ -1024,7 +1027,16 @@ compact_region()
     for (i = 0; i <= ALLOCSIZE; i++) {
 	ptr = curregion->freeptrs[i];
 	while (ptr != NULL) {
-	    if (ptr < lowWater)
+#if 0
+    {
+        char		buffer[100];
+        sprintf(buffer, "Free area %x bytes %d [%x], next %x", ptr, ptr->size,
+			ptr + (sizeof(objhdr) + ptr->size) / sizeof(objhdr),
+			 ptr->u.next);
+     dump_string(buffer);
+	}
+#endif
+		    if (ptr < lowWater)
 		lowWater = ptr;
 	    next = ptr->u.next;
 	    ptr->u.class = -1;
@@ -1043,6 +1055,13 @@ compact_region()
 	        * Put object number into size field, and squirel away
 	        * size in objects address pointer.
 	        */
+#if 0
+    {
+        char		buffer[100];
+        sprintf(buffer, "Moving %d bytes %d", i, ptr->size);
+        dump_string(buffer);
+	};
+#endif
 		objmem[i] = (Objhdr) ptr->size;
 		ptr->size = i;
 	    }
@@ -1054,6 +1073,14 @@ compact_region()
     while (src < (int *) highWater) {
        /* Check if free or allocated object. */
 	if (((Objhdr) src)->u.class == -1) {
+#if 0
+    {
+        char		buffer[100];
+        sprintf(buffer, "Skip area %x, bytes %d", src, ((Objhdr) src)->size);
+        dump_string(buffer);
+	};
+#endif
+
 	    /* Free area, skip it */
 	    src += (sizeof(objhdr) + ((Objhdr) src)->size) / sizeof(int);
 	} else {
@@ -1061,6 +1088,14 @@ compact_region()
 	    i = (int) (((Objhdr) src)->size);
 	    size = (int) objmem[i];
 
+#if 0
+    {
+        char		buffer[100];
+        sprintf(buffer, "Copying %x, %d bytes %d, next %x", src, i, size,
+		src + size );
+        dump_string(buffer);
+	};
+#endif
 
 	    if ((src + (wordsize(size)/sizeof(int))) > (int *)highWater)
 		error("Compact out of range");
@@ -1192,6 +1227,14 @@ free_all_other_objects(Objptr op)
        /* Go backward until we hit size field. */
 	if (--offset >= 1) {
 	    next = get_pointer(current, offset - 2);
+	   /* Make sure it is not already freed */
+	    if (is_object(next) && !notFree(next)) {
+		void dump_stack(Objptr);
+
+		dump_stack(NilPtr);
+		error("Attempt to reclaim free object");
+	    }
+		
 	   /* If it is an object and we have not seen it */
 	   /* Look into it */
 	    if (is_object(next) && decr_ref_count(next)) {

@@ -30,6 +30,9 @@
 /*
  *
  * $Log: about.c,v $
+ * Revision 1.2  2001/07/31 14:09:47  rich
+ * Fixed for new version of cygwin
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -38,7 +41,7 @@
 
 static char
  rcsid[] =
-"$Id: about.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+"$Id: about.c,v 1.2 2001/07/31 14:09:47 rich Exp $";
 
 #ifdef WIN32
 #include "smalltalk.h"

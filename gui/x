@@ -1,0 +1,17 @@
+display
+    displayed <- true.
+    extent isNil
+        ifTrue: [ self error: 'ListView has no extent!!' ].
+    Display white: (offset extent: extent).
+    Display border: (offset extent: extent)
+            widthRectangle: borderWidth
+	    mask: Form black.
+    listTop isNil
+        ifTrue: [ listTop <- 0 ].
+    pendingSelection isNil
+        ifFalse: [ self select: pendingSelection.
+	           pendingSelection <- nil ].
+    self showList.
+    subviews isNil
+        ifFalse: [ subviews do: [ :view | view display ] ]
+!

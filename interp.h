@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.7 2001/08/18 16:17:01 rich Exp rich $
+ * $Id: interp.h,v 1.8 2002/01/29 16:40:38 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.8  2002/01/29 16:40:38  rich
+ * Increased size of event queue.
+ *
  * Revision 1.7  2001/08/18 16:17:01  rich
  * Fixed bugs in process management functions.
  * Added queue functions to improve communication from system to image.
@@ -144,6 +147,7 @@ extern event_queue  asyncsigs;
 
 #define is_empty(queue) (queue)->rdptr == (queue)->wrptr
 
+void		    execute(Objptr, Objptr);
 void		    SendToClass(Objptr, int *, int, Objptr);
 void		    dump_stack(Objptr);
 void                interp();

@@ -1,9 +1,12 @@
 " Methods for Class misc extra classes"
 
-" $Id: misc.st,v 1.4 2001/07/31 14:09:48 rich Exp rich $ "
+" $Id: misc.st,v 1.5 2001/08/18 16:17:01 rich Exp $ "
 
 "
  $Log: misc.st,v $
+ Revision 1.5  2001/08/18 16:17:01  rich
+ Fixed category of class.
+
  Revision 1.4  2001/07/31 14:09:48  rich
  Code cleanup
 

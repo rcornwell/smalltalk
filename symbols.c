@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: symbols.c,v $
+ * Revision 1.6  2001/08/01 16:42:31  rich
+ * Added thisContext builtin variable.
+ *
  * Revision 1.5  2001/07/31 14:09:49  rich
  * Fixed to compile under new cygwin.
  *
@@ -23,7 +26,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: symbols.c,v 1.5 2001/07/31 14:09:49 rich Exp rich $";
+	"$Id: symbols.c,v 1.6 2001/08/01 16:42:31 rich Exp $";
 
 #endif
 

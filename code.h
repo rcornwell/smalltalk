@@ -1,9 +1,13 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: code.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: code.h,v 1.2 2000/02/01 18:09:47 rich Exp $
  *
  * $Log: code.h,v $
+ * Revision 1.2  2000/02/01 18:09:47  rich
+ * Fixed stack adjust of return.
+ * Changed way jump targets set.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *

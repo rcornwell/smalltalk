@@ -29,9 +29,12 @@
  */
 
 /*
- * $Id: about.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: about.h,v 1.2 2001/07/31 14:09:47 rich Exp $
  *
  * $Log: about.h,v $
+ * Revision 1.2  2001/07/31 14:09:47  rich
+ * Fixed for new version of cygwin
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *

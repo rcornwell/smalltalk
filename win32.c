@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Windows 32 interface.
  *
  * $Log: win32.c,v $
+ * Revision 1.3  2002/02/07 04:21:05  rich
+ * Added code to request size of window to be last window size.
+ * Added code to change current working directory.
+ *
  * Revision 1.2  2001/09/17 20:19:55  rich
  * Got display and cursor support working.
  *
@@ -12,7 +16,7 @@
  */
 
 #ifndef lint
-static char        *rcsid = "$Id: win32.c,v 1.2 2001/09/17 20:19:55 rich Exp rich $";
+static char        *rcsid = "$Id: win32.c,v 1.3 2002/02/07 04:21:05 rich Exp rich $";
 #endif
 
 #ifdef WIN32
@@ -64,6 +68,20 @@ static unsigned char reverse_map[256] = {
 };
 
 #define ID_TICKTIMER	1
+
+/* Create main window. */
+int                 WINAPI
+WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+	PSTR szCmdLine, int iCmdShow) {
+    char		**argv;
+    int			argc;
+
+    argv = CommandLineToArgvW(GetCommandLine(), &argc);
+    if (argv != NULL) {
+	main(argc, argv);
+	GlobalFree(argv);
+    }
+}
 
 /* Initialize the system */
 int
@@ -655,7 +673,7 @@ file_write(long id, char *buffer, long size)
 
     if (!WriteFile((HANDLE) id, buffer, size, &did, 0))
 	return -1;
-    if (did != size)
+    if (did != (DWORD)size)
 	return -1;
     else
 	return did;
@@ -836,6 +854,7 @@ void
 dump_string(char *str)
 {
     DWORD		did;
+#if 0
 
     if (needconsole) {
 	if (AllocConsole() == 0)
@@ -849,7 +868,36 @@ dump_string(char *str)
 
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), str, strlen(str), &did, 0);
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\r\n", 2, &did, 0);
+#endif
+    static int		id = NULL;
+
+    if (id == NULL) {
+	id = CreateFile("smalltalk.log", GENERIC_READ | GENERIC_WRITE,
+			 FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
+			 FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+    WriteFile(id, str, strlen(str), &did, 0);
+    WriteFile(id, "\r\n", 2, &did, 0);
 }
+
+void
+dump_char(char c)
+{
+    DWORD		did;
+
+    if (needconsole) {
+	if (AllocConsole() == 0)
+	   return;
+	/* Set console to igrnore mouse/ window events */
+    	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE),
+			ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT 
+		        | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT );
+	needconsole = 0;
+    }
+
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), &c, 1, &did, 0);
+}
+
 
 static void
 fill_buffer(char c)

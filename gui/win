@@ -1,0 +1,311 @@
+      (0,0)
+view:  ++========+--------------+
+       || Window |              |
+       ||        |              |
+       ||        |              |
+       |+========+              |
+       |                        |
+       +------------------------+ (x,y)
+
+
+Screen:
+        +-------------SuperView----------------------------+
+        |                                                  |
+        |  (location)                                      |
+        |   +--------SubView------------------+            |
+        |   | ViewPort                        |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   |                                 |            |
+        |   +---------------------------------+            |
+        |                                  (location)      |
+        +--------------------------------------------------+
+
+   boundingBox is the true size of the object to be displayed.
+   window is area of view object that is displayed.
+   viewPort is area of screen that window is shown.  = insetBox
+   location is Rectangle defining viewport location in superView.
+   displayTranslation translates Window coords to ViewPort coords.
+   insetBox is viewPort shrunk by borderWidth.
+
+
+View:
+release
+	call release for each subview.
+
+display
+	Display border
+	call display for each subview
+
+emphasizeView
+	Highlight view
+
+deEmphasizeView
+	Gray out view
+
+viewFullHeight
+	Returns total hieght of window
+
+scrollTo: pos
+	Scrolls window to pos, returns true if successfull, false if beyond
+	limits.
+
+scrollPosition
+	Returns current scroll position.
+
+update: x	(Overridden)
+	x = name, setContentsFrom: (model preform: aSymbol)
+	   displayed, display
+
+Contollers:
+
+restore
+    Display background form.
+    call screenController display.
+    Call each controller in reverse order to display
+
+
+promote: aController.
+	Move controller to top of scheduled controllers stack
+
+pullBottomToTop
+	reverse order of controllers.
+
+activeController: aController
+	deemphasize the current active controller.
+	move aController to top of list.
+	make aController active.
+	   fork: aController Startup. searchForActiveController
+
+unschedule: aScheduledController
+    Remove scheduled controller form list of controllers.
+    If this is active controller, set no active controllers
+    Restore display
+
+schedulePassive: aController
+    Adds aController to be next runnable controller
+
+scheduleActive: aController
+    Adds aController as new active process, does not return
+
+sceduleActiveNoTerminate: aController
+    Adds aController as new.
+
+scheduleOnBottom: aController
+    Adds aController as last passive controller
+    Pop under?
+
+*scheduleBottom
+    Move last controller to top.
+
+searchForActiveController
+    Clear activeController.
+    Call each contollers isControlWanted
+	if non ask screenController isControlWanted
+    If non wait for sensor event and try again.
+    If found one schedule it as active controller
+    And terminate process.
+
+isControlWanted
+    Return true if this window needs to do anything
+     Generaly if the cursor  is in window
+
+
+isControlActive
+    Return true if this window has events pending.
+
+
+startUp
+    Call controlInitialize, controlLoop, controlTerminate
+
+controlInitialize
+    Called when window becomes active.
+
+controlLoop
+    Process events for window. 
+	call controlActivity anytime window is active.
+
+controlTerminate
+    Called when window is no longer active
+
+controlActivity
+    Process window events.
+
+controlToNextLevel
+    Disptach to whichever subview wants to gain control.
+	If found one call it's startUp
+
+centerCursorInView
+   Move cursor to center of view.
+
+viewHasCursor
+    Check if cursor is inside view.
+
+
+Mouse Button:
+	xxxButtonActivity
+
+xxxButtonActivity
+	if xxxMenuNotify object set notify it, else notify self.
+	   If xxxButtonMenu is a symbol send it to notify object to get menu.
+	   If menu is Menu call popupAt: for: notify
+
+
+
+StandardSystemController:
+
+move
+	Set mouse to corner, then wait for button press.
+	Set window origin to mouse point.
+
+
+close
+	Release view and self. Then unschedule self.
+
+collapse
+	Set status to collapsed, then restore display
+
+expand
+	Grab rectange from user and all controlers setSize: x
+
+under
+         Call scheduleBottom
+
+open
+	Set status to active, then schedule.
+
+
+Scrolling:
+    scroll monitor mouse and slide widow as needed.
+
+canScroll
+   Return if window can scroll
+
+scrollView
+    move view by scroll amount delta
+
+scrollView: anInteger
+    Pass onto view scrollTo: anInteger.
+
+viewDelta
+    How much view is moving.
+
+moveMarker
+    self moveMarker: self markerDelta negated
+
+moveMarker: anInteger
+    Move and display marker by anInteger.
+
+markerDelta
+    How much should marker move.
+
+markerRegion: aRectangle
+    Set marker to mark a region
+
+
+scrollAbsolute
+    Scroll window to absolute position.
+
+scrollDown
+    Scroll window down by scollAmount
+
+scrollUp
+    Scroll window up by scrollAmount
+
+scrollAmount
+    Return amount the window should scroll up/down for each click in scroll
+ bar.
+! !
+
+
+controller -> open.
+        view -> resizeInitially.
+	    view -> resizeTo: Rectangle fromUser
+		view -> window: (self window) viewport: aRectangle.
+		   window -> ^ merged viewport of subwindows. 
+		   view setWindow: aWindow
+			window <- aWindow, 
+        status <- #open
+        Schedule self.
+
+window: aWindow viewport: aViewport
+    window <- aWindow.
+    transform <- scale: aViewport / aWindow translation: aViewport - aWindow
+    viewport <- nil.
+    displayTransfrom <- nil.
+    insetbox <- nil.
+    viewport <- transform scale * aWindow + translation.
+!
+
+displayTransform 
+	translation, merged with superviews transform
+
+insetBox 
+	transform window by displayTransform.
+	inset by border.
+	clip by superview.
+
+in StandardSystemController
+
+open ->
+	view initialSize
+	status <- #open.
+	schedule.
+
+in StandardSystemView
+getFrame
+	min <- self miniumSize
+	^ Rectangle fromUserMin: min.
+
+initialSize
+	self window: self getWindow viewport: self getFrame.
+
+display
+	self lock
+	displayBorder
+	displayView
+	displaySubViews
+
+View
+
+ model			-> Holds object view is showing.
+ controller		-> Holds controller to manage view.
+ superview		-> Holds view contianing this view.
+ subviews		-> Collection of views inside this view. 
+ borderWidth		-> Size of border in pixels.
+ insetBox		-> rectangle holding area inside window to draw in.
+ name			-> Name of window, handed during updates.
+ backform		-> Background image.
+ location		-> Location of window in superview.
+ transformation		-> WindowTransform to map from window to viewport
+ window			-> Display coords for window.
+ viewport		-> Position of window being displayed.
+ minSize		-> Minimum size of window.
+
+minimumSize
+	returns min size that will hold window. Default is 10x10 pixel.
+
+boundBox
+	returns prefered size of window or minumumSize whichever is larger.
+
+unlock
+	clear window and transformation.
+
+lock
+	setWindow: getWindow.
+	
+getWindow
+	win <- self defaultWindow.
+	window <- win.
+
+defaultWindow
+	self isTopView ifFalse: [
+		win <- self superView window.
+		^ location applyTo: win.
+	] ifTrue: [ ^ DisplayScreen bondedBox ].
+
