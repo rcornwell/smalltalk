@@ -2,6 +2,11 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.3  2000/03/04 22:28:13  rich
+ * Removed extra includes.
+ * Converted local references to static.
+ * Fixed bug in compiling of cascade messages.
+ *
  * Revision 1.2  2000/02/01 18:09:59  rich
  * Added code to detect get and set of instance variable short methods.
  * Added errors for failing to add symbols.
@@ -18,7 +23,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.2 2000/02/01 18:09:59 rich Exp rich $";
+	"$Id: parse.c,v 1.3 2000/03/04 22:28:13 rich Exp rich $";
 
 #endif
 
@@ -203,7 +208,7 @@ CompileForClass(char *text, Objptr class, Objptr aCatagory, int pos)
     if (primnum > 0 || numargs > 12) {
 	litsize++;
 	eheader = (EMETH_PRIM & (primnum << 1)) +
-			(EMETH_ARGS  & (numargs << 16));
+			(EMETH_ARGS  & (numargs << 17));
         header = (METH_NUMLITS & (litsize << 1)) +
 			(METH_NUMTEMPS & (nstate->tempcount << 9)) +
 			(METH_STACKSIZE & (cstate->maxstack << 17)) +
@@ -264,7 +269,7 @@ CompileForExecute(char *text)
     if (primnum > 0) {
 	litsize++;
 	eheader = (EMETH_PRIM & (primnum << 1)) +
-			(EMETH_ARGS  & (0 << 16));
+			(EMETH_ARGS  & (0 << 17));
         header = (METH_NUMLITS & (litsize << 1)) +
 			(METH_NUMTEMPS & (nstate->tempcount << 9)) +
 			(METH_STACKSIZE & (cstate->maxstack << 17)) +
@@ -771,18 +776,20 @@ doIfTrue()
 {
     Codenode            block;
     int                 flag;
+    int			next = 1;
 
     block = genJumpFForw(cstate);	/* Jump forward to end of block. */
     flag = optimBlock();
 
     if (get_cur_token(tstate) == KeyKeyword &&
 	strcmp(get_token_string(tstate), "ifFalse:") == 0) {
-        genPopTOS(cstate);
+    /*    genPopTOS(cstate); */
 	setJumpTarget(cstate, block, 1);
 	block = genJumpForw(cstate);	/* Skip around else block */
 	flag = optimBlock();		/* Do else part */
+	next = 0;
     } 
-    setJumpTarget(cstate, block, 1);
+    setJumpTarget(cstate, block, next);
     return flag;
 }
 
@@ -794,19 +801,21 @@ doIfFalse()
 {
     Codenode            block, eblock = NULL;
     int                 flag;
+    int			next = 1;
 
     block = genJumpTForw(cstate);	/* Jump forward to end of block. */
     flag = optimBlock();
 
     if (get_cur_token(tstate) == KeyKeyword &&
 	strcmp(get_token_string(tstate), "ifTrue:") == 0) {
-        genPopTOS(cstate);
+     /*   genPopTOS(cstate); */
 	setJumpTarget(cstate, block, 1);
 	eblock = genJumpForw(cstate);	/* Skip around else block */
 	block = eblock;
 	flag = optimBlock();	/* Do else part */
+	next = 0;
     } 
-    setJumpTarget(cstate, block, 1);
+    setJumpTarget(cstate, block, next);
     return flag;
 }
 
