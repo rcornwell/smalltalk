@@ -1,9 +1,12 @@
 " Methods for Class misc extra classes"
 
-" $Id: misc.st,v 1.2 2000/02/01 18:09:56 rich Exp rich $ "
+" $Id: misc.st,v 1.3 2001/01/07 15:47:21 rich Exp rich $ "
 
 "
  $Log: misc.st,v $
+ Revision 1.3  2001/01/07 15:47:21  rich
+ Code cleanup
+
  Revision 1.2  2000/02/01 18:09:56  rich
  Moved Date and Time collection to magnitude.
 
@@ -23,13 +26,13 @@ Random comment:
 'My instances are generator streams that produce random numbers, which are 
 floating point values between 0 and 1.'!
 
-!Random class methodsFor: 'instance creation'!
+! Random class methodsFor: 'instance creation'!
 
 new
     ^self basicNew setSeed
 ! !
 
-!Random methodsFor: 'testing'!
+! Random methodsFor: 'testing'!
 
 chiSquare
     "returns on Sun3 93.40000000000009"
@@ -52,7 +55,7 @@ chiSquare: n range: r
 ! !
 
 
-!Random methodsFor: 'basic'!
+! Random methodsFor: 'basic'!
 
 atEnd
     ^false
@@ -80,7 +83,7 @@ nextMatchFor: aNumber
     ^self next = aNumber
 ! !
 
-!Random methodsFor: 'private'!
+! Random methodsFor: 'private'!
 
 setSeed
     seed <- Time secondClock
