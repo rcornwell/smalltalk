@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Lexiconal Scanner.
  *
  * $Log: lex.c,v $
+ * Revision 1.3  2000/02/02 16:06:22  rich
+ * Don't need to include primitives any more
+ *
  * Revision 1.2  2000/02/01 18:09:54  rich
  * Converted pushback from array to single character.
  * Fixed some bugs in floating point conversion.
@@ -18,27 +21,13 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: lex.c,v 1.2 2000/02/01 18:09:54 rich Exp rich $";
+	"$Id: lex.c,v 1.3 2000/02/02 16:06:22 rich Exp rich $";
 
 #endif
 
 /* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
+#include "smalltalk.h"
 #include <math.h>
-#include <memory.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
 #include "object.h"
 #include "smallobjs.h"
 #include "lex.h"
