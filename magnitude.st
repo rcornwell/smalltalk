@@ -1,9 +1,14 @@
 " Methods for Class magnitude and all it's subclasses"
 
-" $Id: magnitude.st,v 1.4 2001/07/31 14:09:48 rich Exp rich $ "
+" $Id: magnitude.st,v 1.5 2001/08/18 16:17:01 rich Exp rich $ "
 
 "
  $Log: magnitude.st,v $
+ Revision 1.5  2001/08/18 16:17:01  rich
+ Placed classes and methods in correct categories.
+ Added LargeInteger, Fraction and Complex classes.
+ Fixed Date and Time classes.
+
  Revision 1.4  2001/07/31 14:09:48  rich
  Code cleanup.
  Moved definition of Magnitude, Number, Integer class to init.c
@@ -21,7 +26,11 @@
  Initial revision
 
 "
-Magnitude category: 'Comparision'!
+Object subclass: 'Magnitude'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Comparision' !
 
 Magnitude comment: 
  'I am a abstract class. I represent relationships between objects.' !
@@ -64,7 +73,15 @@ max: aMagnitude
 			  ifFalse: [ ^ aMagnitude ].
 ! !
 
-Character category: 'Comparision'!
+"Magnitude subclass: 'Character'
+	instanceVariableNames: 'value'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Comparision'" !
+
+Magnitude addSubclass: Character !
+
+Character category: 'Comparison' !
 
 Character comment: 
  'I represent individual characters, my class is initialized by the system
@@ -262,7 +279,11 @@ storeOn: aStream
     aStream nextPut: self
 ! !
 
-Number category: 'Arithmetic'!
+Magnitude subclass: 'Number'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
 	
 Number comment: 
  'I am a abstract class. I represent numeric objects.' !
@@ -512,7 +533,9 @@ numerator: nInteger denominator: dInteger
 ! Fraction methodsFor: 'accessing' !
 
 denominator
-	^denominator!
+	^denominator
+!
+
 numerator
 	^numerator 
 ! !
@@ -629,6 +652,10 @@ hash
 
 ! Fraction methodsFor: 'converting' !
 
+asInteger
+	^ self truncated
+!
+
 asFloat
 	^numerator asFloat / denominator asFloat
 !
@@ -675,7 +702,11 @@ setNumerator: numInteger setDenominator: denInteger
 			denominator <- denInteger]
 ! !
 
-Integer category: 'Arithmetic'!
+Number subclass: 'Integer'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
 
 Integer comment: ' I represent integer numbers.' !
 
@@ -753,6 +784,10 @@ timesRepeat: aBlock
 ! !
 
 ! Integer methodsFor: 'conversion'!
+
+asInteger
+    ^ self
+!
 
 asCharacter
     "Return self as an ascii character"
@@ -849,7 +884,15 @@ signedStringBase: radix showRadix: showRadix
     ^str contents
 ! !
 
-SmallInteger category: 'Arithmetic'!
+Integer wordSubclass: 'SmallInteger'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
+
+"SmallInteger category: 'Arithmetic' " !
+
+"Integer addSubclass: SmallInteger " !
 
 SmallInteger comment: 
 	'I represent integer numbers that are built into the system. ' !
@@ -974,7 +1017,11 @@ generality
 	^ 1
 ! !
 
-LargePositiveInteger category: 'Arithmetic'!
+Integer variableByteSubclass: 'LargePositiveInteger'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
 
 LargePositiveInteger comment: 
    'I represent positive integer numbers that are too big for SmallInteger. ' !
@@ -1119,7 +1166,11 @@ generality
 	^ 2
 ! !
 
-LargeNegativeInteger category: 'Arithmetic'!
+Integer variableByteSubclass: 'LargeNegativeInteger'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
 
 LargeNegativeInteger comment: 
    'I represent negative integer numbers that are too big for SmallInteger. ' !
@@ -1259,7 +1310,11 @@ generality
 	^ 2
 ! !
 
-Float category: 'Arithmetic'!
+Number variableByteSubclass: 'Float'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Arithmetic' !
 
 Float comment: 
    'I represent real number. ' !
@@ -1434,6 +1489,10 @@ generality
 ! !
 
 ! Float methodsFor: 'conversion' !
+
+asInteger
+	^ self truncated
+!
 
 asFloat
 	^ self
