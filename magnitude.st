@@ -1,9 +1,13 @@
 " Methods for Class magnitude and all it's subclasses"
 
-" $Id: magnitude.st,v 1.5 2001/08/18 16:17:01 rich Exp rich $ "
+" $Id: magnitude.st,v 1.6 2001/08/29 20:16:35 rich Exp rich $ "
 
 "
  $Log: magnitude.st,v $
+ Revision 1.6  2001/08/29 20:16:35  rich
+ Added class definitions.
+ Added asInteger methods.
+
  Revision 1.5  2001/08/18 16:17:01  rich
  Placed classes and methods in correct categories.
  Added LargeInteger, Fraction and Complex classes.
@@ -345,7 +349,7 @@ retry: aSymbol coercing: aNumber
 
 quo: aNumber
 	"Return the integer quotient of dividing the reciever by aNumber"
-	^ ( self / aNumber) truncated
+	^ ( self // aNumber) truncated
 !
 
 rem: aNumber
