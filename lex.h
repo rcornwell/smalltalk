@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Lexiconal Scanner.
  *
- * $Id: $
+ * $Id: lex.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: lex.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -28,8 +31,7 @@ typedef struct _token {
     int                 tok;
     char               *buffer;
     char               *str;
-    int                 pushptr;
-    char                push[10];
+    char                pushback;
     char               *string;
     Objptr              object;
     char                spec[4];
