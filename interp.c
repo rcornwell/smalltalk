@@ -3,6 +3,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.7  2001/08/18 16:17:01  rich
+ * Fixed process management code.
+ * Added queue functions to improve communications from system to image.
+ *
  * Revision 1.6  2001/08/01 16:42:31  rich
  * Added Pshint instruction.
  * Moved sendsuper to group 2.
@@ -38,7 +42,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.6 2001/08/01 16:42:31 rich Exp rich $";
+"$Id: interp.c,v 1.7 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -396,9 +400,6 @@ interp()
 
    /* Clear Method Cache */
     init_method_cache();
-
-   /* Initialize asynchronous signals queue */
-    init_event(&asyncsigs);
 
    /* Force a load */
     newContextFlag = 1;
