@@ -2,6 +2,11 @@
  * Smalltalk interpreter: File IO routines.
  *
  * $Log: fileio.c,v $
+ * Revision 1.4  2001/01/13 15:53:03  rich
+ * Added routine to check if files are still accessible, and close them
+ *   if they are no longer usable.
+ * Increased buffer size to 8k.
+ *
  * Revision 1.3  2000/02/02 16:05:02  rich
  * Don't need to include primitive.h
  *
@@ -18,27 +23,20 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: fileio.c,v 1.3 2000/02/02 16:05:02 rich Exp rich $";
+	"$Id: fileio.c,v 1.4 2001/01/13 15:53:03 rich Exp rich $";
 
 #endif
 
-#ifdef unix
+#include "smalltalk.h"
+
 /* System stuff */
-#include <stdio.h>
-#include <unistd.h>
+#ifndef WIN32
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #ifdef sun
 #include <sys/filio.h>
 #endif
-#include <malloc.h>
-#include <memory.h>
-#endif
-
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
 #endif
 
 #include "object.h"
@@ -166,7 +164,6 @@ peek_for(Objptr op, char c)
 	    fp->file_flags &= ~FILE_DIRTY;
         }
         file_seek(fp->file_id, fp->file_pos = pos);
-        fp->file_offset = fp->file_buffer;
         fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
         if (fp->file_len < 0) {
     	    return FALSE;
@@ -209,9 +206,8 @@ open_buffer(Objptr op)
 	free(fp);
 	return FALSE;
     }
-    fp->file_offset = fp->file_buffer;
     fp->file_len = 0;
-    fp->file_pos = -1;
+    fp->file_pos = 0;
     name = Cstring(get_pointer(op, FILENAME));
     mode = Cstring(get_pointer(op, FILEMODE));
     if ((fp->file_id = file_open(name, mode, &fp->file_flags)) == -1) {
@@ -316,6 +312,7 @@ read_buffer(Objptr op, int *c)
     struct file_buffer *fp;
     Objptr              temp;
     int                 pos;
+    int			offset;
 
    /* Look it up */
     for (fp = files; fp != NULL; fp = fp->file_next)
@@ -335,21 +332,25 @@ read_buffer(Objptr op, int *c)
     pos = as_integer(temp);
 
    /* Check if we have to move buffer */
-    if (pos < fp->file_pos || pos >= (fp->file_pos + fp->file_len)) {
+    offset = pos - fp->file_pos;
+    if (offset < 0 || offset >= fp->file_len) {
 	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
 	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
 	    file_seek(fp->file_id, fp->file_pos);
-	    file_write(fp->file_id, fp->file_buffer, fp->file_len);
+	    file_write(fp->file_id, fp->file_buffer, fp->file_len + 1);
 	    fp->file_flags &= ~FILE_DIRTY;
 	}
-	file_seek(fp->file_id, fp->file_pos = pos);
-	fp->file_offset = fp->file_buffer;
+	fp->file_pos = pos;
+	offset = 0;
+	file_seek(fp->file_id, fp->file_pos);
 	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	if (fp->file_len < 0)
+	    return FALSE;
     }
     if (fp->file_len <= 0)
 	return FALSE;
    /* Get next char */
-    *c = (int) fp->file_buffer[pos - fp->file_pos];
+    *c = (int) fp->file_buffer[offset];
     pos++;
     Set_integer(op, FILEPOS, pos);
     return TRUE;
@@ -374,8 +375,9 @@ size_buffer(Objptr op)
 
     len = file_size(fp->file_id);
     if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-		 (FILE_WRITE | FILE_DIRTY) && len == fp->file_pos)
-	len += fp->file_len;
+		 (FILE_WRITE | FILE_DIRTY) && 
+		(fp->file_len + fp->file_pos) > len)
+	len = fp->file_len + fp->file_pos;
     return len;
 }
 
@@ -388,6 +390,7 @@ write_buffer(Objptr op, int c)
     struct file_buffer *fp;
     Objptr              temp;
     int                 pos;
+    int			offset;
 
    /* Look it up */
     for (fp = files; fp != NULL; fp = fp->file_next)
@@ -406,30 +409,31 @@ write_buffer(Objptr op, int c)
 	return FALSE;
     pos = as_integer(temp);
    /* Check if we have to move buffer */
-    if (pos < fp->file_pos || pos > (fp->file_pos + BUFSIZE) ||
-	fp->file_len >= (BUFSIZE - 1)) {
+    offset = pos - fp->file_pos;
+    if (offset < 0 || offset >= BUFSIZE || fp->file_len >= BUFSIZE) {
 	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
 	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
 	    file_seek(fp->file_id, fp->file_pos);
 	    file_write(fp->file_id, fp->file_buffer, fp->file_len);
 	    fp->file_flags &= ~FILE_DIRTY;
 	}
-	file_seek(fp->file_id, fp->file_pos = pos);
-	fp->file_offset = fp->file_buffer;
+	fp->file_pos = pos;
+	offset = 0;
+	file_seek(fp->file_id, fp->file_pos);
 	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
 	if (fp->file_len < 0) 
 	    return FALSE;
     }
-    if ((pos - fp->file_pos) >= fp->file_len)
-	fp->file_len = pos - fp->file_pos;
-    fp->file_buffer[pos - fp->file_pos] = c;
+    fp->file_buffer[offset++] = c;
+    if (fp->file_len < offset)
+	fp->file_len = offset;
     fp->file_flags |= FILE_DIRTY;
     pos++;
     Set_integer(op, FILEPOS, pos);
     return TRUE;
 }
 
-#ifdef unix
+#ifndef WIN32
 long 
 file_open(char *name, char *mode, int *flags)
 {
@@ -563,7 +567,7 @@ flush_buffer(int stream, char *string)
 
 #endif
 
-#ifdef _WIN32
+#ifdef WIN32
 long 
 file_open(char *name, char *mode, int *flags)
 {
@@ -584,7 +588,7 @@ file_open(char *name, char *mode, int *flags)
     case 'a':
 	*flags = FILE_READ | FILE_WRITE;
 	id = CreateFile(name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
-			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+			OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	break;
     default:
 	return -1;
@@ -717,7 +721,7 @@ flush_buffer(int stream, char *string)
 
     if (needconsole) {
 	if (AllocConsole() == 0)
-	   return NULL;
+	   return FALSE;
 	needconsole = 0;
     }
 
