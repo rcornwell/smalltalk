@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main routine.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.6  2001/08/18 16:17:02  rich
+ * Moved windows code to win32.c.
+ * Made main generic between windows and unix.
+ *
  * Revision 1.5  2001/07/31 14:09:49  rich
  * Fixed to compile under cygwin.
  *
@@ -22,7 +26,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smalltalk.c,v 1.5 2001/07/31 14:09:49 rich Exp rich $";
+	"$Id: smalltalk.c,v 1.6 2001/08/18 16:17:02 rich Exp rich $";
 #endif
 
 #include "smalltalk.h"
@@ -37,6 +41,7 @@ char               *imagename = NULL;
 char               *loadfile = NULL;
 int                 defotsize = 512;
 char		   *progname = NULL;
+char		   *geometry = NULL;
 
 static int          getnum(char *, int *);
 
@@ -48,7 +53,9 @@ main(int argc, char *argv[])
    /* Process arguments */
     progname = *argv;
     while ((str = *++argv) != NULL) {
-	if (*str == '-') {
+	if (*str == '=') {
+	    geometry = str;
+	} else if (*str == '-') {
 	    while (*++str != '\0') {
 		switch (*str) {
 		case 'i':	/* Image file name */
@@ -91,6 +98,7 @@ main(int argc, char *argv[])
 	/* Allocate some work space */
 	if ((temp = (char *)malloc(strlen(progname) + 5)) == NULL) {
 	   errorStr("Out of memory", NULL);
+    	   endSystem();
 	   return -1;
 	}
 	strcpy(temp, progname);
@@ -120,6 +128,7 @@ main(int argc, char *argv[])
 			loadfile = temp;
 		} else {
 	    		errorStr("No image found", NULL);
+    			endSystem();
 	    		return -1;
 		}
 	}
@@ -137,9 +146,11 @@ main(int argc, char *argv[])
 	    parsefile(loadfile);
 	else {
 	    errorStr("No image found", NULL);
+	    endSystem();
 	    return -1;
 	}
     }
+    endSystem();
     close_files();
     return 0;
 
