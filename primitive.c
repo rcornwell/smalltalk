@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Log: $
+ * $Log: primitive.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: primitive.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -350,6 +353,26 @@ FindSelectorInIDictionary(Objptr dict, Objptr selector)
     }
     return NilPtr;
 }
+
+/*
+ * Find the selector for an object in a identity dictionary.
+ */
+Objptr
+FindKeyInIDictionary(Objptr dict, Objptr key)
+{
+    int                 length = length_of(dict);
+    int                 index;
+    Objptr		values;
+
+
+    values = get_pointer(dict, DICT_VALUES);
+    for (index = 0; index < length; index++) {
+	if (key == get_pointer(values, index))
+	    return get_pointer(dict, index + DICT_KEY);
+    }
+    return NilPtr;
+}
+
 /*
  * Create a new identity dictionary.
  */
@@ -633,6 +656,52 @@ new_Set()
 }
 
 /*
+ * Do a stack trace back of offending send.
+ */
+void
+dump_stack(Objptr op)
+{
+    char		buffer[1024];
+    Objptr		context = current_context;
+
+    context = get_pointer(context, BLOCK_SENDER);
+    while (context != NilPtr) {
+	Objptr		rec, meth, class, dict;
+	Objptr		select = NilPtr;
+
+	/* Figure out info about call */
+	if (get_integer(context, BLOCK_IIP) != 0) {
+	    Objptr	home = get_pointer(context, BLOCK_HOME);
+	    rec = get_pointer(home, BLOCK_REC);
+	    meth = get_pointer(home, BLOCK_METHOD);
+	    strcpy(buffer, "Block: ");
+	} else  {
+	    rec = get_pointer(context, BLOCK_REC);
+	    meth = get_pointer(context, BLOCK_METHOD);
+	    strcpy(buffer, "Called: ");
+	}
+
+	/* Find method name */
+	for (class = class_of(rec);
+	     class != NilPtr;
+	     class = get_pointer(class, SUPERCLASS)) {
+	  if ((dict = get_pointer(class, METHOD_DICT)) != NilPtr &&
+	      (select = FindKeyInIDictionary(dict, meth)) != NilPtr)
+	     break;
+	}
+
+	/* Sanity check */
+	if (select == NilPtr)
+	   break;
+	strcat(buffer, dump_object_value(rec));
+	strcat(buffer, " Selector: ");
+	strcat(buffer, dump_object_value(select));
+	dump_string(buffer);
+        context = get_pointer(context, BLOCK_SENDER);
+    }
+}
+
+/*
  * Process a primitive function.
  */
 int
@@ -646,6 +715,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
     int                 result;
     int                 temp;
     int                 index;
+    char		*str;
 
    /* Grab first argument if there is one */
     if (args >= 1)
@@ -677,9 +747,13 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveDivide:
 	if (is_integer(reciever) && is_integer(argument)) {
-	    if ((temp = as_integer(argument)) == 0)
+	    iarg = as_integer(reciever);
+	    temp = as_integer(argument);
+	    if (temp == 0 || (iarg % temp) != 0)
 		break;
-	    result = as_integer(reciever) / temp;
+	    
+	    result = iarg / temp;
+	    
 	    PushInteger(result, 2);
 	}
 	break;
@@ -695,11 +769,11 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveDiv:
 	if (is_integer(reciever) && is_integer(argument)) {
-	    iarg = as_integer(argument);
-	    temp = as_integer(reciever);
-	    if (iarg == 0 || (temp % iarg) == 0)
+	    iarg = as_integer(reciever);
+	    temp = as_integer(argument);
+	    if (temp == 0)
 		break;
-	    result = temp / iarg;
+	    result = iarg / temp;
 	    PushInteger(result, 2);
 	}
 	break;
@@ -965,7 +1039,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    break;
 	if (index > temp || !arrayAt(argument, index, &res))
 	    break;
-	if (res == StringClass) {
+	if (otemp == StringClass) {
 	    if (!is_integer(res))
 		break;
 	    res = get_pointer(CharacterTable, as_integer(res)
@@ -977,7 +1051,11 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
     case primitiveNextPut:
 	res = get_pointer(reciever, STREAMARRAY);
 	IntValue(reciever, STREAMINDEX, index);
-	IntValue(reciever, STREAMWRITEL, temp);
+	IntValue(reciever, STREAMREADL, temp);
+	IntValue(reciever, STREAMWRITEL, iarg);
+	/* Check if room left in collection for insert */
+	if (temp > iarg)
+	   break;
 	index++;
 	otemp = class_of(res);
 	if (otemp != ArrayClass || otemp != StringClass)
@@ -986,6 +1064,8 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    argument = get_pointer(argument, CHARVALUE);
 	if (index > temp || !arrayPutAt(res, index, argument))
 	    break;
+	if (index > temp)
+	   Set_integer(reciever, STREAMREADL, index - 1);
 	Set_integer(reciever, STREAMINDEX, index);
 	AdjustStack(2, argument);
 
@@ -993,28 +1073,23 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	argument = get_pointer(reciever, STREAMARRAY);
 	IntValue(reciever, STREAMINDEX, index);
 	IntValue(reciever, STREAMREADL, iarg);
-	if (!is_indexable(argument) || index < 0)
-	    break;
-	temp = length_of(argument);
-	res = class_of(argument);
-	if (temp < 0 || res != ArrayClass || res != StringClass)
-	    break;
-	AdjustStack(1, (index >= temp || index >= iarg) ?
-		    TruePointer : FalsePointer);
+	AdjustStack(1, (index > iarg) ? TruePointer : FalsePointer);
 
     case primitiveObjectAt:
 	IsInteger(argument, index);
 	temp = get_pointer(reciever, METH_HEADER);
-	if (index > 0 && index <= LiteralsOf(temp))
-	    AdjustStack(2, get_pointer(reciever, (index - 1) + METH_HEADER));
+	index--;
+	if (index >= 0 && index <= LiteralsOf(temp))
+	    AdjustStack(2, get_pointer(reciever, index + METH_HEADER));
 	break;
 
     case primitiveObjectAtPut:
 	IsInteger(argument, index);
 	temp = get_pointer(reciever, METH_HEADER);
-	if (index > 0 && index <= LiteralsOf(temp)) {
+	index--;
+	if (index >= 0 && index <= LiteralsOf(temp)) {
 	    res = GetStack(2);
-	    Set_object(reciever, (index - 1) + METH_HEADER, res);
+	    Set_object(reciever, index + METH_HEADER, res);
 	    AdjustStack(3, res);
 	}
 	break;
@@ -1025,7 +1100,12 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveNewWithArg:
 	IsInteger(argument, temp);
-	AdjustStack(2, create_new_object(reciever, temp));
+	if (temp < 0)
+	   break;
+	res = create_new_object(reciever, temp);
+	if (res == NilPtr)
+	   break;
+	AdjustStack(2, res);
 	break;
 
     case primitiveBecome:
@@ -1070,15 +1150,14 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveNewMethod:
-	res = GetStack(2);
-	IsInteger(res, temp);
+	otemp = GetStack(2);
+	IsInteger(argument, temp);
        /* Round size to multiple of object pointer size */
-	temp += sizeof(Objptr) - 1;
-	temp /= sizeof(Objptr);
+	temp = (temp + (sizeof(Objptr) - 1)) / sizeof(Objptr);
        /* Add on number of literals and one word for header */
-	temp += 1 + LiteralsOf(argument);
-	if ((res = create_new_object(reciever, temp)) != NilPtr) {
-	    set_pointer(res, METH_HEADER, argument);
+	temp += LiteralsOf(otemp) + 1;
+	if ((res = create_new_object(CompiledMethodClass, temp)) != NilPtr) {
+	    set_pointer(res, METH_HEADER, otemp);
 	    AdjustStack(3, res);
 	}
 	break;
@@ -1098,7 +1177,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    Set_object(current_context, (*stack_pointer)++, NilPtr);
 	}
 
-       /* Remove the block from top of stack too */
+       /* Remove the block from top of stack */
         Set_object(current_context, (*stack_pointer)++, NilPtr);
 
        /* Set new block context registers */
@@ -1219,28 +1298,31 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	Set_object(current_context, *stack_pointer, FalsePointer);
 
        /* Do Snapshot, if we fail, let primitive fail handle problem */
-	if (doSnapShot(reciever)) {
-	    PushBoolean(TRUE, 1);	/* Now return a TRUE to running system */
+	if (doSnapShot(argument)) {
+	    PushBoolean(TRUE, 2); /* Now return a TRUE to running system */
 	} else
 	    return FALSE;
 	break;
 
     case primitiveFileOpen:
-	open_buffer(reciever);
+	PushBoolean (open_buffer(reciever), 1);
 	return TRUE;
 
     case primitiveFileClose:
 	close_buffer(reciever);
+	PushBoolean (TRUE, 1);
 	return TRUE;
 
     case primitiveFileNext:
-	if (read_buffer(reciever, &temp))
-	    AdjustStack(2, get_pointer(CharacterTable, as_integer(temp))
+	if (read_buffer(reciever, &temp)) {
+	    AdjustStack(1, get_pointer(CharacterTable, temp)
 			+ (fixed_size(CharacterTable) / sizeof(Objptr)));
+	}
 	break;
 
     case primitiveFileNextPut:
-	if (write_buffer(reciever, as_integer(temp)))
+	if (write_buffer(reciever, 
+			as_integer(get_pointer(argument, CHARVALUE))))
 	    AdjustStack(2, temp);
 	break;
 
@@ -1261,14 +1343,10 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveInternString:
-	{
-	    char               *str;
-
-	    str = Cstring(reciever);
-	    temp = internString(str);
-	    free(str);
-	    AdjustStack(1, temp);
-	}
+	str = Cstring(reciever);
+	temp = internString(str);
+	free(str);
+	AdjustStack(1, temp);
 	break;
 
     case primitiveClassComment:
@@ -1277,26 +1355,24 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveMethodsFor:
+	str = Cstring(argument);
+	argument = internString(str);
+	free(str);
 	rootObjects[METHFOR0] = compClass = reciever;
 	rootObjects[METHFOR1] = compCatagory = argument;
-	AdjustStack(1, reciever);
+ 	AdjustStack(1, reciever); 
 	break;
 
     case primitiveError:
-	{
-	    char               *str;
-
-	    str = Cstring(argument);
-	    error(str);
-	    free(str);
-	    AdjustStack(2, NilPtr);
-	}
-	break;
+        dump_stack(reciever);
+	str = Cstring(argument);
+	error(str);
+	free(str);
+        AdjustStack(2, NilPtr);
 
     case primitiveDumpObject:
 	dump_object(reciever);
-	AdjustStack(1, reciever);
-	break;
+	return TRUE;
 
     case primitiveTimeWordsInto:
 	/* Creates and initializes a new time object */
@@ -1311,7 +1387,102 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
            then or equal to second argument */
 	break;
 
+    case primitiveStackTrace:
+	/* Print out a stack trace */
+	dump_stack(reciever);
+	return TRUE;
+
+    case primitiveEvaluate:
+	/* Evalutate a CompiledMethod. */
+        otemp = get_pointer(reciever, METH_HEADER);
+        index = TempsOf(otemp);
+        temp = LiteralsOf(otemp);
+
+       /* Check type of method */
+        switch (FlagOf(otemp)) {
+        case METH_RETURN:
+	     res = get_pointer(reciever, temp);
+	     AdjustStack(1, res);
+	     return TRUE;
+        case METH_SETINST:
+	    return FALSE;
+        case METH_EXTEND:
+	    index = PrimitiveOf(get_pointer(reciever, temp + METH_HEADER));
+	    if (index > 0 &&
+	        primitive(index, reciever, newClass, 0, stack_pointer)) {
+	        return TRUE;
+	    }
+	    break;
+        default:
+	    break;
+        }
+	index += StackOf(otemp);
+         /* Initialize a new method. */
+        res = create_new_object(MethodContextClass, index);
+        Set_object(res, BLOCK_SENDER, current_context);
+        Set_integer(res, BLOCK_IP, sizeof(Objptr) * (temp + METH_LITSTART));
+        Set_integer(res, BLOCK_SP, size_of(res) / sizeof(Objptr));
+        Set_object(res, BLOCK_METHOD, reciever);
+        Set_integer(res, BLOCK_IIP, 0);
+        Set_object(res, BLOCK_REC, reciever);
+        Set_integer(res, BLOCK_ARGCNT, 0);
+
+       /* Switch to context */
+	current_context = res;
+	newContextFlag = 1;
+	return TRUE;
+
+     case primitiveFillBuffer:
+	IsInteger(argument, index);
+	res = GetStack(2);
+	IsInteger(res, temp);
+	if ((str = fill_buffer(index, temp)) == NULL)
+	   break;
+    	res = MakeString(str);
+	free(str);
+	AdjustStack(2, res);
+ 	break;
+
+     case primitiveFlushBuffer:
+	IsInteger(argument, index);
+	res = GetStack(2);
+	if ((str = Cstring(res)) == NULL)
+	   break;
+        temp = flush_buffer(index, str);
+        free(str);
+        if (temp)
+	   AdjustStack(2, reciever);
+	break;
+
+    case primitiveByteAt:
+	IsInteger(argument, index);
+	temp = get_pointer(reciever, METH_HEADER);
+	temp = (LiteralsOf(temp) * sizeof(Objptr));
+	index--;
+	if (index >= 0 &&
+		 index < ((length_of(reciever) * sizeof(Objptr)) - temp)) {
+	    temp += fixed_size(reciever);
+	    AdjustStack(2, as_integer_object(get_byte(reciever, index + temp)));
+	}
+	break;
+
+    case primitiveByteAtPut:
+	IsInteger(argument, index);
+        res = GetStack(2);
+	IsInteger(res, iarg);
+	temp = get_pointer(reciever, METH_HEADER);
+	temp = (LiteralsOf(temp) * sizeof(Objptr));
+	index--;
+	if (index >= 0 &&
+		 index <= (1 + (length_of(reciever) * sizeof(Objptr)) - temp)) {
+	    temp += fixed_size(reciever);
+	    set_byte(reciever, index + temp, iarg);
+	    AdjustStack(3, res);
+	}
+	break;
     default:
     }
     return FALSE;
 }
+
+
