@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.6  2001/07/31 14:09:48  rich
+ * Fixed to compile under new cygwin
+ * Fixed bug in preform.
+ *
  * Revision 1.5  2001/01/17 01:42:25  rich
  * ReclaimSpace before dumping an image.
  * Added primitives to call flushCache.
@@ -28,7 +32,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.5 2001/01/17 01:42:25 rich Exp rich $";
+	"$Id: primitive.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -36,8 +40,11 @@ static char        *rcsid =
 #include <math.h>
 #include "image.h"
 #include "object.h"
-#include "smallobjs.h"
 #include "interp.h"
+#include "smallobjs.h"
+#include "largeint.h"
+#include "graphic.h"
+#include "system.h"
 #include "primitive.h"
 #include "fileio.h"
 #include "dump.h"
@@ -46,24 +53,43 @@ static char        *rcsid =
 				 get_pointer(current_context, \
 					stack_pointer + (args - (off))))
 
-/* Add support for largeinteger */
+/* Cases to check and build short long integer */
+#define IsLargeInt(x)	((class_of((x)) == LargeNegIntegerClass || \
+			  class_of((x)) == LargePosIntegerClass ) && \
+				length_of((x)) == sizeof(long))
+#define intValue(x)	(((class_of((x)) == LargeNegIntegerClass)?-1:1) *  \
+			    (*((long *)get_object_base((x)))))
+#define newLargeInt(x)	res = create_new_object( \
+			    ((x) >= 0)? LargePosIntegerClass: \
+				        LargeNegIntegerClass, \
+					 sizeof(long)); \
+			*((long *)get_object_base(res))=((x)>=0)?(x):(-x);
+
+/* Cases to check and build float */
+#define IsFloat(x)	(class_of((x)) == FloatClass)
+#define floatValue(x)	(*((double *)get_object_base((x))))
+#define newFloat(x)	res = create_new_object(FloatClass, sizeof(double)); \
+			*((double *)get_object_base(res))=(x);
+
+/* Cases to check and build char */
+#define IsChar(x)	(class_of((x)) == CharacterClass)
+#define charValue(x)    (get_pointer((x), CHARVALUE))
+
+
 #define IsInteger(op, value) \
-	if (!is_integer((op))) \
-		break; \
-	(value) = as_integer((op));
+	if (is_integer((op))) { \
+	    (value) = as_integer((op)); \
+	} else { \
+	    if(IsLargeInt((op))) \
+	        (value) = intValue((op)); \
+	    else  \
+	        break; \
+	}
 
 #define IntValue(op, off, value) { \
  		  Objptr	_temp_ = get_pointer((op), (off)); \
 		  IsInteger(_temp_, (value)); \
 		  }
-
-#define ReturnInteger(value) { \
-	    Objptr  _temp_ = (value); \
-	    if (canbe_integer(_temp_)) { \
-		res = as_integer_object(_temp_); \
-		success = TRUE; \
-	    } \
-	    }
 
 #define CheckIndex(array, index) { \
 	int _temp_ = length_of(array); \
@@ -71,16 +97,22 @@ static char        *rcsid =
 		break;  \
 	}
 
-#define IsFloat(x)	(class_of((x)) == FloatClass)
-#define floatValue(x)	(*((double *)get_object_base((x))))
-#define newFloat(x)	res = create_new_object(FloatClass, sizeof(double)); \
-			*((double *)get_object_base(res))=(x);
+#define ReturnInteger(value) { \
+	    long  _temp_ = (value); \
+	    if (canbe_integer(_temp_)) \
+		res = as_integer_object(_temp_); \
+	    else { newLargeInt(_temp_); } \
+	    success = TRUE; \
+	    }
 
 
 #define ReturnFloat(expr) {newFloat((expr)); success = TRUE; }
 
 #define ReturnBoolean(expr) \
 	 { res = ((expr))? TruePointer: FalsePointer; success = TRUE; }
+
+#define ReturnBool(expr) \
+	 { res = ((expr))? TruePointer: FalsePointer; }
 
 #define ReturnChar(expr) { \
 	    int _temp_  = (expr); \
@@ -91,8 +123,6 @@ static char        *rcsid =
 	    success = TRUE; \
 	}
 
-#define IsChar(x)	(class_of((x)) == CharacterClass)
-#define charValue(x)    (get_pointer((x), CHARVALUE))
 
 #define ReturnValidObject(expr) { res = (expr); success = res != NilPtr; }
 
@@ -117,8 +147,11 @@ arrayAt(Objptr array, int index, Objptr * value)
 	temp = get_word(array, index + (base / sizeof(Objptr)));
 	if (canbe_integer(temp))
 	    *value = as_integer_object(temp);
-	else
-	    return FALSE;	/* Handle later */
+	else {
+	    Objptr	res;
+	    newLargeInt(temp);
+	    *value = res;
+	}
     } else
 	*value = get_pointer(array, index + (base / sizeof(Objptr)));
     return TRUE;
@@ -139,9 +172,14 @@ arrayPutAt(Objptr array, int index, Objptr value)
 	    return FALSE;	/* Handle Later */
 	set_byte(array, index + base, as_integer(value));
     } else if (is_word(array)) {
-	if (!is_integer(value))
-	    return FALSE;	/* Handle Later */
-	temp = as_integer(value);
+	if (is_integer(value)) { 
+	    temp = as_integer(value); 
+	} else { 
+	    if(IsLargeInt(value)) 
+	        temp = intValue(value); 
+	    else  
+	        return FALSE; 
+	}
 	set_word(array, index + (base / sizeof(Objptr)), temp);
     } else
 	Set_object(array, index + (base / sizeof(Objptr)), value);
@@ -193,9 +231,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveMult:
-	IsInteger(reciever, temp);
-	IsInteger(argument, iarg);
-	ReturnInteger(temp * iarg);
+	ReturnValidObject(small_mult(reciever, argument));
 	break;
 
     case primitiveDivide:
@@ -437,6 +473,78 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
     case primitiveFloatATan:
 	if (IsFloat(reciever))
 	    ReturnFloat(atan(floatValue(reciever)));
+	break;
+
+    case primitiveLargeIntAdd:
+	ReturnValidObject(large_add(reciever, argument));
+	break;
+
+    case primitiveLargeIntSub:
+	ReturnValidObject(large_sub(reciever, argument));
+	break;
+
+    case primitiveLargeIntMult:
+	ReturnValidObject(large_mult(reciever, argument));
+	break;
+
+    case primitiveLargeIntDivide:
+	ReturnValidObject(large_divide(reciever, argument, 2));
+	break;
+
+    case primitiveLargeIntMod:
+	ReturnValidObject(large_divide(reciever, argument, 1));
+	break;
+
+    case primitiveLargeIntDiv:
+	ReturnValidObject(large_divide(reciever, argument, 0));
+	break;
+
+    case primitiveLargeIntBitAnd:
+	ReturnValidObject(large_and(reciever, argument));
+	break;
+
+    case primitiveLargeIntBitOr:
+	ReturnValidObject(large_or(reciever, argument));
+	break;
+
+    case primitiveLargeIntBitXor:
+	ReturnValidObject(large_xor(reciever, argument));
+	break;
+
+    case primitiveLargeIntBitShift:
+	ReturnValidObject(large_shift(reciever, argument));
+	break;
+
+    case primitiveLargeIntEqual:
+	ReturnBool(large_cmp(reciever, argument, &success) == 0);
+	break;
+
+    case primitiveLargeIntNotEqual:
+	ReturnBool(large_cmp(reciever, argument, &success) != 0);
+	break;
+
+    case primitiveLargeIntLess:
+	ReturnBool(large_cmp(reciever, argument, &success) < 0);
+	break;
+
+    case primitiveLargeIntGreater:
+	ReturnBool(large_cmp(reciever, argument, &success) > 0);
+	break;
+
+    case primitiveLargeIntLessEqual:
+	ReturnBool(large_cmp(reciever, argument, &success) <= 0);
+	break;
+
+    case primitiveLargeIntGreaterEqual:
+	ReturnBool(large_cmp(reciever, argument, &success) >= 0);
+	break;
+
+    case primitiveLargeIntNegated:
+	ReturnValidObject(negate(reciever));
+	break;
+
+    case primitiveAsLargeInt:
+	ReturnValidObject(large_int(reciever));
 	break;
 
     case primitiveAt:
@@ -713,6 +821,8 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	return TRUE;
 
     case primitiveResume:
+	/* We don't want to lose this object until it is safe */
+	object_incr_ref(reciever);
 	resume(reciever);
 	return TRUE;
 
@@ -779,20 +889,45 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    success = TRUE;
 	break;
 
-    case primitiveFileGet:
+    case primitiveFileNextAll:
 	/* Load second arguemnt with contents of file */
+	IsInteger(argument, iarg);
+	if (read_str_buffer(reciever, iarg, &res))
+	    success = TRUE;
 	break;
 
-    case primitiveFilePut:
+    case primitiveFileNextPutAll:
 	/* Save second argument to file */
+	otemp = class_of(argument);
+	if (otemp == StringClass) {
+	    str = Cstring(argument);
+	    if (write_str_buffer(reciever, str, length_of(argument)))
+	    	success = TRUE;
+	    free(str);
+ 	}
 	break;
 
     case primitiveFileSize:
 	ReturnInteger(size_buffer(reciever));
 	break;
 
+    case primitiveFileisDirectory:
+	temp = file_isdirect(reciever);
+	if (temp >= 0)
+	    ReturnBoolean(temp);
+	break;
+
+    case primitiveFileRename:
+	ReturnBoolean(file_rename(reciever, argument));
+	break;
+
+    case primitiveFileDelete:
+	ReturnBoolean(file_delete(reciever));
+	break;
+
     case primitiveFileDir:
 	/* Create a array of files in directory of argument */
+	ReturnObject(file_direct(reciever));
 	break;
 
     case primitiveInternString:
@@ -821,23 +956,28 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	error(str);
 	free(str);
 	success = TRUE;
+	/* Fall through */
 
     case primitiveDumpObject:
 	dump_object(reciever);
 	success = TRUE;
 	break;
 
-    case primitiveTimeWordsInto:
+    case primitiveSecondClock:
 	/* Creates and initializes a new time object */
+	ReturnInteger(current_time());
 	break;
 
-    case primitiveTickWordsInto:
-	/* Creates new time object with miliseconds since booting */
+    case primitiveMillisecondClock:
+	/* Creates new time object with miliseconds */
+	ReturnInteger(current_mtime());
 	break;
 
     case primitiveSignalAtTick:
-	/* Signals semaphore reciever when millisecond clock is greater
-           then or equal to second argument */
+	/* Sets semaphore to recieve one signal per millisecond */
+	tick_semaphore = argument;
+	rootObjects[TICKSEMA] = argument;
+	success = TRUE;
 	break;
 
     case primitiveStackTrace:
@@ -887,17 +1027,14 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
      case primitiveFillBuffer:
 	IsInteger(argument, index);
 	IsInteger(otemp, temp);
-	if ((str = fill_buffer(index, temp)) != NULL) {
-    	    ReturnObject(MakeString(str));
-	    free(str);
-	}
+    	ReturnValidObject(read_console(index, temp));
  	break;
 
      case primitiveFlushBuffer:
 	IsInteger(argument, index);
 	if ((str = Cstring(otemp)) == NULL)
 	   break;
-        if(flush_buffer(index, str))
+        if(write_console(index, str))
 	   success = TRUE;
         free(str);
 	break;
@@ -928,16 +1065,71 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    success = TRUE;
 	}
 	break;
+
     case primitiveFlushCacheSelect:
 	flushCache(reciever);
 	success = TRUE;
 	break;
+
     case primitiveFlushCache:
 	flushCache(NilPtr);
 	success = TRUE;
 	break;
+
+    case primitiveInputSemaphore:
+	input_semaphore = argument;
+	rootObjects[INPUTSEMA] = argument;
+	success = TRUE;
+	break;
+
+    case primitiveInputWord:
+	res = nxt_event(&input_queue);
+	success = TRUE;
+	break;
+
+    case primitiveBeDisplay:
+	ReturnValidObject(BeDisplay(reciever));
+	break;
+
+    case primitiveBeCursor:
+	ReturnValidObject(BeCursor(reciever));
+	break;
+
+    case primitiveCopyBits:
+	success = copybits(reciever);
+	break;
+
+    case primitiveScanCharacter:
+	res = character_scanword(reciever, argument);
+	if (res == FALSE || res == NilPtr)
+		success = FALSE;
+	else
+		success = TRUE;
+	break;
+
+    case primitiveDrawLoop:
+	IsInteger(argument, iarg);
+	IsInteger(otemp, temp);
+	success = drawLoop(reciever, iarg, temp);
+	break;
+
+    case primitiveBitAt:
+	ReturnValidObject(BitAt(reciever, argument));
+	break;
+
+    case primitiveBitAtPut:
+	ReturnValidObject(BitAtPut(reciever, argument, otemp));
+	break;
+
+    case primitiveIdleWait:
+	WaitEvent(1);
+	success = TRUE;
+	break;
+
     default:
+	break;
     }
+
     if (success) {
 	 int i; 
 	 object_incr_ref(res);
