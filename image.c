@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Image reader/writer.
  *
  * $Log: image.c,v $
+ * Revision 1.5  2001/08/29 20:16:35  rich
+ * Added support for graphics system.
+ *
  * Revision 1.4  2001/08/18 16:17:01  rich
  * Added support for display
  *
@@ -20,7 +23,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: image.c,v 1.4 2001/08/18 16:17:01 rich Exp rich $";
+	"$Id: image.c,v 1.5 2001/08/29 20:16:35 rich Exp rich $";
 
 #endif
 
@@ -145,9 +148,12 @@ load_image(char *name)
     int                 op, flags, class, size;
     int                *ip;
     char                c;
+    char		*path;
+    char		*ptr;
 
     if ((file_id = file_open(name, "r", &temp)) == -1)
 	return FALSE;
+    
     file_ptr = image_buf;
     buf_len = 0;
    /* Find start of header */
@@ -204,7 +210,8 @@ load_image(char *name)
 	if ((ip = create_object((Objptr) op, flags, (Objptr) class,
 				size)) == NULL) {
 	    file_close(file_id);
-	    return FALSE;
+	    error("Unable to load image");
+	    /* Not reached */
 	}
 	size = (size + (sizeof(int) - 1)) / sizeof(int);
 
@@ -225,6 +232,19 @@ load_image(char *name)
 
   /* All dones close input */
     file_close(file_id);
+
+  /* Put us in same directory as image was loaded from */
+    if ((path = alloca(strlen(name) + 1)) != NULL) {
+	strcpy(path, name);
+	for(ptr = &path[strlen(path)]; ptr != path; ptr--) {
+	   if (*ptr == '\\' || *ptr == '/') {
+		*ptr = '\0';
+		break;
+	   }
+	}
+	if (ptr != path) 
+	   file_cwd(path);
+    }
     return TRUE;
 }
 
