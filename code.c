@@ -2,6 +2,13 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.2  2000/02/01 18:09:46  rich
+ * Removed unused variables.
+ * Cleaned up max stack sizeing code.
+ * Routines to check for get and set instance variable.
+ * Changed way jump targets set.
+ * Improved optimizer.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +17,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: code.c,v 1.2 2000/02/01 18:09:46 rich Exp rich $";
 
 #endif
 
@@ -32,9 +39,7 @@ static char        *rcsid =
 
 #include "object.h"
 #include "smallobjs.h"
-#include "primitive.h"
 #include "interp.h"
-#include "lex.h"
 #include "symbols.h"
 #include "code.h"
 #include "fileio.h"
