@@ -1,9 +1,12 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.6 2001/08/18 16:17:02 rich Exp rich $ "
+" $Id: process.st,v 1.7 2001/08/29 20:16:35 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.7  2001/08/29 20:16:35  rich
+ Added class definitions.
+
  Revision 1.6  2001/08/18 16:17:02  rich
  Changed classes and methods to correct categories.
  Fixed bugs in process management.
@@ -138,6 +141,12 @@ signal
 wait
     <primitive 72>
     ^self primitiveFailed
+! !
+
+! Semaphore methodsFor: 'testing'!
+
+willBlock
+   ^ signals == 0
 ! !
 
 Object variableSubclass: 'BlockContext'
@@ -392,31 +401,31 @@ activePriority
 !
 
 timingPriority
-    8
+    ^ 8
 !
 
 highIOPriority
-    7
+    ^ 7
 !
 
 lowIOPriority
-    6
+    ^ 6
 !
 
 userInterruptPriority
-    5
+    ^ 5
 !
 
 userSchedulingPriority
-    4
+    ^ 4
 !
 
 userBackgroundPriority
-    3
+    ^ 3
 !
 
 systemBackgroundPriority
-    2
+    ^ 2
 
 ! !
 
@@ -497,6 +506,11 @@ nextPut: value
     ^value
 ! !
 
+! SharedQueue methodsFor: 'testing' !
+
+isEmpty
+    ^ valueReady willBlock
+! !
 
 ! SharedQueue methodsFor: 'private'!
 
