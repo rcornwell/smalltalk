@@ -3,6 +3,11 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.3  2000/03/03 00:23:52  rich
+ * Moved recurseError to a functions.
+ * Moved dump_stack here.
+ * Return Temp gets temps from home context not current context.
+ *
  * Revision 1.2  2000/02/01 18:09:53  rich
  * Tracing now controlled in dump.h
  * Added stack checking code to push, pop and send.
@@ -17,7 +22,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.2 2000/02/01 18:09:53 rich Exp rich $";
+"$Id: interp.c,v 1.3 2000/03/03 00:23:52 rich Exp rich $";
 
 #endif
 
@@ -63,6 +68,27 @@ init_method_cache()
     }
 }
 
+/*
+ * Flush the method cache of a given selector.
+ */
+void
+flushCache(Objptr sel)
+{
+    int                 i;
+
+   /* Clear Method Cache */
+    for (i = 0; i < (sizeof(methodCache) / sizeof(method_Cache)); i++) {
+        if (sel == NilPtr || sel == methodCache[i].select) {
+	    methodCache[i].select = NilPtr;
+	    methodCache[i].class = NilPtr;
+	    methodCache[i].method = NilPtr;
+	    methodCache[i].header = NilPtr;
+	}
+    }
+}
+
+
+
 static void
 recurseError(Objptr class, Objptr selector)
 {
@@ -73,6 +99,12 @@ recurseError(Objptr class, Objptr selector)
     strcat(buf, dump_object_value(selector));
     strcat(buf, " Recurisive not understood error encountered");
     error(buf);
+}
+
+void
+SendError(Objptr selector, int *stack)
+{
+	SendMethod(selector, stack, 0);
 }
 
 /*
@@ -266,7 +298,7 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
 void
 dump_stack(Objptr op)
 {
-    char		buffer[1024];
+    char		buffer[4096];
     Objptr		context = current_context;
 
     context = get_pointer(context, BLOCK_SENDER);
@@ -576,7 +608,7 @@ interp()
 		instruct_pointer += oprand;
 	    } else if (value != FalsePointer) {
 	        tstack = stack_pointer;
-		SendMethod(MustBeBooleanSelector, &tstack, 0);
+		SendError(MustBeBooleanSelector, &tstack);
 	        stack_pointer = tstack;
 		break;
 	    }
@@ -609,7 +641,7 @@ interp()
 		instruct_pointer += oprand;
 	    } else if (value != TruePointer) {
 	        tstack = stack_pointer;
-		SendMethod(MustBeBooleanSelector, &tstack, 0);
+		SendError(MustBeBooleanSelector, &tstack);
 	        stack_pointer = tstack;
 		break;
 	    }
@@ -671,9 +703,10 @@ interp()
 	    tstack = stack_pointer;
 	    trace_inst(meth, instruct_pointer, SNDSUP, oprand, Literal(oprand),
 		 argc);
-	    if ((stack_pointer + argc) >= stack_top)  
-		SendMethod(InterpStackFault, &tstack, 0);
-	    else
+	    if ((stack_pointer + argc) >= stack_top)  {
+		dump_stack(Literal(oprand));
+		SendError(InterpStackFault, &tstack);
+	    } else
 	        SendToClass(Literal(oprand), &tstack, argc, temp);
 	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
@@ -701,9 +734,10 @@ interp()
 	    trace_inst(meth, instruct_pointer, SNDLIT, oprand, Literal(oprand), 
 			argc);
 	    tstack = stack_pointer;
-	    if ((stack_pointer + argc) >= stack_top)  
-		SendMethod(InterpStackFault, &tstack, 0);
-	    else
+	    if ((stack_pointer + argc) >= stack_top)  {
+		dump_stack(Literal(oprand));
+		SendError(InterpStackFault, &tstack);
+	    } else
 	        SendMethod(Literal(oprand), &tstack, argc);
 	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
@@ -746,9 +780,10 @@ interp()
 	    trace_inst(meth, instruct_pointer, opcode, oprand,
 		       get_pointer(SpecialSelectors, oprand), argc);
 	    tstack = stack_pointer;
-	    if ((stack_pointer + argc) >= stack_top)  
-		SendMethod(InterpStackFault, &tstack, 0);
-	    else
+	    if ((stack_pointer + argc) >= stack_top)  {
+		dump_stack(get_pointer(SpecialSelectors, oprand));
+		SendError(InterpStackFault, &tstack);
+	    } else
 	       SendMethod(get_pointer(SpecialSelectors, oprand), &tstack, argc);
 	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
@@ -942,7 +977,7 @@ checkProcessSwitch()
 {
     while (semaphoreIndex >= 0)
 	synchronusSignal(semaphoreList[semaphoreIndex--]);
-
+#if 0
     if (newProcessWaiting) {
 	Objptr              sched;
 
@@ -955,6 +990,7 @@ checkProcessSwitch()
 	newContextFlag = 1;
 	current_context = get_pointer(newProcess, PROC_SUSPEND);
     }
+#endif
 }
 
 Objptr
