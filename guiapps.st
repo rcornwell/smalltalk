@@ -1,9 +1,12 @@
 " Basic GUI applications for Smalltalk. "
 
-" $Id: $ "
+" $Id: guiapps.st,v 1.1 2002/01/29 16:41:50 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: guiapps.st,v $
+ Revision 1.1  2002/01/29 16:41:50  rich
+ Initial revision
+
 
 "
 
@@ -11,93 +14,96 @@ StandardSystemController subclass: 'NotifyController'
   instanceVariableNames: ''
   classVariableNames: ''
   poolDictionaries: ''
-  category: 'Graphics Windows'
+category: 'Graphics Windows'
 !
 
 ! NotifyController methodsFor: 'control' !
 
 isControlWanted
-    ^true
+  ^true
 !
 
 isControlActive
-    ^status ~= #inactive
+  ^status ~= #inactive
 !
 
 controlActivity
-    self viewHasCursor
-        ifTrue: [ super controlActivity ]
-! !
+  self viewHasCursor
+      ifTrue: [ super controlActivity ]
+!
 
 ! NotifyController methodsFor: 'blue button menu items' !
 
 proceed
-    model proceed.
-    view release.
-    self release.
-    status <- #inactive
+  model proceed.
+  view release.
+  self release.
+  status <- #inactive
 !
 
 debug
-    model debug.
-    view release.
-    self release.
-    status <- #inactive
+  model debug.
+  view release.
+  self release.
+  status <- #inactive
 !
 
 traceDump
-    model isNil
-        ifTrue: [ ^nil ].
-    model traceDump
-! !
+  model isNil
+      ifTrue: [ ^nil ].
+  model traceDump
+!
 
 Object subclass: 'Notifier'
-  instanceVariableNames: 'status theMessage backtraceList'
-  classVariableNames: ''
-  poolDictionaries: ''
-  category: 'Graphics Windows'
+instanceVariableNames: 'status theMessage backtraceList'
+classVariableNames: ''
+poolDictionaries: ''
+category: 'Graphics Windows'
 !
 
 ! Notifier class methodsFor: 'instance creation' !
 
 message: aString
-    ^self new message: aString; yourself
+  ^self new message: aString; yourself
 ! !
 
 ! Notifier methodsFor: 'initialising' !
 
 message: aString
     | width height x y aStream contentsList topView subView extent |
+	stderr nextPutAll: 'Notifier: '.
+	stderr nextPutAll: aString.
+	stderr nl.
     theMessage <- aString.
-    contentsList <- Smalltalk newBacktrace.
+    contentsList <- System newBacktrace.
     aStream <- WriteStream on: (String new: 0).
     contentsList do:
         [ :line | aStream nextPutAll: line. aStream nl ].
     backtraceList <- aStream contents.
-    extent <- backtraceList displayExtent.
-    width <- extent x.
-    height <- extent y.
-    x <- Display width - width // 2.
-    y <- Display height - height // 2.
-    topView <- (StandardSystemView new: (x@y extent: width@height))
+	stderr nextPutAll: backtraceList. stderr nl.
+	stderr nextPutAll: 'makeing views '.
+    topView <- StandardSystemView new: (100@100 extent: 300@200);
                                   label: theMessage;
+				  model: self ;
 				  yourself.
-    topView model: self.
-    subView <- TextView new: (topView offset extent: width@height).
-    subView model: self; name: #backTrace.
-    topView addSubView: subView.
+	stderr nextPutAll: 'text '.
+    subView <- TextView on: self aspect: #backTrace change: nil
+				menu: nil initialSelection: nil.
+    topView addSubView: subView in: (0@0 extent: 1.0@1.0).
+    topView setSize: (100@100 extent: 300@200).
     topView controller: NotifyController new.
-    subView controller yellowButtonMenu:
+    subView controller blueButtonMenu:
                               (Menu labelArray: #('proceed' 'debug'
 			                          'trace dump')
                                     lines: #(2)
 		                    selectors: #(proceed debug
 				                 traceDump))
 		       notifying: topView controller.
+	stderr nextPutAll: 'startup'. stderr nl.
     topView controller startUp.
-    stdout nextPutAll: 'notifier terminated: ' , theMessage. stdout nl.
-    stdout nextPutAll: 'status now is to: '.
-    status printNl.
+    stderr nextPutAll: 'notifier terminated: ' , theMessage. stderr nl.
+    stderr nextPutAll: 'status now is to: '.
+    status printOn: stderr. stderr nl.
     ScheduledControllers restore
 !
 
@@ -266,6 +272,52 @@ newBrowser
 ! !
 
 ! Browser methodsFor: 'accessing' !
+
+
+catList
+	^ catList
+!
+
+catMenu
+    ^ nil
+!
+
+category: aString
+    | aStream classString |
+    aString isNil
+        ifTrue: [ classList <- Array new: 0 ]
+	ifFalse: [ classList <- OrderedCollection new: 0.
+		   (Object allClassesForCategory: aString)
+			do: [ :class | classList add: class printString ]].
+    theClass <- nil.
+    theMethod <- nil.
+    self changed: #class;
+         changed: #methods;
+         changed: #text
+!
+
+
+catList
+	^ catList
+!
+
+catMenu
+    ^ nil
+!
+
+category: aString
+    | aStream classString |
+    aString isNil
+        ifTrue: [ classList <- Array new: 0 ]
+	ifFalse: [ classList <- OrderedCollection new: 0.
+		   (Object allClassesForCategory: aString)
+			do: [ :class | classList add: class printString ]].
+    theClass <- nil.
+    theMethod <- nil.
+    self changed: #class;
+         changed: #methods;
+         changed: #text
+!
 
 classList
     ^classList
@@ -479,8 +531,8 @@ initSystem
     "Initialize the environment."
     | main |
     main <- super new.
-    ScheduledControllers <- ControlManager new.
     main initDisplay.
+    ScheduledControllers <- ControlManager new.
     StandardSystemController initMenus.
     main initMenu.
     "main initTranscript."
@@ -496,20 +548,30 @@ initDisplay
     self offset: 0@0.
     self beDisplay.
     Cursor normal show.
-!
+! !
+
+! DisplayScreen methodsFor: 'setup windows' !
 
 initMenu
-    menu <- Menu labelArray: #('Class Browser' 
-			      'Save Image' 'Prompter Demo'
-                              'Refresh Screen' 'Exit Smalltalk'
+    menu <- Menu labelArray: #(
 			      'Inspect Active Process'
+			      'Workspace'
+			      'Class Browser' 
+			      'Save Image'	
+			      'Prompter Demo'
+                              'Refresh Screen'
+			      'Exit Smalltalk'
 			      'New Backtrace')
 		lines: #()
-		selectors: #(fullClassBrowser 
-			     saveImage prompterDemo
-		             refreshScreen exitSmalltalk
-			     inspectActiveProcess
-			     newBackTrace)
+		selectors: #(
+			        inspectActiveProcess
+				workspace
+				fullClassBrowser 
+			     	saveImage
+				prompterDemo
+		             	refreshScreen
+				exitSmalltalk
+			        newBackTrace)
 !
 
 initTranscript
@@ -530,6 +592,14 @@ initTranscript
 ! !
 
 ! DisplayScreen methodsFor: 'menu items' !
+
+workspace
+    ^ StandardSystemView new
+            label: 'WorkSpace';
+    	  addSubView: (TextView new) in: (0.0@0 extent: 1.0@1.0);
+	   open ;
+	    yourself.
+!
 
 prompterDemo
     | aString |
