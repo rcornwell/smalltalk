@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Image reader/writer.
  *
  * $Log: image.c,v $
+ * Revision 1.4  2001/08/18 16:17:01  rich
+ * Added support for display
+ *
  * Revision 1.3  2001/07/31 14:09:48  rich
  * Make to work under new cygwin.
  *
@@ -17,7 +20,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: image.c,v 1.3 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: image.c,v 1.4 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -238,6 +241,12 @@ save_image(char *name, char *process)
     int                 size, flags;
     int                *ip;
     struct file_buffer *fp;
+    Objptr		save_input = input_semaphore;
+    Objptr		save_tick = tick_semaphore;
+
+    /* Stop any thing touching the image while we dump */
+    input_semaphore = NilPtr;
+    tick_semaphore = NilPtr;
 
     if ((file_id = file_open(name, "w", &temp)) == -1)
 	return FALSE;
@@ -293,9 +302,13 @@ save_image(char *name, char *process)
    /* Save out the known objects */
     put_int(display_object);
     put_int(cursor_object);
-    put_int(input_semaphore);
-    put_int(tick_semaphore);
+    put_int(save_input);
+    put_int(save_tick);
     put_int(console.file_oop);
+
+   /* Restore input system */
+    input_semaphore = save_input;
+    tick_semaphore = save_tick;
 
    /* Flush output and close file */
     flush_buf();
