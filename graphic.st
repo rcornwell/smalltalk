@@ -1,10 +1,13 @@
 
 " Methods for Class graphics subclasses"
 
-" $Id: $ "
+" $Id: graphic.st,v 1.1 2001/08/18 16:23:46 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: graphic.st,v $
+ Revision 1.1  2001/08/18 16:23:46  rich
+ Initial revision
+
 
 "
 
@@ -16,8 +19,7 @@ Object subclass: 'Point'
        instanceVariableNames: 'x y'
        classVariableNames: ''
        poolDictionaries: ''
-       category: 'Graphic-Kernel'
-!
+       category: 'Graphic-Kernel' !
 
 Point comment:
 'Beginning of a Point class for simple display manipulation.  Has not been
@@ -487,17 +489,17 @@ intersect: aRectangle
 ! Rectangle methodsFor: 'printing'!
 
 printOn: aStream
-    aStream print: origin;
-	nextPutAll: ' corner: ';
-	print: corner
+    aStream print: origin.
+    aStream nextPutAll: ' corner: '.
+    aStream print: corner
 !
 
 storeOn: aStream
-    aStream nextPutAll: '(Rectangle origin: ';
-	store: origin;
-	nextPutAll: ' corner: ';
-	store: corner;
-	nextPut: $)
+    aStream nextPutAll: '(Rectangle origin: '.
+    aStream store: origin.
+    aStream nextPutAll: ' corner: '.
+    aStream store: corner.
+    aStream nextPut: $)
 ! !
 
 ! Rectangle methodsFor: 'truncation and round off'!
@@ -543,7 +545,7 @@ Object subclass: 'BitBlt'
     'destForm sourceForm halftoneForm combinationRule destX destY width height clipX clipY clipWidth clipHeight sourceX sourceY'
   classVariableNames: ''
   poolDictionaries: ''
-  category: 'Graphics Kernel'
+  category: 'Graphics-Kernel'
 !
 
 ! BitBlt class methodsFor: 'instance creation' !
@@ -575,12 +577,36 @@ destForm: destination sourceForm: source halftoneForm: halftone
     destY <- destOrigin y.
     width <- extent x.
     height <- extent y.
-    clipX <- clipRect left.
-    clipY <- clipRect top.
-    clipWidth <- clipRect width.
-    clipHeight <- clipRect height.
+    clipRect isNil ifTrue: [
+            clipX <- 0.
+            clipY <- 0.
+            clipWidth <- destForm width.
+            clipHeight <- destForm height.
+    	] ifFalse: [
+            clipX <- clipRect left.
+            clipY <- clipRect top.
+            clipWidth <- clipRect width.
+            clipHeight <- clipRect height.
+    ].
     sourceX <- sourceOrigin x.
     sourceY <- sourceOrigin y
+!
+
+initialize
+    destForm <- Display.
+    sourceForm <- nil.
+    halftoneForm <- nil.
+    combinationRule <- 3.
+    destX <- 0.
+    destY <- 0.
+    width <- destForm width.
+    height <- destForm height.
+    clipX <- 0.
+    clipY <- 0.
+    clipWidth <- destForm width.
+    clipHeight <- destForm height.
+    sourceX <- 0.
+    sourceY <- 0
 ! !
 
 ! BitBlt methodsFor: 'accessing'!
@@ -672,9 +698,14 @@ sourceX: anInteger
 !
 
 sourceY: anInteger
-            "Set the receiver's source form top left y
-            coordinate to be the argument, anInteger."
+    "Set the receiver's source form top left y
+     coordinate to be the argument, anInteger."
     sourceY <- anInteger
+!
+
+destRect
+     "Return a rectangle as the area of the destination"
+    ^ Rectangle left: destX right: width top: destY bottom: height
 !
 
 destRect: aRectangle
@@ -734,7 +765,7 @@ drawFrom: startPoint to: stopPoint
             mask and combination rule."
     | deltaX deltaY |
     self destOrigin: startPoint.
-    deltaX <- stopPoint x - startPoint y.
+    deltaX <- stopPoint x - startPoint x.
     deltaY <- stopPoint y - startPoint y.
     ^self drawLoop: deltaX and: deltaY
 !
@@ -748,14 +779,14 @@ Object subclass: 'DisplayObject'
   instanceVariableNames: 'width height offset'
   classVariableNames: ''
   poolDictionaries: ''
-  category: 'Graphics Kernel'
+  category: 'Graphics-Kernel'
 !
 
 DisplayObject subclass: 'DisplayMedium'
   instanceVariableNames: ''
   classVariableNames: ''
   poolDictionaries: ''
-  category: 'Graphics Kernel'
+  category: 'Graphics-Kernel'
 !
 
 DisplayMedium subclass: 'Form'
@@ -763,7 +794,7 @@ DisplayMedium subclass: 'Form'
   classVariableNames: 
     'BlackMask VeryDarkGrayMask DarkGrayMask GrayMask LightGrayMask VeryLightGrayMask WhiteMask'
   poolDictionaries: ''
-  category: 'Graphics Kernel'
+  category: 'Graphics-Kernel'
 !
 
 ! DisplayObject methodsFor: 'accessing' !
@@ -830,7 +861,7 @@ boundingBox
                     "Answer the rectangular area that represents
                     the boundaries of the receiver's space of
                     information."
-    ^offset extent: width @ height
+    ^offset extent: (width @ height)
 ! !
 
 ! DisplayObject methodsFor: 'displaying' !
@@ -1278,10 +1309,12 @@ fromDisplay: aRectangle
 extent: aPoint fromArray: anArray offset: offsetPoint
     "Can only create Forms of width 16 with this method
      at the moment."
+    | roundwidth |
     width <- aPoint x.
     height <- aPoint y.
     offset <- offsetPoint.
-    bitmap <- WordArray new: ((width // 32 ) * height).
+    roundwidth <- (width + 31) // 32.
+    bitmap <- WordArray new: (roundwidth * height).
     1 to: anArray size do: [ :i | bitmap at: i put: (anArray at: i) ].
 !
 
@@ -1297,10 +1330,12 @@ fromString: aString
 extent: aPoint
                     "Set the width and height of the receiver to be
                     the coordinates of the argument, aPoint."
+    | roundwidth |
     width <- aPoint x.
     height <- aPoint y.
     offset <- 0@0.
-    bitmap <- WordArray new: ((width // 32 ) * height).
+    roundwidth <- (width + 31) // 32.
+    bitmap <- WordArray new: (roundwidth * height).
 !
 
 extent: extentPoint offset: offsetPoint
@@ -1373,33 +1408,18 @@ beDisplay
 Form initialize !
 
 Object subclass: 'InputSensor'
-  instanceVariableNames:
-    'mousePoint currentCursor keyboardQueue button1Pressed button2Pressed button3Pressed'
-  classVariableNames: 'InSemaphore'
-  poolDictionaries: ''
-  category: ''Graphic-Kernel' !
+       instanceVariableNames: 'mousePoint currentCursor keyboardQueue button1Pressed button2Pressed button3Pressed waitSemaphore waitEvent'
+       classVariableNames: 'InSemaphore'
+       poolDictionaries: ''
+       category: 'Graphics-Kernel'
+!
+
+InputSensor comment: 'I collect input from the real world'. !
 
 ! InputSensor class methodsFor: 'initialising' !
 
 initialize
     ^ self new initialize.
-! !
-
-! InputSensor methodsFor: 'private' !
-
-resize
-   " For right now nothing, will be replaced later "
-    ^ self
-!
-
-getInput
-    <primitive 129>
-    ^ self primitiveFailed
-!
-
-setSemaphore: aSemaphore
-    <primitive 128>
-   ^ self primitiveFailed
 ! !
 
 ! InputSensor methodsFor: 'initializing' !
@@ -1408,12 +1428,12 @@ initialize
     | map |
     InSemaphore <- Semaphore new.
     self setSemaphore: InSemaphore.
-    Smalltalk at: #Sensor put: self.
     self initKeyboardQueue.
-    self startSensorLoop
+    self startSensorLoop.
+    Smalltalk at: #Sensor put: self.
 ! !
 
-! InputSensor methodsFor: 'accessing' !
+! InputSensor methodsFor: 'mouse' !
 
 redButtonPressed
     ^button1Pressed
@@ -1439,6 +1459,12 @@ noButtonPressed
 	           and: [ button3Pressed not ] ])
 !
 
+mousePoint
+    ^mousePoint
+! !
+
+! InputSensor methodsFor: 'keyboard' !
+
 keyboard
     ^keyboardQueue next
 !
@@ -1453,10 +1479,12 @@ keyboardPeek
 
 flushKeyboard
     self initKeyboardQueue
-!
+! !
 
-mousePoint
-    ^mousePoint
+! InputSensor methodsFor: 'cursor' !
+
+currentCursor
+    ^currentCursor
 !
 
 cursorPoint
@@ -1465,28 +1493,80 @@ cursorPoint
 	ifFalse: [ ^mousePoint + currentCursor offset ]
 !
 
+currentCursor: aCursor
+    currentCursor <- aCursor.
+    currentCursor beCursor.
+! !
+
+! InputSensor methodsFor: 'waiting' !
+
+waitKey
+    [ self keyboardPressed ] whileFalse: [
+        waitSemaphore <- Semaphore new.
+        waitEvent <- 1.
+        waitSemaphore wait
+    ]
+!
+
+waitEvent
+    [ (self keyboardPressed or: [ self anyButtonPressed] ) ] whileFalse: [
+        waitSemaphore <- Semaphore new.
+        waitEvent <- 7.
+        waitSemaphore wait
+    ]
+!
+
+waitMouse
+    waitSemaphore <- Semaphore new.
+    waitEvent <- 6.
+    waitSemaphore wait
+!
+
 waitButton
     [ self noButtonPressed ]
-          whileTrue: [ ]
+          whileTrue: [
+             waitSemaphore <- Semaphore new.
+             waitEvent <- 4.
+             waitSemaphore wait
+	 ]
 !
 
 waitNoButton
     [ self anyButtonPressed ]
-          whileTrue: [ ]
+          whileTrue: [
+             waitSemaphore <- Semaphore new.
+             waitEvent <- 4.
+             waitSemaphore wait
+	 ]
 !
 
 waitClickButton
     self waitButton.
     self waitNoButton 
+! !
+
+! InputSensor methodsFor: 'private' !
+
+resize
+   " For right now nothing, will be replaced later "
+    ^ self
 !
 
-currentCursor
-    ^currentCursor
+getInput
+    <primitive 129>
+    ^ self primitiveFailed
 !
 
-currentCursor: aCursor
-    currentCursor <- aCursor 
-    currentCursor beCursor.
+setSemaphore: aSemaphore
+    <primitive 128>
+   ^ self primitiveFailed
+!
+
+signalEvent: aNumber
+   (((waitEvent bitAnd: aNumber) ~= 0) and: [ waitSemaphore notNil ])
+	ifTrue: [ waitSemaphore signal. 
+		  waitSemaphore <- nil.
+		  waitEvent <- 0 ]
 !
 
 startSensorLoop
@@ -1494,17 +1574,19 @@ startSensorLoop
     [ [ true ] whileTrue: [
 	InSemaphore wait.
 	event <- self getInput.
+	event isNil ifTrue: [ event <- 0 ].
 	value <- event // 16.
 	event <- event bitAnd: 16rF.
 
-	event == 0 ifTrue: [ "Timer event " ].
 	event == 1 ifTrue: [ "Char event"
 		keyboardQueue nextPut: value.
+		self signalEvent: 1.
 	].
 	event == 2 ifTrue: [ "Mouse Pointer event" 
 		x <- value bitAnd: 16rFFF.
-		y <- (value bitShift: -12) bitAnd; 16rFFF.
+		y <- (value bitShift: -12) bitAnd: 16rFFF.
 		mousePoint <- x@y.
+		self signalEvent: 4.
 	].
 	event == 3 ifTrue: [ "Mouse Button event"
 		((value bitAnd: 1) == 1) ifTrue: [ button1Pressed <- true ]
@@ -1513,11 +1595,12 @@ startSensorLoop
 				        ifFalse: [ button2Pressed <- false ].
 		((value bitAnd: 4) == 4) ifTrue: [ button3Pressed <- true ]
 				        ifFalse: [ button3Pressed <- false ].
+		self signalEvent: 2.
         ].
 	event == 4 ifTrue: [ "Resize event"
 		self resize.
 	]
-     ] forkAt: Processor lowIOPriority.
+     ]] forkAt: Processor lowIOPriority.
 !
 
 initKeyboardQueue
@@ -1525,6 +1608,776 @@ initKeyboardQueue
     button1Pressed <- false.
     button2Pressed <- false.
     button3Pressed <- false.
+    waitEvent <- 0.
     mousePoint <- 0@0
+! !
+
+InputSensor initialize !
+
+Form subclass: 'OpaqueForm'
+  instanceVariableNames: 'mask'
+  classVariableNames: ''
+  poolDictionaries: ''
+  category: 'Graphics-Kernel'
+!
+
+! OpaqueForm methodsFor: 'accessing' !
+
+mask
+                    "Answer the recievers mask."
+    ^mask
+! !
+
+! OpaqueForm methodsFor: 'displaying' !
+
+displayOn: aDisplayMedium
+                at: aDisplayPoint
+                clippingBox: clipRectangle
+                rule: ruleInteger
+                mask: aForm
+                    "Display the receiver at location aDisplayPoint
+                    with rule, ruleInteger, and halftone mask,
+                    aForm.  Information to be displayed must be
+                    confined to the area that intersects with
+                    clipRectangle."
+    (BitBlt destForm: aDisplayMedium sourceForm: self halftoneForm: aForm
+            combinationRule: ruleInteger destOrigin: aDisplayPoint + offset
+	    sourceOrigin: 0@0 extent: width @ height clipRect: clipRectangle)
+	copyBits
+! !
+
+! OpaqueForm class methodsFor: 'instance creation' !
+
+fromDisplay: aRectangle
+                    "Answer a new Form whose bits are copied
+                    from the display screen within the boundaries
+                    defined by the argument, aRectangle, into the
+                    receiver's bitmap."
+    ^self new fromDisplay: aRectangle; yourself
+!
+
+extent: aPoint fromArray: anArray maskArray: aMask offset: offsetPoint
+    ^self new extent: aPoint fromArray: anArray maskArray: aMask
+		 offset: offsetPoint; yourself
+!
+
+extent: extentPoint
+    ^self new extent: extentPoint; white; yourself
+!
+
+fromString: aString
+    ^self new fromString: aString; yourself
+! !
+
+! OpaqueForm methodsFor: 'initialise-release' !
+
+extent: aPoint fromArray: anArray maskArray: aMask offset: offsetPoint
+    "Can only create Forms of width 16 with this method
+     at the moment."
+    | roundwidth |
+    width <- aPoint x.
+    height <- aPoint y.
+    offset <- offsetPoint.
+    roundwidth <- (width + 31) // 32.
+    bitmap <- WordArray new: (roundwidth * height).
+    1 to: anArray size do: [ :i | bitmap at: i put: (anArray at: i) ].
+    mask <- Form extent: aPoint fromArray: aMask offset: offsetPoint
+! !
+
+! OpaqueForm methodsFor: 'accessing' !
+
+extent: aPoint
+                    "Set the width and height of the receiver to be
+                    the coordinates of the argument, aPoint."
+    | roundwidth |
+    width <- aPoint x.
+    height <- aPoint y.
+    offset <- 0@0.
+    roundwidth <- (width + 31) // 32.
+    bitmap <- WordArray new: (roundwidth * height).
+    mask <- Form new extent: aPoint ; black ; yourself.
+! !
+
+! OpaqueForm methodsFor: 'pattern' !
+
+maskAt: aPoint
+     ^ mask valueAt: aPoint
+!
+
+maskAt: aPoint put: bitCode
+     ^ mask valueAt: aPoint put: bitCode
+! !
+
+OpaqueForm subclass: 'Cursor'
+  instanceVariableNames: ''
+  classVariableNames: 'Normal Execute Up Down Origin Corner Read Write Crosshair Move Marker Wait'
+  poolDictionaries: ''
+  category: 'Graphics-Kernel'
+!
+
+! Cursor class methodsFor: 'initializing' !
+
+initialize
+    Normal <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000001 2r0000000000000011
+				 2r0000000000000111 2r0000000000001111
+				 2r0000000000011111 2r0000000001111111
+				 2r0000000000011001 2r0000000000011000
+				 2r0000000000110000 2r0000000000110000
+				 2r0000000001100000 2r0000000011000000
+				 2r0000000110000000 2r0000000110000000
+				 2r0000001100000000 2r0000011000000000)
+		   maskArray: #( 2r0000000000000001 2r0000000000000011
+				 2r0000000000000111 2r0000000000001111
+				 2r0000000000011111 2r0000000001111111
+				 2r0000000000011001 2r0000000000011000
+				 2r0000000000110000 2r0000000000110000
+				 2r0000000001100000 2r0000000011000000
+				 2r0000000110000000 2r0000000110000000
+				 2r0000001100000000 2r0000011000000000)
+		      offset: 0@0.
+ 
+    Execute <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000001 2r0000100000000011
+				 2r0001110000000111 2r1111111110001111
+				 2r0110001100011111 2r0010001001111111
+				 2r0011111000011001 2r0110001100011000
+				 2r1100000110110000 2r0000000000110000
+				 2r0000000011000000 2r0000000011000000
+				 2r0000001100000000 2r0000000110000000
+				 2r0000011000000000 2r0000011000000000)
+		   maskArray: #( 2r0000000000000001 2r0000100000000011
+				 2r0001110000000111 2r1111111110001111
+				 2r0111111100011111 2r0010001001111111
+				 2r0011111000011001 2r0110001100110000
+				 2r1100000110110000 2r0000000001100000
+				 2r0000000011000000 2r0000000110000000
+				 2r0000001100000000 2r0000001100000000
+				 2r0000011000000000 2r0000110000000000)
+		      offset: 0@0.
+ 
+    Up <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000001 2r0000000000000011
+				 2r0000000000000111 2r0000000000001111
+				 2r0000000000011111 2r0000000000111111
+				 2r0000000001111111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111)
+		   maskArray: #( 2r0000000000000001 2r0000000000000011
+				 2r0000000000000111 2r0000000000001111
+				 2r0000000000011111 2r0000000000111111
+				 2r0000000001111111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111)
+		      offset: 0@0.
+
+    Down <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000001111111
+				 2r0000000000111111 2r0000000000011111
+				 2r0000000000001111 2r0000000000000111
+				 2r0000000000000011 2r0000000000000001)
+		   maskArray: #( 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000001111111
+				 2r0000000000111111 2r0000000000011111
+				 2r0000000000001111 2r0000000000000111
+				 2r0000000000000011 2r0000000000000001)
+		      offset: 0@0.
+
+    Origin <- Cursor extent: 16@16
+                   fromArray: #( 2r1111111111111111 2r1111111111111111
+				 2r1111111111111111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111)
+		   maskArray: #( 2r1111111111111111 2r1111111111111111
+				 2r1111111111111111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111
+				 2r0000000000000111 2r0000000000000111)
+		      offset: 0@0.
+
+    Corner <- Cursor extent: 16@16
+                   fromArray: #( 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1111111111111111
+				 2r1111111111111111 2r1111111111111111)
+		   maskArray: #( 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1110000000000000
+				 2r1110000000000000 2r1111111111111111
+				 2r1111111111111111 2r1111111111111111)
+		      offset: 16@16.
+
+    Read <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0110000000110000
+				 2r1001000001001000 2r1001000001001000
+				 2r0000100000000100 2r0000010000000010
+				 2r0000011111011111 2r0000010000100001
+				 2r0000010000100001 2r0000010110101101
+				 2r0000001111011110 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		   maskArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0110000000110000
+				 2r1001000001001000 2r1001000001001000
+				 2r0000100000000100 2r0000010000000010
+				 2r0000011111011111 2r0000010000100001
+				 2r0000011111111111 2r0000011111111111
+				 2r0000001111011110 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		      offset: 0@0.
+
+    Write <- Cursor extent: 16@16
+                   fromArray: #( 2r0111000000000000 2r1111100000000000
+				 2r0011110000000000 2r0001101000000000
+				 2r0000100100000000 2r0000010010000000
+				 2r0000001001000000 2r1000000100100000
+				 2r0100000010010000 2r0010000001001000
+				 2r0010000000100100 2r0010100000011110
+				 2r0001010000001010 2r0000001000000110
+				 2r0000000111111111 2r0000000000000000)
+		   maskArray: #( 2r0111000000000000 2r1111100000000000
+				 2r0011110000000000 2r0001111000000000
+				 2r0000111100000000 2r0000011110000000
+				 2r0000001111000000 2r1000000111100000
+				 2r0100000011110000 2r0010000001111000
+				 2r0010000000111100 2r0010100000011110
+				 2r0001010000001010 2r0000001000000110
+				 2r0000000111111111 2r0000000000000000)
+		      offset: 0@0.
+     
+    Crosshair <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r1111111111111111 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000)
+		   maskArray: #( 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r1111111111111111 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000
+				 2r0000000100000000 2r0000000100000000)
+ 
+		      offset: 8@8.
+     
+    Move <- Cursor extent: 16@16
+                   fromArray: #( 2r1111111111111111 2r1111111111111111
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1111111111111111
+				 2r1111111111111111 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1111111111111111 2r1111111111111111)
+		   maskArray: #( 2r1111111111111111 2r1111111111111111
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1111111111111111
+				 2r1111111111111111 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1100000110000011 2r1100000110000011
+				 2r1111111111111111 2r1111111111111111)
+		      offset: 8@8.
+
+    Marker <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000110000000 2r0000011111100000
+				 2r0000011111100000 2r0000000110000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		   maskArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000110000000 2r0000011111100000
+				 2r0000011111100000 2r0000000110000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		      offset: 8@8.
+     
+    Wait <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0110000110000110 2r1111001111001111
+				 2r1111001111001111 2r0110000110000110
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		   maskArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0110000110000110 2r1111001111001111
+				 2r1111001111001111 2r0110000110000110
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		      offset: 8@8.
+! !
+
+! Cursor class methodsFor: 'shapes' !
+
+normal
+    ^ Normal
+!
+
+execute 
+    ^ Execute 
+!
+ 
+up
+    ^ Up
+!
+
+down
+    ^ Down
+!
+
+origin
+    ^ Origin
+!
+
+corner
+    ^ Corner
+!
+
+read
+    ^ Read
+!
+
+write
+    ^ Write
+!
+
+crosshair
+    ^ Crosshair
+!
+
+move
+    ^ Move
+!
+
+marker
+    ^ Marker
+!
+
+wait
+    ^ Wait
+! !
+
+! Cursor methodsFor: 'displaying' !
+
+show
+     Sensor currentCursor: self
+!
+
+showWhile: aBlock
+    | last |
+    last <- Sensor currentCursor.
+    Sensor currentCursor: self.
+    aBlock value.
+    Sensor currentCursor: last.
+! !
+
+! Cursor methodsFor: 'private' !
+
+beCursor
+     <primitive 131>
+     ^ self primitiveFailed
+! !
+
+Cursor initialize !
+
+BitBlt subclass: 'Pen'
+       instanceVariableNames: 'location direction drawing'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Graphics-Turtle' !
+
+! Pen class methodsFor: 'creation' !
+
+new
+	^ super new initialize
+! !
+
+! Pen methodsFor: 'instance creation' !
+
+defaultNib:  aShape
+	aShape class == Point ifTrue: [ sourceForm <- Form new extent: aShape. ]
+			      ifFalse: [ sourceForm <- Form new
+				extent: aShape @ aShape ].
+	sourceForm black.
+! !
+
+! Pen methodsFor: 'access' !
+
+location
+	^ location
+!
+
+direction
+	^ direction
+!
+
+frame
+	^ self destRect
+!
+
+frame: aRect
+	self destRect: aRect
+! !
+
+! Pen methodsFor: 'moving' !
+
+down
+	drawing <- true.
+!
+
+up
+	drawing <- false.
+!
+
+turn: degrees
+	direction <- (direction + degrees) \\ 360
+!
+
+north
+	direction <- 270.
+!
+
+south
+	direction <- 90.
+!
+
+east
+	direction <- 0.
+!
+
+west
+	direction <- 180.
+!
+
+go: aDistance
+    "move the pen by given distance, in its current direction"
+
+    | px py |
+    px <- (direction degreesToRadians cos * aDistance) asInteger + location x.
+    py <- (direction degreesToRadians sin * aDistance) asInteger + location y.
+    self goto: (px @ py)
+!
+
+goto: aPoint
+    "move the pen to some new location"
+    drawing ifTrue:[ self drawFrom: location to: aPoint ].
+    location <- aPoint.
+!
+
+place: aPoint
+	location <- aPoint
+!
+
+home
+	location <- self frame center.
+! !
+
+
+! Pen methodsFor: 'geometric designs' !
+
+cCurve: level side: sideLength
+    "draw a c-curve with the specified level and side length"
+
+    level == 0 ifTrue:[^ self go: sideLength].
+    self cCurve: level - 1 side: sideLength. self turn: 90.
+    self cCurve: level - 1 side: sideLength. self turn: -90
+
+    "(Pen new) turn: -90; cCurve: 10 side: 4"
+!
+
+dragon: n
+    "draw a dragon curve with order n"
+
+    (n == 0) ifTrue: [ self go: 10
+    ] ifFalse:[
+	n > 0 ifTrue: [
+	    self dragon: n - 1.
+	    self turn: 90.
+	    self dragon: 1 - n
+	] ifFalse: [
+	    self dragon: -1 - n.
+	    self turn: -90.
+	    self dragon: 1 + n
+	]
+    ]
+    "(Pen new) dragon:10"
+!
+
+hilbert: n side: s
+    "draw a hilbert curve with order n and sideLength s"
+
+    | a m negA negM |
+
+    n == 0 ifTrue: [ self turn: 180
+    ] ifFalse: [
+	n > 0 ifTrue: [
+	    a <- 90.
+	    negA <- -90.
+	    m <- n - 1
+	] ifFalse:[
+	    a <- -90.
+	    negA <- 90.
+	    m <- n + 1
+	].
+	negM <- 0 - m.
+	self turn: a.
+	self hilbert: negM side: s.
+	self turn: a.
+	self go: s.
+	self hilbert: m side: s.
+	self turn: negA.
+	self go: s.
+	self turn: negA.
+	self hilbert: m side: s.
+	self go: s.
+	self turn: a.
+	self hilbert: negM side: s.
+	self turn: a
+    ]
+    "(Pen new) hilbert: 5 side: 15"
+!
+
+koch: n side: s
+    "draw a koch curve with order n and sideLength s"
+
+    n == 0 ifTrue: [ self go: s
+    ] ifFalse: [
+	self koch: (n - 1) side: s.
+	self turn: -45.
+	self koch: (n - 1) side: s.
+	self turn: 90.
+	self koch: (n - 1) side: s.
+	self turn: -45.
+	self koch: (n - 1) side: s
+    ]
+    "(Pen new) koch:5 side:4"
+!
+
+mandala: n radius: r
+    "draw a mandala curve with n segments and radius of r"
+
+    | px py points deltaAngle angle |
+
+    deltaAngle <- 360.0 / n.
+    angle <- 0.0.
+    points <- Array new: n.
+    1 to: n do: [ :index |
+	px <- (angle degreesToRadians cos * r) asInteger + location x.
+	py <- (angle degreesToRadians sin * r) asInteger + location y.
+	points at: index put: (px @ py).
+	angle <- angle + deltaAngle
+    ].
+    1 to: n do: [ :thisIndex |
+	thisIndex to: n do: [ :otherIndex |
+	    self place: (points at: thisIndex).
+	    self goto: (points at: otherIndex)
+	]
+    ]
+    "(Pen new) mandala: 20 radius: 300"
+!
+
+pythagoras: n side: s
+    "draw a pythagoras curve with order n sideLength of s"
+
+    | a l d |
+
+    a <- (s*s / 2) sqrt.
+
+    self go: s.
+    self turn: -45.
+    n > 1 ifTrue: [
+	self pythagoras: ( n - 1 ) side: a.
+    ].
+    self turn: 135; go: s.
+
+    l <- location. d <- direction.
+    self up; turn: -135; go: a.
+    self turn: 90; down.
+    n > 1 ifTrue: [
+	self pythagoras: ( n - 1 ) side: a.
+    ].
+    location <- l. direction <- d.
+
+    self turn: 90.
+    self go: s.
+    self turn: 90.
+    self go: s.
+    self turn: 90.
+
+    " at original location & direction again ... "
+!
+
+spiral: n angle: a
+    "draw a spiral curve with order n sideLength of s"
+
+    1 to: n do: [ :i |
+	self go: i.
+	self turn: a
+    ]
+
+    "(Pen new) spiral: 300 angle: 89"
+    "(Pen new) spiral: 300 angle: 121"
+    "(Pen new) spiral: 300 angle: 59"
+! !
+
+! Pen methodsFor: 'initialization' !
+
+initialize
+    super initialize.
+    self defaultNib: 1.
+    self home.
+    self east.
+    self down
+! !
+
+Array subclass: 'Commander'
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Graphics-Turtle'
+!
+
+! Commander class methodsFor: 'instance creation' !
+
+new: numberOfPens
+    |newCommander|
+    newCommander <- super new:numberOfPens.
+    1 to: numberOfPens do: [ :index |
+	newCommander at: index put: Pen new
+    ].
+    ^ newCommander
+! !
+
+! Commander methodsFor: 'distributing' !
+
+
+fanOut
+    "change all pens directions to point avay from each other"
+
+    | dist |
+
+    dist <- (360 / self size).
+
+    self keysAndValuesDo: [ :idx :pen | pen turn: (idx - 1) * dist ]
+!
+
+lineUpFrom: startPoint to: endPoint
+    "place all pens along a line"
+
+    1 to: self size do: [ :index |
+	(self at: index)
+	    place: startPoint +
+		  (endPoint - startPoint * (index - 1)/(self size - 1))
+    ]
+! !
+
+! Commander methodsFor: 'pen compatablity' !
+
+doesNotUnderstand: aMessage
+    "this is funny: all message we do not understand, are passed
+     on to every Pen - so we do not have to care for all
+     possible messages ...(thanks to the Message class)"
+
+    self do: [ :each |
+	each perform: (aMessage selector) withArguments: (aMessage arguments)
+    ]
+! !
+
+! Rectangle class methodsFor: 'instance creation' !
+
+fromUser
+    | origin corner bitblt position deltaX deltaY nib |
+    Cursor origin showWhile: [ Sensor waitButton ].
+    origin <- Sensor mousePoint.
+    corner <- Sensor mousePoint.
+    nib <- Form new extent: 1@1.
+    nib black.
+    bitblt <- BitBlt destForm: Display sourceForm: nib
+                     halftoneForm: nil
+                     combinationRule: Form reverse
+                     destOrigin: 0@0 sourceOrigin: 0@0
+                     extent: (1@1) clipRect: nil.
+    bitblt drawFrom: origin
+           to: corner x @ origin y.
+    bitblt drawFrom: origin x @ (origin y + 1)
+           to: origin x @ corner y.
+    bitblt drawFrom: corner x @ (origin y + 1)
+           to: corner.
+    bitblt drawFrom: (origin x + 1) @ corner y
+           to: (corner x - 1) @ corner y.
+    Cursor corner showWhile: [
+        [ Sensor waitMouse. Sensor anyButtonPressed ]
+            whileTrue:
+                [ position <- Sensor mousePoint.
+	          position == corner
+	              ifFalse: [ bitblt drawFrom: origin
+                                        to: corner x @ origin y.
+                                 bitblt drawFrom: origin x @ (origin y + 1)
+                                        to: origin x @ corner y.
+                                 bitblt drawFrom: corner x @ (origin y + 1)
+                                        to: corner.
+                                 bitblt drawFrom: (origin x + 1) @ corner y
+                                        to: (corner x - 1) @ corner y.
+                                 corner <- position.
+                                 bitblt drawFrom: origin
+                                        to: corner x @ origin y.
+                                 bitblt drawFrom: origin x @ (origin y + 1)
+                                        to: origin x @ corner y.
+                                 bitblt drawFrom: corner x @ (origin y + 1)
+                                        to: corner.
+                                 bitblt drawFrom: (origin x + 1) @ corner y
+                                        to: (corner x - 1) @ corner y ] ] ].
+    bitblt drawFrom: origin
+           to: corner x @ origin y.
+    bitblt drawFrom: origin x @ (origin y + 1)
+           to: origin x @ corner y.
+    bitblt drawFrom: corner x @ (origin y + 1)
+           to: corner.
+    bitblt drawFrom: (origin x + 1) @ corner y
+           to: (corner x - 1) @ corner y.
+    origin <= corner
+        ifTrue: [ ^self origin: origin corner: corner ]
+	ifFalse: [ ^self origin: corner corner: origin ]
 ! !
 
