@@ -3,6 +3,12 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.5  2001/01/07 18:00:48  rich
+ * Changed flags on Float class.
+ * Changed value of SchedulerAssociationPointer.
+ * Added Smalltalk to Smalltalk dictionary.
+ * Removed Smalltalk keywords.
+ *
  * Revision 1.4  2000/08/19 15:01:59  rich
  * Always create instance variable arrays even if no instance variables.
  *
@@ -22,26 +28,11 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.4 2000/08/19 15:01:59 rich Exp rich $";
+	"$Id: init.c,v 1.5 2001/01/07 18:00:48 rich Exp rich $";
 
 #endif
 
 /* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <memory.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -72,27 +63,31 @@ struct _class_template {
     { MetaClass, CLASS_PTRS, META_INSTCLASS + 1, ClassClass, "MetaClass",
 	    "instanceClass"
     },
-    { ObjectClass, 0, 0, NilPtr, "Object", NULL },
+    { ObjectClass, CLASS_PTRS, 0, NilPtr, "Object", NULL },
     { StringClass, CLASS_BYTE | CLASS_INDEX, 0, ObjectClass, "String", NULL },
     { ArrayClass, CLASS_PTRS | CLASS_INDEX, 0, ObjectClass, "Array", NULL },
     { MethodContextClass, CLASS_PTRS | CLASS_INDEX, BLOCK_STACK,
 	    ObjectClass, "MethodContext",
-	    "sender ip sp method unused reciever argcount"
+	    "sender ip sp method unused receiver argcount"
     },
     { BlockContextClass, CLASS_PTRS | CLASS_INDEX,
 	    BLOCK_STACK, ObjectClass, "BlockContext",
 	    "caller ip sp home iip unused argcount"
     },
-    { PointClass, 0, 2, ObjectClass, "Point", "x y" },
-    { MessageClass, 0, MESSAGE_SIZE, ObjectClass, "Message", "args selector" },
-    { CharacterClass, 0, 1, ObjectClass, "Character", "value" },
-    { FloatClass, CLASS_INDEX|CLASS_BYTE, 0, ObjectClass, "Float", NULL },
-    { UndefinedClass, 0, 0, ObjectClass, "Undefined", NULL },
-    { TrueClass, 0, 0, BooleanClass, "True", NULL },
-    { FalseClass, 0, 0, BooleanClass, "False", NULL },
+    { PointClass, CLASS_PTRS, 2, ObjectClass, "Point", "x y" },
+    { MessageClass, CLASS_PTRS, MESSAGE_SIZE, ObjectClass, "Message",
+		 "args selector" },
+    { MagnitudeClass, CLASS_PTRS, 0, ObjectClass, "Magnitude", NULL },
+    { NumberClass, CLASS_PTRS, 0, MagnitudeClass, "Number", NULL },
+    { IntegerClass, CLASS_PTRS, 0, NumberClass, "Integer", NULL },
+    { CharacterClass, CLASS_PTRS, 1, MagnitudeClass, "Character", "value" },
+    { FloatClass, CLASS_INDEX|CLASS_BYTE, 0, NumberClass, "Float", NULL },
+    { UndefinedClass, CLASS_PTRS, 0, ObjectClass, "Undefined", NULL },
+    { TrueClass, CLASS_PTRS, 0, BooleanClass, "True", NULL },
+    { FalseClass, CLASS_PTRS, 0, BooleanClass, "False", NULL },
     { LinkClass, CLASS_PTRS, 1, ObjectClass, "Link", "next" },
     { SymLinkClass, CLASS_PTRS, 2, LinkClass, "Symbol", "value" },
-    { BooleanClass, 0, 0, ObjectClass, "Boolean", NULL },
+    { BooleanClass, CLASS_PTRS, 0, ObjectClass, "Boolean", NULL },
     { CompiledMethodClass, CLASS_INDEX, 2, ObjectClass, "CompiledMethod",
 	    "description header"
     },
@@ -108,7 +103,7 @@ struct _class_template {
     { AssociationClass, CLASS_PTRS, 2, ObjectClass, "Association",
 		 "key value" },
     { SSetClass, CLASS_PTRS | CLASS_INDEX, 1, ObjectClass, "Set", "tally" },
-    { SmallIntegerClass, 0, 0, ObjectClass, "SmallInteger", NULL }
+    { SmallIntegerClass, 0, 0, IntegerClass, "SmallInteger", NULL }
 };
 
 char               *specialSelector[32] =
