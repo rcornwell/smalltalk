@@ -1,9 +1,12 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: stream.st,v 1.2 2000/02/01 18:10:04 rich Exp rich $ "
+" $Id: stream.st,v 1.3 2000/08/27 17:08:37 rich Exp rich $ "
 
 "
  $Log: stream.st,v $
+ Revision 1.3  2000/08/27 17:08:37  rich
+ Fixed bugs in reading chunk from stream.
+
  Revision 1.2  2000/02/01 18:10:04  rich
  Fixed some compile errors.
  Added chunk read/write code.
@@ -557,12 +560,14 @@ atEnd
 !FileStream class methodsFor: 'Initialize'!
 
 initialize
-	| array |
-	array <- Array new: 4.
-	array at: 1 put: (FileStream
-		 open: (initSourceFile at: 1) mode: 'r').
-	array at: 2 put: (FileStream open: 'smalltalk.stc' mode: 'a').
-	Smalltalk at: #sourceFiles put: array.
+	| array n |
+        Smalltalk at: #sourceFiles ifAbsent: [ 
+	    n <- initSourceFile at: 1.
+	    array <- Array new: 4.
+	    array at: 1 put: (FileStream open: n mode: 'r').
+	    array at: 2 put: (FileStream open: (n , 'c') mode: 'a').
+	    Smalltalk at: #sourceFiles put: array
+	]
 ! !
 
 FileStream initialize !
