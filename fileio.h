@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Id: $
+ * $Id: fileio.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: fileio.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -16,6 +19,7 @@ void                close_buffer(Objptr op);
 int                 read_buffer(Objptr op, int *c);
 int                 size_buffer(Objptr op);
 int                 write_buffer(Objptr op, int c);
+void		    close_files();
 
 /* OS Wrapper functions */
 long                file_open(char *, char *, int *);
@@ -24,6 +28,8 @@ int                 file_write(long, char *, long);
 int                 file_read(long, char *, long);
 int                 file_close(long);
 long                file_size(long);
+char	           *fill_buffer(int, int);
+int		    flush_buffer(int, char *);
 
 /* Misc functions. */
 void                error(char *);
@@ -37,9 +43,11 @@ struct file_buffer {
     int                 file_flags;	/* Flags on file */
     char               *file_buffer;	/* Internal Buffer */
     char               *file_offset;	/* Pointer into buffer */
-    char               *file_end;	/* End of data */
+    int                 file_len;	/* Amount of data in buffer */
     struct file_buffer *file_next;	/* Next in chain of open files */
 };
+
+extern struct file_buffer *files;
 
 #define BUFSIZE		8192
 #define FILE_READ	1
