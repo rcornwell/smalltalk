@@ -2,6 +2,11 @@
  * Smalltalk interpreter: File IO routines.
  *
  * $Log: fileio.c,v $
+ * Revision 1.5  2001/07/31 14:09:48  rich
+ * Fixed to compile with new cygwin
+ * Made sure open append mode under windows works correctly.
+ * Fixed bugs in write_buffer so it works correctly.
+ *
  * Revision 1.4  2001/01/13 15:53:03  rich
  * Added routine to check if files are still accessible, and close them
  *   if they are no longer usable.
@@ -23,27 +28,19 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: fileio.c,v 1.4 2001/01/13 15:53:03 rich Exp rich $";
+	"$Id: fileio.c,v 1.5 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
 #include "smalltalk.h"
-
-/* System stuff */
-#ifndef WIN32
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#ifdef sun
-#include <sys/filio.h>
-#endif
-#endif
-
 #include "object.h"
 #include "smallobjs.h"
 #include "fileio.h"
+#include "system.h"
+#include "interp.h"
 
 struct file_buffer *files = NULL;
+struct file_buffer console;
 
 Objptr
 new_file(char *name, char *mode)
@@ -230,6 +227,30 @@ open_buffer(Objptr op)
 }
 
 /*
+ * Check if a file is a directory.
+ */
+int
+file_isdirect(Objptr op)
+{
+    struct file_buffer *fp;
+    char               *name;
+    int			res;
+
+   /* Look it up */
+    for (fp = files; fp != NULL; fp = fp->file_next)
+	if (fp->file_oop == op) {
+	    /* If it is open is can't be a directory */
+	    return FALSE;
+	}
+
+   /* Ok did not find it, ask os what type of file it is. */
+    name = Cstring(get_pointer(op, FILENAME));
+    res = file_checkdirect(name);
+    free(name);
+    return res;
+}
+
+/*
  * Close off a file object.
  */
 void
@@ -357,6 +378,100 @@ read_buffer(Objptr op, int *c)
 }
 
 /*
+ * Read at least the next len character off a file stream.
+ */
+int
+read_str_buffer(Objptr op, int len, Objptr *res)
+{
+    struct file_buffer *fp;
+    Objptr              temp;
+    int                 pos;
+    int			offset;
+    int			base;
+
+   /* For the moment, set to empty */
+    *res = NilPtr;
+
+   /* Look it up */
+    for (fp = files; fp != NULL; fp = fp->file_next)
+	if (fp->file_oop == op)
+	    break;
+
+    if (fp == NULL)
+	return FALSE;
+
+    if ((fp->file_flags & FILE_READ) == 0)
+	return FALSE;
+
+   /* Get position of smalltalk file */
+    temp = get_pointer(op, FILEPOS);
+    if (!is_integer(temp))
+	return FALSE;
+    pos = as_integer(temp);
+
+   /* Check if we have to move buffer */
+    offset = pos - fp->file_pos;
+    if (offset < 0 || offset >= fp->file_len) {
+	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
+	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
+	    file_seek(fp->file_id, fp->file_pos);
+	    file_write(fp->file_id, fp->file_buffer, fp->file_len + 1);
+	    fp->file_flags &= ~FILE_DIRTY;
+	}
+	fp->file_pos = pos;
+	offset = 0;
+	file_seek(fp->file_id, fp->file_pos);
+	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	if (fp->file_len < 0)
+	   return FALSE;
+    }
+    if (fp->file_len <= 0)
+	return FALSE;
+
+   /* Now adjust len based on how much more is available in file. */
+    if (len > fp->file_len) {
+	/* only care if we will exceed amount in buffer */
+	int	flen = file_size(fp->file_id) - fp->file_pos;
+	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
+		 (FILE_WRITE | FILE_DIRTY) && 
+					fp->file_len > flen)
+	   flen = fp->file_len;
+	if (len > flen)
+	   len = flen;
+    }
+
+    if (len <= 0)
+	return FALSE;
+	  
+    /* Now create a object to recieve results of read */ 
+    *res = create_new_object(StringClass, len);
+    base = fixed_size(*res);
+    while (len-- > 0) {
+        /* Get next char */
+	set_byte(*res, base++, fp->file_buffer[offset++]);
+    	pos++;
+	/* Check if we need to move buffer */
+        if (offset >= fp->file_len) {
+	    if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
+	        (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
+	        file_seek(fp->file_id, fp->file_pos);
+	        file_write(fp->file_id, fp->file_buffer, fp->file_len + 1);
+	        fp->file_flags &= ~FILE_DIRTY;
+	    }
+	    fp->file_pos = pos;
+	    offset = 0;
+	    file_seek(fp->file_id, fp->file_pos);
+	    fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	    if (fp->file_len < 0) 
+	        return FALSE;
+	}
+    }
+    Set_integer(op, FILEPOS, pos);
+    return TRUE;
+}
+
+
+/*
  * Return the size of a file.
  */
 int
@@ -419,10 +534,14 @@ write_buffer(Objptr op, int c)
 	}
 	fp->file_pos = pos;
 	offset = 0;
-	file_seek(fp->file_id, fp->file_pos);
-	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
-	if (fp->file_len < 0) 
-	    return FALSE;
+        if (fp->file_flags & FILE_READ) {
+	    file_seek(fp->file_id, fp->file_pos);
+	    fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	    if (fp->file_len < 0) 
+	        return FALSE;
+	} else {
+	    fp->file_len = 0;
+	}
     }
     fp->file_buffer[offset++] = c;
     if (fp->file_len < offset)
@@ -433,328 +552,113 @@ write_buffer(Objptr op, int c)
     return TRUE;
 }
 
-#ifndef WIN32
-long 
-file_open(char *name, char *mode, int *flags)
+/*
+ * Append string of characters onto end of stream.
+ */
+int
+write_str_buffer(Objptr op, char *str, int len)
 {
-    int                 fmode = 0;
-    int                 id;
+    struct file_buffer *fp;
+    Objptr              temp;
+    int                 pos;
+    int			offset;
 
-    switch (*mode) {
-    case 'r':
-	fmode = O_RDONLY;
-	*flags = FILE_READ;
-	break;
-    case 'w':
-	fmode = O_WRONLY|O_CREAT;
-	*flags = FILE_WRITE;
-	break;
-    case 'a':
-	fmode = O_RDWR|O_CREAT|O_APPEND;
-	*flags = FILE_READ | FILE_WRITE;
-	break;
-    case 'm':
-	fmode = O_RDWR|O_CREAT;
-	*flags = FILE_READ | FILE_WRITE;
-	break;
-    default:
-	return -1;
+   /* Look it up */
+    for (fp = files; fp != NULL; fp = fp->file_next)
+	if (fp->file_oop == op)
+	    break;
+
+    if (fp == NULL)
+	return FALSE;
+
+    if ((fp->file_flags & FILE_WRITE) == 0)
+	return FALSE;
+
+   /* Get position of smalltalk file */
+    temp = get_pointer(op, FILEPOS);
+    if (!is_integer(temp))
+	return FALSE;
+    pos = as_integer(temp);
+    offset = pos - fp->file_pos;
+
+   /* Process string */
+    while(len-- > 0) {
+   	/* Check if we have to move buffer */
+        if (offset < 0 || offset >= BUFSIZE || fp->file_len >= BUFSIZE) {
+	    if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
+	        (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
+	        file_seek(fp->file_id, fp->file_pos);
+	        file_write(fp->file_id, fp->file_buffer, fp->file_len);
+	        fp->file_flags &= ~FILE_DIRTY;
+	    }
+	    fp->file_pos = pos;
+	    offset = 0;
+            if (fp->file_flags & FILE_READ) {
+	        file_seek(fp->file_id, fp->file_pos);
+	        fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	        if (fp->file_len < 0) {
+    		    Set_integer(op, FILEPOS, pos);
+	            return FALSE;
+	        }
+	    } else {
+	        fp->file_len = 0;
+	    }
+        }
+        fp->file_buffer[offset++] = *str++;
+        if (fp->file_len < offset)
+	    fp->file_len = offset;
+        pos++;
+        fp->file_flags |= FILE_DIRTY;
     }
-    if ((id = open(name, fmode, 0660)) < 0)
-	return -1;
-    if (*mode == 'a') {
-	lseek(id, 0, SEEK_END);
-	*flags |= FILE_APPEND;
-    }
-    return id;
-
+    Set_integer(op, FILEPOS, pos);
+    return TRUE;
 }
 
-long 
-file_seek(long id, long pos)
-{
-    return lseek(id, pos, SEEK_SET);
-}
 
-int 
-file_write(long id, char *buffer, long size)
-{
-    return write(id, buffer, size);
-}
-
-int 
-file_read(long id, char *buffer, long size)
-{
-    return read(id, buffer, size);
-}
-
-int 
-file_close(long id)
-{
-    return close(id);
-}
-
-long 
-file_size(long id)
-{
-    struct stat        stat;
-
-    if (fstat(id, &stat) < 0)
-	return -1;
-    return stat.st_size;
-}
-
+/*
+ * Initialize the console input buffer.
+ */
 void
-error(char *str)
+init_console(Objptr op)
 {
-    dump_string(str);
-    exit(-1);
+    console.file_oop = op;
+    console.file_buffer = (char *) malloc(BUFSIZE);
+    console.file_len = 0;
+    console.file_pos = 0;
+    console.file_id = 0;
+    console.file_flags = FILE_READ;
 }
 
-void
-errorStr(char *str, char *argument)
+/*
+ * Read whatever is waiting in stdin queue, put process to sleep if
+ * there is nothing to read.
+ */
+Objptr
+read_console(int stream, int mode)
 {
-    fprintf(stderr, str, argument);
-    exit (-1);
-}
+    Objptr              res;
 
-void
-dump_string(char *str)
-{
-       fputs(str, stderr);
-       fputc('\n', stderr);
-}
-
-char *
-fill_buffer(int stream, int mode)
-{
-    int len;
-    char *buf;
+   /* Can only read stream 0 */
     if (stream != 0)
-	return NULL;
+	return NilPtr;
+
+    if (console.file_len == 0) {
+	/* Put process to sleeep */
+	wait_console(console.file_oop);
+	return NilPtr;
+    }
+
+   /* Update mode for console */
     if (mode) 
-	len = ioctl(0, FIONREAD, 0);
+	console.file_flags |= FILE_CHAR;
     else
-	len = 8193;
-    if ((buf = malloc(len)) == NULL)
-	return NULL;
-    if (len == 0)
-	return buf;
-    len = read(0, buf, len - 1);
-    if (len < 0) {
-	free(buf);
-	return NULL;
-    }
-    buf[len + 1] = '\0';
-    return buf;
-}
+	console.file_flags &= ~FILE_CHAR;
 
-int
-flush_buffer(int stream, char *string)
-{
-    switch (stream) {
-    case 1:
-	    fputs(string, stdout);
-	    break;
-    case 2:
-	    fputs(string, stderr);
-	    break;
-    default:
-	    return FALSE;
-    }
-    return TRUE;
-}
+    console.file_buffer[console.file_len] = '\0';
+    res = MakeString(console.file_buffer);
+    console.file_len = 0;
 
-#endif
-
-#ifdef WIN32
-long 
-file_open(char *name, char *mode, int *flags)
-{
-    HANDLE              id;
-
-    switch (*mode) {
-    case 'r':
-	*flags = FILE_READ;
-	id = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
-			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	break;
-    case 'w':
-	*flags = FILE_WRITE;
-	id = CreateFile(name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
-			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	break;
-    case 'm':
-    case 'a':
-	*flags = FILE_READ | FILE_WRITE;
-	id = CreateFile(name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
-			OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	break;
-    default:
-	return -1;
-    }
-    if (id == INVALID_HANDLE_VALUE)
-	return -1;
-    if (*mode == 'a') {
-	*flags |= FILE_APPEND;
-	SetEndOfFile(id);
-    }
-    return (int) id;
-}
-
-long 
-file_seek(long id, long pos)
-{
-    return SetFilePointer((HANDLE) id, pos, NULL, FILE_BEGIN);
-}
-
-int 
-file_write(long id, char *buffer, long size)
-{
-    DWORD               did;
-
-    WriteFile((HANDLE) id, buffer, size, &did, 0);
-    if (did != size)
-	return -1;
-    else
-	return did;
-}
-
-int 
-file_read(long id, char *buffer, long size)
-{
-    DWORD               did;
-
-    ReadFile((HANDLE) id, buffer, size, &did, 0);
-    if (did == 0)
-	return -1;
-    else
-	return did;
-}
-
-int 
-file_close(long id)
-{
-    return CloseHandle((HANDLE) id);
-}
-
-long 
-file_size(long id)
-{
-    DWORD               hsize, lsize;
-
-    lsize = GetFileSize((HANDLE) id, &hsize);
-    return lsize;
-}
-
-void 
-error(char *str)
-{
-    dump_string(str);
-    ExitProcess(-1);
-}
-
-void
-errorStr(char *str, char *argument)
-{
-    char	buffer[1024];
-    wsprintf(buffer, str, argument);
-    error(buffer);
+    return res;
 }
 
 
-void
-dump_string(char *str)
-{
-    DWORD		did;
-
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), str, strlen(str), &did, 0);
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\r\n", 2, &did, 0);
-}
-
-static int	needconsole = 1;
-
-char *
-fill_buffer(int stream, int mode)
-{
-    HANDLE	in;
-    int         len;
-    char        *buf, *ptr;
-    char        c;
-    DWORD	did;
-
-    if (stream != 0)
-	return NULL;
-
-    if (needconsole) {
-	if (AllocConsole() == 0)
-	   return NULL;
-	needconsole = 0;
-    }
-
-    in = GetStdHandle(STD_INPUT_HANDLE);
-    len = 1024;
-    if ((buf = malloc(len)) == NULL)
-	return NULL;
-    ptr = buf;
-    while (len > 0) { 
-    	ReadFile(in, &c, 1, &did, 0);
-	if (c == '\r') 
-	    c = '\n';
-	*ptr++ = c;
-	len--;
-	if (c == '\n')
-	   break;
-    }
-    *ptr = '\0';
-    return buf;
-}
-
-int
-flush_buffer(int stream, char *string)
-{
-    HANDLE	out;
-    DWORD	did;
-    char	buf[1024];
-    char	*ptr;
-    int		len;
-
-    if (needconsole) {
-	if (AllocConsole() == 0)
-	   return FALSE;
-	needconsole = 0;
-    }
-
-    switch (stream) {
-    case 1:
-            out = GetStdHandle(STD_OUTPUT_HANDLE);
-	    break;
-    case 2:
-            out = GetStdHandle(STD_ERROR_HANDLE);
-	    break;
-    default:
-	    return FALSE;
-    }
-
-    ptr = buf;
-    len = 0;
-    while(*string != '\0') {
-	char c = *string++;
-	*ptr++ = c;
-	len++;
-	if (c == '\n') {
-	   *ptr++ = '\r';
-	   len++;
-	}
-	if (len >= (sizeof(buf) - 2)) {
-            WriteFile(out, buf, len, &did, 0);
-	    ptr = buf;
-	    len = 0;
-	}
-    }
-    if (len >= 0) 
-        WriteFile(out, buf, len, &did, 0);
-    return TRUE;
-}
-
-#endif
