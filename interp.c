@@ -3,6 +3,12 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.2  2000/02/01 18:09:53  rich
+ * Tracing now controlled in dump.h
+ * Added stack checking code to push, pop and send.
+ * Added stack display to push instructions.
+ * Reload methodPointer after a object create or send.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -11,7 +17,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+"$Id: interp.c,v 1.2 2000/02/01 18:09:53 rich Exp rich $";
 
 #endif
 
@@ -57,6 +63,18 @@ init_method_cache()
     }
 }
 
+static void
+recurseError(Objptr class, Objptr selector)
+{
+    char		buf[1024];
+
+    strcpy(buf, dump_class_name(class));
+    strcat(buf, ":");
+    strcat(buf, dump_object_value(selector));
+    strcat(buf, " Recurisive not understood error encountered");
+    error(buf);
+}
+
 /*
  * Lookup a method in a class tree, if not found, Send not found message.
  */
@@ -70,6 +88,7 @@ lookupMethodInClass(Objptr class, Objptr selector, int *stack_pointer,
     Objptr              dict;
     Objptr              res;
     int                 i;
+    Objptr		oselector = selector;
 
    /* Look up class chain */
     for (currentClass = class;
@@ -107,9 +126,10 @@ lookupMethodInClass(Objptr class, Objptr selector, int *stack_pointer,
 
    /* Not found... if it is DoesNotUnderstandSelector, error our */
     running = 0;
-    error("Recurisive not understood error encountered");
+    recurseError(class, oselector);
     return NilPtr;
 }
+
 
 /*
  * Return an object to a sender.
@@ -237,6 +257,53 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
     current_context = newContext;
     newContextFlag = 1;
     return;
+}
+
+
+/*
+ * Do a stack trace back of offending send.
+ */
+void
+dump_stack(Objptr op)
+{
+    char		buffer[1024];
+    Objptr		context = current_context;
+
+    context = get_pointer(context, BLOCK_SENDER);
+    while (context != NilPtr) {
+	Objptr		rec, meth, class, dict;
+	Objptr		select = NilPtr;
+
+	/* Figure out info about call */
+	if (get_integer(context, BLOCK_IIP) != 0) {
+	    Objptr	home = get_pointer(context, BLOCK_HOME);
+	    rec = get_pointer(home, BLOCK_REC);
+	    meth = get_pointer(home, BLOCK_METHOD);
+	    strcpy(buffer, "Block: ");
+	} else  {
+	    rec = get_pointer(context, BLOCK_REC);
+	    meth = get_pointer(context, BLOCK_METHOD);
+	    strcpy(buffer, "Method: ");
+	}
+
+	/* Find method name */
+	for (class = class_of(rec);
+	     class != NilPtr;
+	     class = get_pointer(class, SUPERCLASS)) {
+	  if ((dict = get_pointer(class, METHOD_DICT)) != NilPtr &&
+	      (select = FindKeyInIDictionary(dict, meth)) != NilPtr)
+	     break;
+	}
+
+	/* Sanity check */
+	if (select == NilPtr)
+	   break;
+	strcat(buffer, dump_object_value(rec));
+	strcat(buffer, " Selector: ");
+	strcat(buffer, dump_object_value(select));
+	dump_string(buffer);
+        context = get_pointer(context, BLOCK_SENDER);
+    }
 }
 
 /*
@@ -705,8 +772,8 @@ interp()
 	case RETTMP + 0xd:
 	case RETTMP + 0xe:
 	case RETTMP + 0xf:
-	    temp = get_pointer(current_context, oprand + BLOCK_STACK);
-	    trace_inst(meth, instruct_pointer, opcode, RETTMP, temp, 0);
+	    temp = get_pointer(home, oprand + BLOCK_STACK);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, temp, 0);
 	   /* Something wrong if stack there is no sending object */
 	    if (sender == NilPtr) {
 		Push(current_context);
