@@ -1,9 +1,14 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.8 2001/08/18 16:17:00 rich Exp rich $ "
+" $Id: behavior.st,v 1.9 2001/08/29 20:16:34 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.9  2001/08/29 20:16:34  rich
+ Added class definitions.
+ Always add a class to set of subclasses.
+ Moved Stream functions from object.st to here.
+
  Revision 1.8  2001/08/18 16:17:00  rich
  Placed classes and methods in correct category.
  Added methods for building new source file.
@@ -387,7 +392,7 @@ adjustMethodsSourceChannel: aChannel
 
 Behavior subclass: 'Class'
    instanceVariableNames: 'name vars comment category classvars pool methcats'
-   classVariableNames: ''
+   classVariableNames: 'Categories'
    poolDictionaries: ''
    category: 'Class-Mangement'
 !
@@ -586,10 +591,6 @@ comment: aString
 	^ comment <- aString
 !
 
-category: aString
-	^ category <- aString
-!
-
 name: aString
 	^ name <- aString
 !
@@ -605,6 +606,38 @@ instFlags: variableBoolean
 	    ifFalse: [ wordBoolean ifFalse: [ temp <- temp bitOr: 2 ]].
 	variableBoolean ifTrue: [ temp <- temp bitOr: 4 ].
 	^ flags <- temp
+! !
+
+! Class methodsFor: 'category managment' !
+
+category: aString
+	| set |
+	Categories isNil ifTrue: [ Categories <- Dictionary new ].
+	category isNil ifFalse: [
+		set <- Categories at: category asSymbol ifAbsent: [ nil ].
+		set isNil ifFalse: [ set remove: self ].
+		set <- Categories at: aString asSymbol ifAbsent: [ nil ].
+		set isNil ifTrue: [
+			 set <- Set new.
+			 Categories at: aString asSymbol put: set].
+		set add: self
+	].
+	^ category <- aString
+!
+
+allCategories
+	| cats |
+	Categories isNil ifTrue: [ Categories <- Dictionary new ].
+        cats <- OrderedCollection new.
+	Categories keysDo: [ :c | cats add: c asString ].
+	^ cats
+!
+
+allClassesForCategory: aString
+	| classes |
+	Categories isNil 
+	    ifTrue: [ ^ Set new ]
+	   ifFalse: [ ^ Categories at: aString asSymbol ifAbsent: [ nil ]].
 ! !
 
 ! Class methodsFor: 'testing class hierarchy' !
