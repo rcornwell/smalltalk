@@ -3,6 +3,11 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.4  2001/01/17 01:46:17  rich
+ * Added routine to flush method cache.
+ * Added routine to send an error message.
+ * Temporiarly commented out process scheduling.
+ *
  * Revision 1.3  2000/03/03 00:23:52  rich
  * Moved recurseError to a functions.
  * Moved dump_stack here.
@@ -22,14 +27,11 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.3 2000/03/03 00:23:52 rich Exp rich $";
+"$Id: interp.c,v 1.4 2001/01/17 01:46:17 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#include <stdio.h>
-#include <unistd.h>
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "interp.h"
@@ -47,8 +49,8 @@ int                 running;
 int                 compiling;
 int                 newContextFlag = 0;
 
-static inline Objptr lookupMethodInClass(Objptr, Objptr, int *, int *);
-static inline void   return_Object(Objptr, Objptr);
+static INLINE Objptr lookupMethodInClass(Objptr, Objptr, int *, int *);
+static INLINE void   return_Object(Objptr, Objptr);
 static void          init_method_cache();
 
 /*
@@ -87,6 +89,25 @@ flushCache(Objptr sel)
     }
 }
 
+/*
+ * Flush the method cache of a given method.
+ */
+void
+flushMethod(Objptr meth)
+{
+    int                 i;
+
+   /* Clear Method Cache */
+    for (i = 0; i < (sizeof(methodCache) / sizeof(method_Cache)); i++) {
+        if (meth == NilPtr || meth == methodCache[i].method) {
+	    methodCache[i].select = NilPtr;
+	    methodCache[i].class = NilPtr;
+	    methodCache[i].method = NilPtr;
+	    methodCache[i].header = NilPtr;
+	}
+    }
+}
+
 
 
 static void
@@ -110,7 +131,7 @@ SendError(Objptr selector, int *stack)
 /*
  * Lookup a method in a class tree, if not found, Send not found message.
  */
-static inline       Objptr
+static INLINE       Objptr
 lookupMethodInClass(Objptr class, Objptr selector, int *stack_pointer,
 		    int *args)
 {
@@ -170,7 +191,7 @@ lookupMethodInClass(Objptr class, Objptr selector, int *stack_pointer,
  *      Then push value onto returned stack.
  *      Lastly, clear out current context stack.
  */
-static inline void
+static INLINE void
 return_Object(Objptr value, Objptr caller)
 {
     int                 sstack;
@@ -704,7 +725,6 @@ interp()
 	    trace_inst(meth, instruct_pointer, SNDSUP, oprand, Literal(oprand),
 		 argc);
 	    if ((stack_pointer + argc) >= stack_top)  {
-		dump_stack(Literal(oprand));
 		SendError(InterpStackFault, &tstack);
 	    } else
 	        SendToClass(Literal(oprand), &tstack, argc, temp);
