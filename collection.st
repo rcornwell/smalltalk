@@ -1,7 +1,10 @@
-" $Id: collection.st,v 1.6 2001/08/18 16:17:01 rich Exp rich $ "
+" $Id: collection.st,v 1.7 2001/08/29 20:16:34 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.7  2001/08/29 20:16:34  rich
+ Added class definitions
+
  Revision 1.6  2001/08/18 16:17:01  rich
  Placed classes and methods in correct categories.
 
@@ -197,7 +200,7 @@ isEmpty
 !
 
 includes: anObject
-    self do: [ :element | anObject = element ifTrue: [ ^true ]].
+    self do: [ :element | anObject = element ifTrue: [ ^true ]. ].
     ^false
 !
 
