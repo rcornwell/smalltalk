@@ -3,6 +3,11 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.2  2000/02/01 18:09:52  rich
+ * Added stack checking code.
+ * Changed class variables to an Array.
+ * Moved image start up to here.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -11,7 +16,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: init.c,v 1.2 2000/02/01 18:09:52 rich Exp rich $";
 
 #endif
 
@@ -37,8 +42,8 @@ static char        *rcsid =
 #include "interp.h"
 #include "primitive.h"
 #include "fileio.h"
-#include "lex.h"
 #include "dump.h"
+#include "lex.h"
 #include "symbols.h"
 #include "parse.h"
 #include "image.h"
