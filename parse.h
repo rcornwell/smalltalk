@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: $
+ * $Id: parse.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: parse.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */  
 
@@ -22,8 +25,8 @@ int                 parseBinary();
 int                 nameTerm(Symbolnode);
 int                 doContinue(int);
 int                 keyContinue(int);
-void                doBinaryContinue(int);
-void                doUnaryContinue(int);
+int                 doBinaryContinue(int);
+int                 doUnaryContinue(int);
 int                 doBlock();
 int                 optimBlock();
 int                 doIfTrue();
