@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: object.h,v 1.2 2000/01/03 16:23:22 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.2  2000/01/03 16:23:22  rich
+ * Moved object pointer out to a new structure to reduce access cost.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -17,6 +20,30 @@
 #define FALSE	0
 #define TRUE 	1
 #define INLINE	inline
+
+/* Root object indexies */
+#define	CURCONT		0
+#define NEWPROC		1
+#define SMALLTLK	2
+#define SYMTAB		3
+#define CHARTAB		4
+#define OBJECT		5
+#define SPECSEL		6
+#define TRUEOBJ		7
+#define FALSEOBJ	8
+#define SELECT0		9
+#define SELECT1		10
+#define SELECT2		11
+#define SELECT3		12
+#define SELECT4		13
+#define TEMP0		14
+#define TEMP1		15
+#define TEMP2		16
+#define TEMP3		17
+#define METHFOR0	18
+#define METHFOR1	19
+#define ERRORSEL	20
+#define ROOTSIZE	21
 
 typedef unsigned int Objptr;
 
@@ -52,7 +79,7 @@ typedef struct _otentry {
     unsigned int        ptrs:1;			/* Object has pointers */
 } otentry          , *Otentry;
 
-extern Objptr       rootObjects[19];
+extern Objptr       rootObjects[ROOTSIZE];
 extern int          otsize;
 extern int          growsize;
 extern Otentry      otable;			/* Array of object info */
@@ -78,27 +105,8 @@ int                *create_object(Objptr, int, Objptr, int);
 void                rebuild_free();
 int                *next_object(Objptr *, int *, Objptr *, int *);
 void		    free_all_other_objects(Objptr);
+void		    reclaimSpace();
 
-/* Root object indexies */
-#define	CURCONT		0
-#define NEWPROC		1
-#define SMALLTLK	2
-#define SYMTAB		3
-#define CHARTAB		4
-#define OBJECT		5
-#define SPECSEL		6
-#define TRUEOBJ		7
-#define FALSEOBJ	8
-#define SELECT0		9
-#define SELECT1		10
-#define SELECT2		11
-#define SELECT3		12
-#define TEMP0		13
-#define TEMP1		14
-#define TEMP2		15
-#define METHFOR0	16
-#define METHFOR1	17
-#define ERRORSEL	18
 
 #ifdef INLINE_OBJECT_MEM
 
