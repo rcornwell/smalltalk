@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.3  2000/02/02 16:48:58  rich
+ * Changed include order.
+ *
  * Revision 1.2  2000/02/01 18:09:46  rich
  * Removed unused variables.
  * Cleaned up max stack sizeing code.
@@ -17,7 +20,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.2 2000/02/01 18:09:46 rich Exp rich $";
+	"$Id: code.c,v 1.3 2000/02/02 16:48:58 rich Exp rich $";
 
 #endif
 
@@ -327,8 +330,7 @@ combineCode(Codestate cstate)
        /* Find end of code block run */
 	for (nxt = cur->next;
 	     nxt != NULL &&
-	     (nxt->type == CodeBlock || nxt->type == Nop ) &&
-	     (nxt->flags & CODE_LABEL) == 0;
+	     (nxt->type == CodeBlock || nxt->type == Nop );
 	     nxt = nxt->next)
 	    len += nxt->len;
 
@@ -338,8 +340,7 @@ combineCode(Codestate cstate)
 	i = cur->len;
 	for (nxt = cur->next;
 	     nxt != NULL &&
-             (nxt->type == CodeBlock || nxt->type == Nop) &&
-	     (nxt->flags & CODE_LABEL) == 0;
+             (nxt->type == CodeBlock || nxt->type == Nop);
 	     nxt = cur->next) {
 	   /* Copy over chunks */
 	    if (nxt->type == CodeBlock)
@@ -739,8 +740,7 @@ optimize(Codestate cstate)
     do {
         superflag = peephole(cstate);
 	i = optimizeJump(cstate);
-	if (i == TRUE)
-	    relabel(cstate);
+        relabel(cstate);
     } while (i == TRUE);
     return superflag;
 }
