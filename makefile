@@ -10,8 +10,8 @@ INCLUDE=$(SDK)/include
 CC = gcc 
 RC = windres -I rc -O coff -DWIN32 -DINLINE_OBJECT_MEM #--include-dir $(INCLUDE)
 HC = $(SDK)/bin/hcw
-CFLAGS = -g -Wall -O2 -DWIN32 -DINLINE_OBJECT_MEM #-I$(INCLUDE) -g 
-LDFLAGS = -g -mwindows -mno-cygwin
+CFLAGS = -Wall -O2 -DWIN32 -DINLINE_OBJECT_MEM -DINLINE=inline #-I$(INCLUDE) -g 
+LDFLAGS = -mwindows -mno-cygwin
 LIBS=-lversion
 
 
@@ -30,7 +30,7 @@ SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
 	   behavior.st process.st system.st graphic.st font.st mvc.st \
 	   guiapps.st
 
-all:	$(PROJ).sti 
+all:	smalledit.exe $(PROJ).sti 
 
 $(PROJ).sti: $(PROJ).exe source.st boot.st
 	./$(PROJ).exe boot.st
@@ -44,18 +44,29 @@ source.st: $(SMALLSRC)
 $(PROJ).exe: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) 
 
+smalledit.exe: smalledit.$(O) about.$(O) smalledit.res
+	$(CC) $(LDFLAGS) -o $@ smalledit.$(O) about.$(O) smalledit.res \
+		-lcomctl32  $(LIBS)
+
 $(PROJ).hlp: $(PROJ).rtf $(PROJ).hpj $(PROJ).cnt
 	$(HC) /C /E $(PROJ).hpj
 
 $(PROJ).res: $(PROJ).rc $(PROJ).h about.h
 	$(RC) -i $< -o $@
 
+smalledit.res: smalledit.rc smalledit.h about.h
+	$(RC) -i $< -o $@
+
 clean:
 	rm -f $(OBJS)
 	rm -f $(PROJ).hlp $(PROJ).gid $(PROJ).err $(PROJ).log
+	rm -f smalledit.$(O) smalledit.res
+	rm -f boot.st boot.stc source.st
 
 .c.$(O):
 	$(CC) -c $(CFLAGS) -o $@ $<
+
+smalledit.$(O): smalledit.c smalledit.h
 
 about.$(O):	about.c smalltalk.h about.h
 code.$(O):	code.c smalltalk.h object.h smallobjs.h interp.h lex.h \
