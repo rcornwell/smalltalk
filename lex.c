@@ -3,6 +3,13 @@
  * Smalltalk interpreter: Lexiconal Scanner.
  *
  * $Log: lex.c,v $
+ * Revision 1.2  2000/02/01 18:09:54  rich
+ * Converted pushback from array to single character.
+ * Fixed some bugs in floating point conversion.
+ * Made sure tok is always defined before it is used.
+ * Buffer now freed in init.c
+ * Names in arrays are considered symbols.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -11,7 +18,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: lex.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: lex.c,v 1.2 2000/02/01 18:09:54 rich Exp rich $";
 
 #endif
 
@@ -34,7 +41,6 @@ static char        *rcsid =
 
 #include "object.h"
 #include "smallobjs.h"
-#include "primitive.h"
 #include "lex.h"
 #include "fileio.h"
 #include "dump.h"
