@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.4 2001/01/07 15:14:02 rich Exp rich $
+ * $Id: smallobjs.h,v 1.5 2001/07/31 14:09:49 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.5  2001/07/31 14:09:49  rich
+ * Added Magnitude, Number and Integer classes.
+ *
  * Revision 1.4  2001/01/07 15:14:02  rich
  * Changed location of flags.
  *
@@ -81,9 +84,11 @@
 #define IntegerClass		((Objptr)46)
 #define SmallIntegerClass	((Objptr)48)
 #define FloatClass		((Objptr)50)
+#define LargePosIntegerClass	((Objptr)52)
+#define LargeNegIntegerClass	((Objptr)54)
 
 /* Class MethodContext */
-#define MethodContextClass	((Objptr)52)
+#define MethodContextClass	((Objptr)56)
 #define BLOCK_SENDER		0	/* Who Sent message */
 #define BLOCK_IP		1	/* Current Instruct pointer */
 #define BLOCK_SP		2	/* Current Stack Pointer */
@@ -93,14 +98,14 @@
 #define BLOCK_ARGCNT		6	/* Number of arguments */
 #define BLOCK_STACK		7	/* Start of stack */
 
-#define BlockContextClass	((Objptr)54)
+#define BlockContextClass	((Objptr)58)
 #define BLOCK_CALLER		0	/* Who called context */
 #define BLOCK_HOME		3	/* Home for block context */
 #define BLOCK_IIP		4	/* Initial Instruction Pointer */
 #define BLOCK_NOTUSED		5	/* Reciever in methodContext */
 
 /* Class CompiledMethod */
-#define CompiledMethodClass	((Objptr)56)
+#define CompiledMethodClass	((Objptr)60)
 #define METH_DESCRIPTION	0
 #define METH_HEADER		1
 #define METH_LITSTART		2
@@ -124,42 +129,42 @@
 #define PrimitiveOf(ehdr)	(((ehdr) & EMETH_PRIM)>>1)
 
 /* Class MethodInfoClass */
-#define MethodInfoClass		((Objptr)58)
+#define MethodInfoClass		((Objptr)62)
 #define METHINFO_SOURCE		0
 #define METHINFO_POS		1
 #define METHINFO_CAT		2
 
 /* Class Point */
-#define PointClass		((Objptr)60)
+#define PointClass		((Objptr)64)
 #define XINDEX			0
 #define YINDEX			1
 
 /* Class Message */
-#define MessageClass		((Objptr)62)
+#define MessageClass		((Objptr)66)
 #define MESSAGE_ARGS		0
 #define MESSAGE_SELECT		1
 #define MESSAGE_SIZE		2
 
 /* Class CharacterValue */
-#define CharacterClass		((Objptr)64)
+#define CharacterClass		((Objptr)68)
 #define CHARVALUE		0
 
 /* Class Link */
-#define LinkClass		((Objptr)66)
+#define LinkClass		((Objptr)70)
 #define LINK_NEXT		0
 
 /* Class SymLink */
-#define SymLinkClass		((Objptr)68)
+#define SymLinkClass		((Objptr)72)
 #define SYM_VALUE		1
 
 /* Array classes */
-#define StringClass		((Objptr)70)
-#define ArrayClass		((Objptr)72)
+#define StringClass		((Objptr)74)
+#define ArrayClass		((Objptr)76)
 
 /* Collection classes */
-#define SSetClass		((Objptr)74)
-#define DictionaryClass		((Objptr)76)
-#define IdentityDictionaryClass	((Objptr)78)
+#define SSetClass		((Objptr)78)
+#define DictionaryClass		((Objptr)80)
+#define IdentityDictionaryClass	((Objptr)82)
 /* Class Dictionary */
 #define DICT_TALLY		0
 #define DICT_VALUES		1
@@ -175,11 +180,10 @@
 /* Class Process */
 #define PROC_SUSPEND		1
 #define PROC_PRIO		2
-#define PROC_MYLISTINDEX	3
 
 
 /* Class Association */
-#define AssociationClass	((Objptr)80)
+#define AssociationClass	((Objptr)84)
 #define ASSOC_KEY		0
 #define ASSOC_VALUE		1
 
@@ -196,6 +200,43 @@
 #define FILEMODE		1
 #define FILEPOS			2
 
+/* BitBlt Class */
+#define DEST_FORM		0
+#define SRC_FORM		1
+#define HALF_FORM		2
+#define COMB_RULE		3
+#define DEST_X			4
+#define DEST_Y			5
+#define DEST_WIDTH		6
+#define DEST_HEIGHT		7
+#define CLIP_X			8
+#define CLIP_Y			9
+#define CLIP_WIDTH		10
+#define CLIP_HEIGHT		11
+#define SRC_X			12
+#define SRC_Y			13
+
+/* Class CharacterScanner */
+#define CHAR_TEXT		14
+#define CHAR_TEXT_POS		15
+#define CHAR_XTABLE		16
+#define CHAR_STOPX		17
+#define CHAR_EXCEPT		18
+#define CHAR_PRINTING		19
+#define CHAR_ENDRUNCODE		20
+
+/* Form Class */
+#define FORM_WIDTH		0		/* DisplayObject */
+#define FORM_HEIGHT		1		/* DisplayObject */
+#define FORM_OFFSET		2		/* DisplayObject */
+#define FORM_BITMAP		3		/* Form */
+
+/* Event types */
+#define	EVENT_TIMER		0		/* Sent to tick_semaphore */
+#define	EVENT_CHAR		1
+#define	EVENT_MOUSEPOS		2
+#define	EVENT_MOUSEBUT		3
+#define	EVENT_RESIZE		4
 
 Objptr              MakeString(char *);
 char               *Cstring(Objptr);
