@@ -1,10 +1,15 @@
 
 " Methods for Class graphics subclasses"
 
-" $Id: graphic.st,v 1.3 2001/09/17 20:19:55 rich Exp rich $ "
+" $Id: graphic.st,v 1.4 2002/01/16 19:11:51 rich Exp rich $ "
 
 "
  $Log: graphic.st,v $
+ Revision 1.4  2002/01/16 19:11:51  rich
+ Fixed typo in clipExtent.
+ Removed keyboardPeek method.
+ Added Menu cursor type.
+
  Revision 1.3  2001/09/17 20:19:55  rich
  Added methods to read values from BitBlt objects.
 
@@ -167,6 +172,25 @@ min: aPoint
     (self < aPoint)
        ifTrue: [^ self ]
        ifFalse:[^ aPoint ]
+! !
+
+! Point methodsFor: 'transforming'!
+
+moveBy: aPoint
+    ^ self + aPoint.
+!
+
+moveTo: aPoint
+    | diff |
+    ^ aPoint 
+!
+
+scaleBy: scale
+    ^ self * scale
+!
+
+translateBy: factor
+    ^ self + factor
 ! !
 
 ! Point methodsFor: 'point functions'!
@@ -1406,13 +1430,6 @@ extent: aPoint fromArray: anArray offset: offsetPoint
     roundwidth <- (width + 31) // 32.
     bitmap <- WordArray new: (roundwidth * height).
     1 to: anArray size do: [ :i | bitmap at: i put: (anArray at: i) ].
-!
-
-fromString: aString
-    "bitmap <- Bitmap fromString: aString.
-    width <- bitmap width.
-    height <- bitmap height.
-    offset <- 0@0"
 ! !
 
 ! Form methodsFor: 'accessing' !
@@ -1472,20 +1489,6 @@ valueAt: aPoint put: bitCode
                     bitmap to be bitCode, either 0 or 1."
     <primitive 139>
     ^ self primitiveFailed
-! !
-
-! Form methodsFor: 'displaying text' !
-
-displayString: aString at: aPoint
-                 clippingBox: clipRectangle
-		 rule: rule
-		 mask: mask
-    bitmap isNil
-        ifTrue: [ ^nil ].
-    bitmap displayString: aString at: aPoint
-                 clippingBox: clipRectangle
-		 rule: rule
-		 mask: mask
 ! !
 
 ! Form methodsFor: 'display managment' !
@@ -1610,7 +1613,7 @@ waitButton
     [ self noButtonPressed ]
           whileTrue: [
              waitSemaphore <- Semaphore new.
-             waitEvent <- 4.
+             waitEvent <- 2.
              waitSemaphore wait
 	 ]
 !
@@ -1619,7 +1622,7 @@ waitNoButton
     [ self anyButtonPressed ]
           whileTrue: [
              waitSemaphore <- Semaphore new.
-             waitEvent <- 4.
+             waitEvent <- 2.
              waitSemaphore wait
 	 ]
 !
@@ -2034,18 +2037,18 @@ initialize
     Menu <- Cursor extent: 16@16
                    fromArray: #( 2r0000000000000000 2r0000000000000000
 				 2r0000000000000000 2r0000000000000000
-				 2r0000000000000000 2r0000000000001000
-				 2r0000000000001100 2r1111111111111110
-				 2r0000000000001111 2r1111111111111110
-				 2r0000000000001100 2r0000000000001000
+				 2r0000000000000000 2r0001000000000000
+				 2r0011000000000000 2r0111111111111111
+				 2r1111000000000000 2r0111111111111111
+				 2r0011000000000000 2r0001000000000000
 				 2r0000000000000000 2r0000000000000000
 				 2r0000000000000000 2r0000000000000000)
 		   maskArray: #( 2r0000000000000000 2r0000000000000000
 				 2r0000000000000000 2r0000000000000000
-				 2r0000000000000000 2r0000000000001000
-				 2r0000000000001100 2r1111111111111110
-				 2r0000000000001111 2r1111111111111110
-				 2r0000000000001100 2r0000000000001000
+				 2r0000000000000000 2r0001000000000000
+				 2r0011000000000000 2r0111111111111111
+				 2r1111000000000000 2r0111111111111111
+				 2r0011000000000000 2r0001000000000000
 				 2r0000000000000000 2r0000000000000000
 				 2r0000000000000000 2r0000000000000000)
 		      offset: 8@8.
