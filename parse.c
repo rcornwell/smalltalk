@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.6  2001/07/31 14:09:48  rich
+ * Fixed to compile under new cygwin
+ *
  * Revision 1.5  2001/01/17 01:02:12  rich
  * Changed location of flags in header.
  * Fixed compile bug in generation of send super messages.
@@ -30,7 +33,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.5 2001/01/17 01:02:12 rich Exp rich $";
+	"$Id: parse.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -42,6 +45,7 @@ static char        *rcsid =
 #include "code.h"
 #include "parse.h"
 #include "fileio.h"
+#include "system.h"
 #include "dump.h"
 
 Token		    tstate;
@@ -121,6 +125,7 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     Set_object(methinfo, METHINFO_CAT, aCatagory);
     rootObjects[TEMP2] = NilPtr;
 
+#if 0
     if ((catdict = get_pointer(aClass, CLASS_METHCAT)) == NilPtr) {
 	catdict = new_Dictionary();
 	Set_object(aClass, CLASS_METHCAT, catdict);
@@ -134,7 +139,7 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
         rootObjects[TEMP2] = NilPtr;
     }
     AddSelectorToSet(get_pointer(catset, ASSOC_VALUE), aSelector);
-
+#endif
 }
  
 /*
