@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: $
+ * $Id: code.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: code.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */  
 
@@ -44,15 +47,19 @@ typedef struct _codestate {
 
 Codestate	    newCode();
 void		    freeCode(Codestate cstate);
-Codenode	    genCode(Codestate cstate, enum code_type type, enum oper_type oper, int amount);
+Codenode	    genCode(Codestate cstate, enum code_type type,
+			 enum oper_type oper, int amount);
 void                genStore(Codestate cstate, Symbolnode sym);
 void                genPushLit(Codestate cstate, Literalnode lit);
 void                genPush(Codestate cstate, Symbolnode sym);
 void                genSend(Codestate cstate, Literalnode lit, int argc,
-				 int superFlag);
+			int superFlag);
 Codenode	    genBlockCopy(Codestate cstate, int argc);
 void                genJump(Codestate cstate, Codenode label);
-void                setJumpTarget(Codestate cstate, Codenode label);
+void                setJumpTarget(Codestate cstate, Codenode label, 
+			int advance);
+int		    isGetInst(Codestate cstate);
+int		    isSetInst(Codestate cstate);
 int                 optimize(Codestate cstate);
 void                genblock(Codestate cstate);
 
@@ -67,7 +74,7 @@ void                genblock(Codestate cstate);
 #define genReturnNil(cstate) genCode(cstate, Return, Nil, 0)
 
 /* Generate return Top of stack opcode.  */
-#define genReturnTOS(cstate) genCode(cstate, Return, Stack, -1)
+#define genReturnTOS(cstate) genCode(cstate, Return, Stack, 0)
 
 #define genPopTOS(cstate) genCode(cstate, PopStack, Stack, -1)
 
