@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.5  2001/01/16 01:08:16  rich
+ * Code cleanup.
+ *
  * Revision 1.4  2000/08/19 19:46:50  rich
  * Fixed optimizer bug resulting in not all code being emited.
  * Always relabel nodes after jump optimization.
@@ -24,26 +27,11 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.4 2000/08/19 19:46:50 rich Exp rich $";
+	"$Id: code.c,v 1.5 2001/01/16 01:08:16 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <memory.h>
-#include <malloc.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "interp.h"
