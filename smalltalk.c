@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main routine.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.3  2000/02/02 16:07:38  rich
+ * Don't need to include primitive.h
+ *
  * Revision 1.2  2000/02/01 18:10:03  rich
  * Fixed image load code.
  *
@@ -13,7 +16,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smalltalk.c,v 1.2 2000/02/01 18:10:03 rich Exp rich $";
+	"$Id: smalltalk.c,v 1.3 2000/02/02 16:07:38 rich Exp rich $";
 #endif
 
 #ifdef _WIN32
@@ -35,7 +38,7 @@ static char        *rcsid =
 
 char               *imagename = NULL;
 char               *loadfile = NULL;
-int                 defotsize = 128;
+int                 defotsize = 512;
 
 static int          getnum(char *, int *);
 
