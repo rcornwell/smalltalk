@@ -20,7 +20,7 @@ OBJS = $(PROJ).o about.o image.o object.o interp.o primitive.o fileio.o \
 BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
 	behavior.st system.st boottail.st
 SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
-	behavior.st process.st system.st graphic.st
+	behavior.st process.st system.st graphic.st font.st
 
 all:	$(PROJ).sti 
 
