@@ -1,9 +1,12 @@
 " Methods for Class magnitude and all it's subclasses"
 
-" $Id: magnitude.st,v 1.2 2000/02/01 18:09:55 rich Exp rich $ "
+" $Id: magnitude.st,v 1.3 2001/01/08 05:53:21 rich Exp rich $ "
 
 "
  $Log: magnitude.st,v $
+ Revision 1.3  2001/01/08 05:53:21  rich
+ Code cleanup
+
  Revision 1.2  2000/02/01 18:09:55  rich
  Added asString method to class Character.
  Fixed Character constants.
@@ -15,14 +18,10 @@
 
 "
 
-" Build Magnitude class tree "
-Object subclass: 'Magnitude' instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: ''!
-
 Magnitude comment: 
  'I am a abstract class. I represent relationships between objects.' !
 
-!Magnitude methodsFor: 'Comparing'!
+! Magnitude methodsFor: 'Comparing'!
 
 = aMagnitude
 	self subclassResponsibility
@@ -48,7 +47,7 @@ between: min and: max
 	^ (self >= min) and: [ self <= max ]
 ! !
 
-!Magnitude methodsFor: 'Testing'!
+! Magnitude methodsFor: 'Testing'!
 
 min: aMagnitude
 	self < aMagnitude ifTrue: [ ^ self ]
@@ -60,9 +59,6 @@ max: aMagnitude
 			  ifFalse: [ ^ aMagnitude ].
 ! !
 	
-Magnitude subclass: 'Number' instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: ''!
-
 Number comment: 
  'I am a abstract class. I represent numeric objects.' !
 
@@ -86,17 +82,16 @@ generality
 
 retry: aSymbol coercing: aNumber
 	| selfGen aNumGen |
-	'Retry' print.
 	selfGen <- self generality.
 	aNumGen <- aNumber generality.
 	selfGen > aNumGen
 	    ifTrue: [ ^ self preform: aSymbol with: (self coerce: aNumber) ].
 	selfGen < aNumGen
-	    ifTrue: [ ^ (aNumber coerce: self) preform: aSymbol with aNumber ].
+	    ifTrue: [ ^ (aNumber coerce: self) preform: aSymbol with: aNumber ].
 	self error: 'retry:coercing: called with same generality'.
 ! !
 
-!Number methodsFor: 'arithmetic'!
+! Number methodsFor: 'arithmetic'!
 
 + aNumber
     self subclassResponsibility
@@ -132,7 +127,7 @@ rem: aNumber
 	^ self - ((self quo: aNumber) * aNumber)
 ! !
 
-!Number methodsFor: 'truncation and round off'!
+! Number methodsFor: 'truncation and round off'!
 
 truncated
 	^self subclassResponsibility
@@ -151,7 +146,8 @@ roundTo: aNumber
 	^(self / aNumber) rounded * aNumber
 ! !
 
-!Number methodsFor: 'testing'!
+! Number methodsFor: 'testing'!
+
 negative
     ^self < 0
 !
@@ -181,7 +177,7 @@ odd
     ^self truncated odd
 ! !
 
-!Number methodsFor: 'misc math'!
+! Number methodsFor: 'misc math'!
 
 squared
     ^self * self
@@ -248,7 +244,7 @@ raisedToInteger: anInteger
     ^result
 ! !
 
-!Number methodsFor: 'truncation and round off'!
+! Number methodsFor: 'truncation and round off'!
 
 floor
         "Return the integer nearest the receiver toward negative infinity."
@@ -262,7 +258,7 @@ floor
                 ifFalse: [^selfTruncated - 1]
 ! !
 
-!Number methodsFor: 'arithmetic'!
+! Number methodsFor: 'arithmetic'!
 
 reciprocal
         self = 0
@@ -270,7 +266,7 @@ reciprocal
                 ifFalse: [^1 / self]
 ! !
 
-!Number methodsFor: 'Interval iterators'!
+! Number methodsFor: 'Interval iterators'!
 
 to: stop by: step do: aBlock
     | i |
@@ -293,20 +289,6 @@ to: stop do: aBlock
     ^self to: stop by: 1 do: aBlock
 ! !
 
-
-Number  subclass: 'Integer' instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: ''!
-
-" Fix up class hierchy now that we have superclasses defined"
-SmallInteger superclass: Integer.
-SmallInteger class superclass: (Integer class).
-Integer addSubclass: SmallInteger.
-Float superclass: Number.
-Float class superclass: (Number class).
-Number addSubclass: Float.
-Character superclass: Magnitude.
-Character class superclass: (Magnitude class).
-Magnitude addSubclass: Character. !
 
 ! SmallInteger methodsFor: 'arithmetic' !
 
@@ -362,6 +344,7 @@ Magnitude addSubclass: Character. !
     <primitive 14>
     ^ self retry: #> coercing: aNumber
 !
+
 <= aNumber
     <primitive 15>
     ^ self retry: #<= coercing: aNumber
@@ -370,7 +353,6 @@ Magnitude addSubclass: Character. !
 >= aNumber
     <primitive 16>
     ^ self retry: #>= coercing: aNumber
-
 !
 
 negative
@@ -434,7 +416,13 @@ highBit
 	   [ :i | (self bitAnd: (1 bitShift: i)) ~= 0 ifTrue: [ ^i ] ]
 ! !
 
-!SmallInteger methodsFor: 'Misc methods' !
+! SmallInteger methodsFor: 'Misc methods' !
+
+asObject
+        "Answer an integer pointer for object."
+        <primitive 61>
+        ^ self primitiveFailed
+!
 
 hash
 	^ self
@@ -479,7 +467,7 @@ asFloat
 
 ! !
 
-!SmallInteger methodsFor: 'Iteration' !
+! SmallInteger methodsFor: 'Iteration' !
 
 timesRepeat: aBlock
 	| i |
@@ -487,7 +475,8 @@ timesRepeat: aBlock
 	[ i <= self ] whileTrue: [ aBlock value. i <- i + 1]
 ! !
 
-!SmallInteger methodsFor: 'Conversion'!
+! SmallInteger methodsFor: 'Conversion'!
+
 asCharacter
     "Return self as an ascii character"
     ^Character value: self
@@ -517,7 +506,7 @@ rounded
     ^self
 ! !
 
-!SmallInteger methodsFor: 'copying'!
+! SmallInteger methodsFor: 'copying'!
 
 shallowCopy
     ^self
@@ -527,7 +516,7 @@ deepCopy
     ^self
 ! !
 
-!SmallInteger methodsFor: 'printing'!
+! SmallInteger methodsFor: 'printing'!
 
 printOn: aStream base: b
     aStream nextPutAll: (self radix: b)
@@ -541,20 +530,20 @@ printOn: aStream
     aStream nextPutAll: (self signedStringBase: 10 showRadix: false)
 ! !
 
-!SmallInteger methodsFor: 'storing'!
+! SmallInteger methodsFor: 'storing'!
 
 storeOn: aStream
     self printOn: aStream 
 ! !
 
-!SmallInteger methodsFor: 'private'!
+! SmallInteger methodsFor: 'private'!
 
 unsignedStringBase: radix string: aStream
     self ~= 0 ifTrue: [
 	(self // radix ) unsignedStringBase: radix string: aStream.
 	aStream nextPut: (Character digitValue: (self \\ radix))
     ]
-! 
+!
     
 signedStringBase: radix showRadix: showRadix
     | str num |
@@ -647,7 +636,6 @@ positive
 
 ! Float methodsFor: 'Math' !
 
-
 truncated
 	<primitive 29>
 !
@@ -713,14 +701,14 @@ arcTan
 	<primitive 44>
 ! !
 
-!Float class methodsFor: 'basic' !
+! Float class methodsFor: 'basic' !
 
 pi
 	"Returns the value of pi"
 	^ 3.1415926535897
 ! !
 
-!Float methodsFor: 'convertion' !
+! Float methodsFor: 'convertion' !
 
 coerce: aNumber
 	^ aNumber asFloat
@@ -742,7 +730,7 @@ hash
 		ifFalse: [ ^ expt ]
 ! !
 
-!Float methodsFor: 'Copying' !
+! Float methodsFor: 'Copying' !
 
 shallowCopy
 	^ self
@@ -752,7 +740,7 @@ deepCopy
 	^ self
 ! !
 
-!Float methodsFor: 'printing'!
+! Float methodsFor: 'printing'!
 
 printOn: aStream
     | num exp |
@@ -772,14 +760,14 @@ printOn: aStream
                    exp printOn: aStream ].
 ! !
 
-!Float methodsFor: 'storing'!
+! Float methodsFor: 'storing'!
 
 storeOn: aStream
     self printOn: aStream
 ! !
 
 
-!Float methodsFor: 'private'!
+! Float methodsFor: 'private'!
 
 printFloatOn: aStream
     | num str intDigits |
@@ -845,7 +833,7 @@ revDigitsBase: b
     ^str contents
 ! !
 
-!Character class methodsFor: 'built ins'!
+! Character class methodsFor: 'built ins'!
 
 value: anInteger
     "Returns the character object corresponding to anInteger.  Error if
@@ -857,7 +845,7 @@ value: anInteger
 	    [ ^ charsymbols basicAt: (anInteger + 1) ]
 ! !
 
-!Character class methodsFor: 'constants'!
+! Character class methodsFor: 'constants'!
 
 backspace
     ^charsymbols basicAt: 9
@@ -888,7 +876,7 @@ space
 ! !
 
 
-!Character class methodsFor: 'Instance creation'!
+! Character class methodsFor: 'Instance creation'!
 
 digitValue: anInteger
     "Returns a character that corresponds to anInteger.  0-9 map to $0-$9,
@@ -900,7 +888,7 @@ digitValue: anInteger
     ^self error: 'value not in range 0 to 35'
 ! !
 
-!Character methodsFor: 'converting'!
+! Character methodsFor: 'converting'!
 
 digitValue
     "Returns the value of self interpreted as a digit.  Here, 'digit' means
@@ -920,7 +908,7 @@ asString
 
 ! !
 
-!Character methodsFor: 'comparing'!
+! Character methodsFor: 'comparing'!
 
 = char
     "Boolean return value; true if the characters are equal Return true
@@ -950,7 +938,7 @@ asciiValue
 ! !
 
 
-!Character methodsFor: 'testing'!
+! Character methodsFor: 'testing'!
 
 isDigit
     "True if self is a 0-9 digit"
@@ -1000,7 +988,7 @@ isVowel
     ^false
 ! !
 
-!Character methodsFor: 'Conversion'!
+! Character methodsFor: 'Conversion'!
 
 asLowercase
     "Returns self as a lowercase character if it's an uppercase letter,
@@ -1024,13 +1012,13 @@ asSymbol
     ^ str asSymbol
 ! !
 
-!Character methodsFor: 'printing'!
+! Character methodsFor: 'printing'!
 
 printOn: aStream
     self storeOn: aStream
 ! !
 
-!Character methodsFor: 'storing'!
+! Character methodsFor: 'storing'!
 
 storeOn: aStream
     aStream nextPut: $$.
@@ -1045,7 +1033,7 @@ Time comment:
 creation, methods that access components (hours, minutes, and seconds) of a 
 time value, and a block execution timing facility.' !
 
-!Time class methodsFor: 'basic'!
+! Time class methodsFor: 'basic'!
 
 now
     ^self new setSeconds: Time secondClock
@@ -1067,7 +1055,7 @@ millisecondsToRun: timedBlock
 ! !
 
 
-!Time methodsFor: 'accessing'!
+! Time methodsFor: 'accessing'!
 
 hours
     ^(seconds // (60*60)) \\ 24
@@ -1082,7 +1070,7 @@ seconds
 ! !
 
 
-!Time methodsFor: 'comparing'!
+! Time methodsFor: 'comparing'!
 
 = aTime
     ^seconds = aTime time
@@ -1108,7 +1096,7 @@ hash
     ^seconds
 ! !
 
-!Time methodsFor: 'arithmetic'!
+! Time methodsFor: 'arithmetic'!
 
 addTime: timeAmount
     ^Time new setSeconds: seconds + timeAmount
@@ -1128,7 +1116,7 @@ printOn: aStream
     self seconds printOn: aStream
 ! !
 
-!Time methodsFor: 'private'!
+! Time methodsFor: 'private'!
 
 setSeconds: secs
     seconds <- secs
@@ -1158,7 +1146,7 @@ Smalltalk at: #DayNameDict put: Dictionary new!
 
 Smalltalk at: #MonthNameDict put: Dictionary new!
 
-!Date class methodsFor: 'basic'!
+! Date class methodsFor: 'basic'!
 
 initialize
     self initDayNameDict.
@@ -1244,7 +1232,7 @@ dateAndTimeNow
     ^Array with: (Date today) with: (Time now)
 ! !
 
-!Date class methodsFor: 'instance creation'!
+! Date class methodsFor: 'instance creation'!
 
 today
     | now date |
@@ -1267,7 +1255,7 @@ newDay: day month: monthName year: yearInteger
              + (self yearAsDays: yearInteger))
 ! !
 
-!Date class methodsFor: 'private methods'!
+! Date class methodsFor: 'private methods'!
 
 yearAsDays: yearInteger
    | temp |
@@ -1303,7 +1291,7 @@ daysInMonthIndex: monthIndex forYear: yearInteger
 
 ! !
 
-!Date methodsFor: 'basic'!
+! Date methodsFor: 'basic'!
 
 addDays: dayCount
     days <- days + dayCount
@@ -1317,7 +1305,7 @@ subtractDate: aDate
     ^days - aDate days
 ! !
 
-!Date methodsFor: 'comparing'!
+! Date methodsFor: 'comparing'!
 
 = aDate
     ^days = aDate days
@@ -1343,7 +1331,7 @@ hash
     ^days
 ! !
 
-!Date methodsFor: 'printing'!
+! Date methodsFor: 'printing'!
 
 printOn: aStream
     self computeDateParts:
@@ -1356,7 +1344,7 @@ printOn: aStream
 ! !
 
 
-!Date methodsFor: 'storing'!
+! Date methodsFor: 'storing'!
 
 storeOn: aStream
     "Won't work past around 1200 years in the future"
@@ -1373,7 +1361,7 @@ storeOn: aStream
     aStream nextPut: $)
 ! !
 
-!Date methodsFor: 'private methods'!
+! Date methodsFor: 'private methods'!
 
 days
     ^days
