@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.3  2000/02/02 00:37:43  rich
+ * Exported dump_class_name
+ *
  * Revision 1.2  2000/02/01 18:09:49  rich
  * Exposed dump_object_value.
  * Renamed trace_inst to dump_inst.
@@ -18,7 +21,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.2 2000/02/01 18:09:49 rich Exp rich $";
+"$Id: dump.c,v 1.3 2000/02/02 00:37:43 rich Exp rich $";
 
 #endif
 
@@ -744,6 +747,7 @@ dump_code(void *state)
     Codenode            cur;
     char                buffer[1024];
     char                line[1024];
+    char		ref;
 
     for (cur = cstate->code; cur != NULL; cur = cur->next) {
 	switch (cur->type) {
@@ -865,7 +869,8 @@ dump_code(void *state)
 	default:
 	    break;
 	}
-        wsprintf(line, "%x: %s", cur, buffer);
+	ref = (cur->flags & CODE_LABEL)? '*': ' ';
+        wsprintf(line, "%x: %c%s", cur, ref, buffer);
         dump_string(line);
     }
 }
