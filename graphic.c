@@ -2,6 +2,11 @@
  * Smalltalk graphics: Routines for doing graphics primitive.
  *
  * $Log: graphic.c,v $
+ * Revision 1.2  2001/08/29 20:16:34  rich
+ * Make sure bit order is correct.
+ * Fixed bugs in doblit and drawloop.
+ * Moved clip_data function into doBlit.
+ *
  * Revision 1.1  2001/08/18 16:20:57  rich
  * Initial revision
  *
@@ -12,7 +17,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: graphic.c,v 1.1 2001/08/18 16:20:57 rich Exp rich $";
+    "$Id: graphic.c,v 1.2 2001/08/29 20:16:34 rich Exp rich $";
 
 #endif
 
@@ -711,8 +716,8 @@ drawLoop(Objptr blitOp, int x, int y)
     /* Set initial area */
     minx = blit_data.dx;
     miny = blit_data.dy;
-    maxx = blit_data.dx + blit_data.w;
-    maxy = blit_data.dy + blit_data.h;
+    maxx = blit_data.dx + blit_data.sw;
+    maxy = blit_data.dy + blit_data.sh;
 
     /* Check for null copy */
     doblit(&blit_data);
@@ -768,10 +773,10 @@ drawLoop(Objptr blitOp, int x, int y)
 	    minx = blit_data.dx;
 	if (blit_data.dy < miny)
 	    miny = blit_data.dy;
-	if ((blit_data.dx + blit_data.w) > maxx)
-	    maxx = blit_data.dx + blit_data.w;
-	if ((blit_data.dy + blit_data.h) > maxy)
-	    maxy = blit_data.dy + blit_data.h;
+	if ((blit_data.dx + blit_data.sw) > maxx)
+	    maxx = blit_data.dx + blit_data.sw;
+	if ((blit_data.dy + blit_data.sh) > maxy)
+	    maxy = blit_data.dy + blit_data.sh;
 	blit_data.dx = minx;
 	blit_data.dy = miny;
 	blit_data.w = maxx - minx;
