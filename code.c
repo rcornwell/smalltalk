@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Log: $
+ * $Log: code.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: code.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -34,11 +37,11 @@ static char        *rcsid =
 #include "lex.h"
 #include "symbols.h"
 #include "code.h"
+#include "fileio.h"
+#include "dump.h"
 
 Codenode            code = NULL;
 Codenode            lastcode = NULL;
-int                 maxstack;
-int                 curstack;
 
 /*
  * Create a new code state block.
@@ -86,7 +89,9 @@ genCode(Codestate cstate, enum code_type type, enum oper_type oper, int amount)
 {
     Codenode            newcode;
 
+    /* Create a new code node */
     if ((newcode = (Codenode) malloc(sizeof(codenode))) != NULL) {
+	/* Fill in values */
 	newcode->type = type;
 	newcode->oper = oper;
 	newcode->len = 0;
@@ -94,6 +99,7 @@ genCode(Codestate cstate, enum code_type type, enum oper_type oper, int amount)
 	newcode->flags = 0;
 	newcode->u.codeblock = NULL;
         newcode->next = NULL;
+	/* Hook it into the linked list of instructions */
 	if (cstate->code == NULL) {
 	    cstate->code = newcode;
 	    cstate->last = newcode;
@@ -101,10 +107,9 @@ genCode(Codestate cstate, enum code_type type, enum oper_type oper, int amount)
 	    cstate->last->next = newcode;
 	    cstate->last = newcode;
 	}
-	if (amount < 0) {
-           if (cstate->curstack > cstate->maxstack)
-	      cstate->maxstack = cstate->curstack;
-	}
+	/* Adjust the stack */
+        if (cstate->curstack > cstate->maxstack)
+           cstate->maxstack = cstate->curstack;
     	cstate->curstack += amount;
     }
     return newcode;
@@ -164,17 +169,19 @@ genJump(Codestate cstate, Codenode label)
 {
     Codenode            newnode;
 
-    newnode = genCode(cstate, Jump, Nil, 0);
+    newnode = genCode(cstate, Jump, Label, 0);
     newnode->u.jump = label;
-    if (label != NULL)
-	label->flags |= CODE_LABEL;
+    newnode->argcount = 0;
 }
 
 void
-setJumpTarget(Codestate cstate, Codenode label)
+setJumpTarget(Codestate cstate, Codenode label, int advance)
 {
-    if (label != NULL && cstate->last != NULL) 
-        label->u.jump = cstate->last;
+    if (label != NULL && cstate->last != NULL) {
+      	label->u.jump = cstate->last;
+	if (label->type != BlockCopy)
+	    label->argcount = advance;
+    }
 }
 
 /*
@@ -186,6 +193,8 @@ removeNext(Codestate cstate, Codenode node)
     if (node != NULL && node->next != NULL) {
 	Codenode            dead = node->next;
 
+	if ((dead->flags & CODE_LABEL) != 0)
+	   dump_string("Removing referenced node");
 	node->next = dead->next;
        /* Fix last pointer */
 	if (dead == cstate->last) {
@@ -200,6 +209,80 @@ removeNext(Codestate cstate, Codenode node)
 	free(dead);
     }
 }
+
+/*
+ * Remove the current node.
+ */
+static Codenode
+removeCur(Codestate cstate, Codenode node)
+{
+    if (node != NULL) {
+	Codenode            next = node->next;
+        Codenode	    temp;
+
+	/* Remove anything it referenced */
+	if (node->oper == Literal && node->u.literal != NULL) {
+	    node->u.literal->usage--;
+	}
+	if (node->type == CodeBlock)
+	    free(node->u.codeblock);
+	/* Remove it from tree */
+	if (node == cstate->code) 
+	    cstate->code = next;
+	else {
+	    for(temp = cstate->code; temp != NULL; temp = temp->next) {
+		if (temp->next == node) {
+		    temp->next = next;
+		    if (cstate->last == node)
+			cstate->last = temp;
+		    break;
+		}
+	    }
+	    
+	}
+
+	/* If old node was a label, advance all labeles to next */
+	for (temp = cstate->code; temp != NULL; temp = temp->next) {
+	    if (temp->oper == Label && temp->u.jump == node) {
+		temp->u.jump = next;
+		next->flags |= CODE_LABEL;
+	    }
+    	}
+	free(node);
+        return next;
+    }
+    return NULL;
+}
+
+/*
+ * Compare two node. Return true if they point to same type of
+ * object.
+ */
+static int
+compareNode(Codenode node1, Codenode node2)
+{
+    if (node1->oper != node2->oper)
+	return FALSE;
+
+    switch (node1->oper) {
+    default:
+	break;
+    case Temp:
+    case Inst:
+    case Arg:
+    	if (node1->u.symbol != node2->u.symbol)
+	    return FALSE;
+        break;
+     case Literal:
+     case Variable:
+        if (node1->u.literal != node2->u.literal)
+	    return FALSE;
+    	node2->u.literal->usage--;
+        break;
+     }
+     return TRUE;
+}
+
 
 /*
  * Check if the next statement begins a basic block.
@@ -266,30 +349,107 @@ combineCode(Codestate cstate)
 }
 
 /*
- * Optimize a code block.
+ * Check if code could be a get instance variable.
+ *
+ *   psh ins #
+ *   ret tos
  */
 int
-optimize(Codestate cstate)
+isGetInst(Codestate cstate)
 {
     Codenode            cur;
-    int                 changed;
-    int                 superflag = 0;
-    int                 i;
+    int                 inst;
+
+    cur = cstate->code;
+    if (cur == NULL)
+	return -1;
+    if (cur->type != Push || cur->oper != Inst)
+	return -1;
+    inst = cur->u.symbol->offset;
+    if ((cur = cur->next) == NULL)
+	return -1;
+    if (cur->type != Return || cur->oper != Stack)
+	return -1;
+    if (cur->next != NULL)
+	return -1;
+    return inst;
+}
+
+/*
+ * Check if code could be a set instance variable.
+ *
+ *   psh arg 0       psh arg 0
+ *   str ins #	     dup
+ *   psh arg 0	     str arg 0
+ *   ret tos         ret tos
+ */
+int
+isSetInst(Codestate cstate)
+{
+    Codenode            cur;
+    int                 inst;
+
+    cur = cstate->code;
+    if (cur == NULL)
+	return -1;
+    if (cur->type != Push || cur->oper != Arg || cur->u.symbol->offset != 0)
+	return -1;
+    if ((cur = cur->next) == NULL)
+	return -1;
+    if (cur->type == Store && cur->type == Inst) {
+        inst = cur->u.symbol->offset;
+        if ((cur = cur->next) == NULL)
+	    return -1;
+        if (cur->type != Push || cur->oper != Arg || cur->u.symbol->offset != 0)
+	    return -1;
+    } else if (cur->type == Duplicate) {
+        if ((cur = cur->next) == NULL)
+	    return -1;
+        if (cur->type == Store && cur->type == Inst) 
+            inst = cur->u.symbol->offset;
+	else
+	    return -1;
+    } else
+	return -1;
+    if ((cur = cur->next) == NULL)
+        return -1;
+    if (cur->type != Return || cur->oper != Stack)
+	return -1;
+    if (cur->next != NULL)
+	return -1;
+    return inst;
+}
 
 /*
  * Fix jump targets to point to next instruction, also set referenced flag.
  */
+static void
+fixjumps(Codestate cstate)
+{
+    Codenode            cur;
+
     for (cur = cstate->code; cur != NULL; cur = cur->next) {
-	if (cur->oper == Label) {
-	    if (cur->u.jump != NULL && cur->u.jump->next != NULL) {
-		if (cur->u.jump->next->type == Nop) 
-		     cur->u.jump = cur->u.jump->next->next->next;
-		else
-		     cur->u.jump = cur->u.jump->next;
-		cur->u.jump->flags |= CODE_LABEL;
-	    }
+	if (cur->oper == Label && cur->u.jump != NULL && 
+		cur->u.jump->next != NULL) {
+	    Codenode target = cur->u.jump->next;
+	    if (cur->type != BlockCopy &&  cur->argcount > 0)
+		target = target->next;
+	    cur->u.jump = target;
+	    target->flags |= CODE_LABEL;
 	}
     }
+}
+
+/*
+ * Preform inline optimitization.
+ */
+static int
+peephole(Codestate cstate)
+{
+    Codenode            cur;
+    int                 superflag = 0;
+    int                 i;
+
 
 /* Preform preoptimization pass.
  * 1) Convert sends into sendSpecail if we can.
@@ -301,6 +461,20 @@ optimize(Codestate cstate)
     for (cur = cstate->code; cur != NULL; cur = cur->next) {
 	switch (cur->type) {
 	case Push:
+	   /* Remove unneeded push/pop pairs */
+	    if (beginBlock(cur) && cur->next->type == PopStack) {
+		cur = removeCur(cstate, cur);
+		cur = removeCur(cstate, cur);
+		continue;
+	    }
+
+	   /* Convert push x /push x to push x/dup */
+	    if (beginBlock(cur) && cur->next->type == Push &&
+	        compareNode(cur, cur->next) == TRUE) {
+		cur->next->type = Duplicate;
+		cur->next->oper = Stack;
+	    }
+
 	   /* Check if it could be a zero or a one. */
 	    if (cur->oper == Literal) {
 		if (is_integer(cur->u.literal->value)) {
@@ -324,49 +498,85 @@ optimize(Codestate cstate)
 		    /* Clean up any code after the return block */
 	    	    while (beginBlock(cur)) 
 			removeNext(cstate, cur);
-		    changed |= 1;
 		    break;
 		default:
 		    break;
 	        }
 	    }
 
+	   /* Convert push bool, jcond to jump or pop */
+	    if (beginBlock(cur) &&
+		 (cur->next->type == JTrue || cur->next->type == JFalse)) {
+	        switch (cur->oper) {
+	        case True:
+		     if (cur->next->type == JTrue) 
+			cur->next->type = Jump;		/* Jump always */
+		     else
+			cur = removeCur(cstate, cur);	/* Never Jump */
+		     cur = removeCur(cstate, cur);
+		     continue;
+	        case False:
+		     if (cur->next->type == JFalse) 
+			cur->next->type = Jump;		/* Jump always */
+		     else
+			cur = removeCur(cstate, cur);	/* Never Jump */
+		     cur = removeCur(cstate, cur);
+		     continue;
+		default:
+		    /* Can't do anything since don't know what got pushed */
+		    break;
+	        }
+	    }
+	    break;
+
 	case Duplicate:
+	    /* Remove dup/pop pairs */
 	    if (beginBlock(cur) && cur->next->type == PopStack) {
-		removeNext(cstate, cur);
-		changed |= 1;
+		cur = removeCur(cstate, cur);
+		cur = removeCur(cstate, cur);
+		break;
+	    }
+
+	   /* Don't need a dup before a ret */
+	    if (beginBlock(cur) && cur->next->type == Return) {
+		cur = removeCur(cstate, cur);
 		break;
 	    }
 	    /* Convert  Dup, Store, Pop -> Store */
 	    if (beginBlock(cur) && cur->next->type == Store &&
 		beginBlock(cur->next) && cur->next->next->type == PopStack) {
-		/* Next to the current value */
-		cur->type = Store;
-		cur->oper = cur->next->oper;
-		cur->u.symbol = cur->next->u.symbol;
-		removeNext(cstate, cur);	/* Remove next two */
-		removeNext(cstate, cur);
-		changed |= 1;
+		if (beginBlock(cur->next->next)
+		    && cur->next->next->next->type == Push &&
+	               compareNode(cur->next, cur->next->next->next) == TRUE) {
+		    removeNext(cstate, cur->next);
+		    removeNext(cstate, cur->next);
+		} else {
+		    cur = removeCur(cstate, cur);
+		    removeNext(cstate, cur);
+		}
 	    }
 	    break;
+
 	case Jump:
 	case Return:
+	   /* Remove dead code after a jump or return */
 	    while (beginBlock(cur)) {
 		removeNext(cstate, cur);
-		changed |= 1;
 	    }
 	    break;
+
 	case SuperSend:
 	    superflag = 1;
 	    break;
+
 	case Send:
 	   /* Scan for selector in specails. */
 	    for (i = 0; i < 32; i++) {
 		if (get_pointer(SpecialSelectors, i) == cur->u.literal->value) {
 		    cur->type = SendSpec;
+		    cur->oper = Operand;
 		    cur->u.literal->usage--;
 		    cur->u.operand = i;
-		    changed = 1;
 		    break;
 		}
 	    }
@@ -374,7 +584,159 @@ optimize(Codestate cstate)
 	default:
 	    break;
 	}
+    } 
+    return superflag;
+}
+
+/*
+ * Readjust reference labels.
+ */
+static void
+relabel(Codestate cstate)
+{
+    Codenode            cur;
+
+    for (cur = cstate->code; cur != NULL; cur = cur->next) 
+	cur->flags &= ~CODE_LABEL;
+
+    /* If node is a jump/block, mark target */
+    for (cur = cstate->code; cur != NULL; cur = cur->next) 
+        if (cur->oper == Label) 
+	    cur->u.jump->flags |= CODE_LABEL;
+        
+} 
+
+/*
+ * Preform code motion optimizations.
+ */
+static int
+optimizeJump(Codestate cstate)
+{
+     Codenode		cur, node;
+     int		valuenum = -1;
+     Objptr		valuesym = internString("value");
+     int		i;
+     int		changed = FALSE;
+
+     for (i = 0; i < 32; i++) {
+	if (get_pointer(SpecialSelectors, i) == valuesym) {
+	    valuenum = i;
+	    break;
+	}
     }
+	
+     for (cur = cstate->code; cur != NULL; cur = cur->next) {
+	switch (cur->type) {
+	case Duplicate:
+		/* Optimize jump chains */
+		if (cur->next != NULL && 
+		    (cur->next->type == JTrue || cur->next->type == JFalse) &&
+		    cur->next->next != NULL &&
+		    cur->next->next->type == PopStack && 
+		    (cur->next->u.jump->type == JFalse ||
+			cur->next->u.jump->type == JTrue) &&
+		    cur->next->u.jump->next != NULL) {
+		   /* Remove dup and pop */
+		    cur = removeCur(cstate, cur);
+		    removeNext(cstate, cur);
+		   /* Move jump forward one step */
+		    if (cur->u.jump->type != cur->type)
+		    	cur->u.jump = cur->u.jump->next;
+		    else
+		    	cur->u.jump = cur->u.jump->u.jump;
+	            cur->u.jump->flags |= CODE_LABEL;
+		    changed = TRUE;
+		}
+ 	        break;
+	case JTrue:
+	case JFalse:
+	case Jump:
+		/* Jumps to jumps can be passed through */
+		if (cur->u.jump->type == Jump) {
+		    cur->u.jump = cur->u.jump->u.jump; 
+		    changed = TRUE;
+		}
+		/* Remove jumps to next location */
+		if (cur->u.jump == cur->next) {
+		    changed = TRUE;
+		    if (cur->type == JTrue || cur->type == JFalse) {
+			cur->type = PopStack;
+			cur->oper = Stack;
+		    } else {
+			cur = removeCur(cstate, cur);
+			continue;
+		    }
+		}
+		break;
+	case BlockCopy:
+		/* Try and unblock whiles */
+		if (cur->argcount == 0 && cur->u.jump->type == Duplicate &&
+		   cur->u.jump->next != NULL && 
+		   ((cur->u.jump->next->type == Send &&
+			cur->u.jump->next->u.literal->value == valuesym) || 
+		    (cur->u.jump->next->type == SendSpec && 
+			cur->u.jump->next->u.operand == valuenum)) &&
+		    cur->u.jump->next->next != NULL &&
+		    (cur->u.jump->next->next->type == JFalse ||
+			cur->u.jump->next->next->type == JTrue) &&
+		    cur->u.jump->next->next->u.jump->type == PopStack) {
+		    /* Major code surgery follows */
+		    /* All labels that point at the dup need to be pointed
+		       at the inst after the block copy */
+		    for(node = cstate->code; node != NULL; node = node->next) {
+        		if (node->oper == Label && node->u.jump == cur->u.jump
+				&& node != cur) {
+			    node->u.jump = cur->next;
+			}
+        		if (node->oper == Label && node->u.jump == cur) {
+			    node->u.jump = cur->next;
+			}
+		    }
+		    /* All ret blks between blockcopy and target need to be
+		       converted to jmp to after send */
+		    for(node = cur->next; node != cur->u.jump; node = node->next) {
+			if (node->type == Return && node->oper == Block) {
+			    node->type = Jump;
+			    node->oper = Label;
+			    node->u.jump = cur->u.jump->next->next;
+			}
+		    }
+		    /* Remove extra instructions */
+		    /* Remove pop */
+		    removeCur(cstate, cur->u.jump->next->next->u.jump);
+		    /* remove Dup and send */
+		    removeCur(cstate, cur->u.jump->next);
+		    removeCur(cstate, cur->u.jump);
+		    cur = removeCur(cstate, cur);
+		    changed = TRUE;
+		    continue;
+		}
+	     break;
+	default:
+	     break;
+        }
+    }
+    return changed;
+}
+
+/*
+ * Optimize a code block.
+ */
+int
+optimize(Codestate cstate)
+{
+    int                 superflag = 0;
+    int                 i;
+
+    fixjumps(cstate);
+    show_code(cstate);
+
+    do {
+        superflag = peephole(cstate);
+	i = optimizeJump(cstate);
+	if (i == TRUE)
+	    relabel(cstate);
+    } while (i == TRUE);
     return superflag;
 }
 
@@ -633,7 +995,7 @@ genblock(Codestate cstate)
    /* Convert jumps and remaining into code blocks */
     for (cur = cstate->code; cur != NULL; cur = cur->next) {
 	len = cur->len;
-	i = 0;
+	i = -1;
 	switch (cur->type) {
 	default:		/* Skip if not jump */
 	    len = 0;
@@ -643,7 +1005,7 @@ genblock(Codestate cstate)
 	    opcode = JMPT;
 	    if (len == 1)
 		opcode |= 0xf & operand;
-	    else if (len == 3) {
+	    else if (len == 4) {
 		opcode = JMPF + 3;
 		i = JMPLNG;
 	    } else
@@ -654,7 +1016,7 @@ genblock(Codestate cstate)
 	    opcode = JMPF;
 	    if (len == 1)
 		opcode |= 0xf & operand;
-	    else if (len == 3) {
+	    else if (len == 4) {
 		opcode = JMPT + 3;
 		i = JMPLNG;
 	    } else
@@ -696,8 +1058,9 @@ genblock(Codestate cstate)
 		cur->u.codeblock[j++] = cur->argcount;
 		len--;
 		len--;
-		cur->u.codeblock[j++] = i;
 	    }
+	    if (i != -1)
+		cur->u.codeblock[j++] = i;
 	    if (len > 1)
 		cur->u.codeblock[j++] = operand;
 	    if (len > 2)
@@ -710,6 +1073,4 @@ genblock(Codestate cstate)
     /* Combine remaining code blocks, should have only one block left */
     combineCode(cstate);
 }
-
-
 
