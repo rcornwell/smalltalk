@@ -29,18 +29,19 @@
 
 /*
  *
- * $Log: $
+ * $Log: about.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 static char
  rcsid[] =
-"$Id: $";
+"$Id: about.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-
+#ifdef WIN32
+#include "smalltalk.h"
 #include "about.h"
 
 static BOOL CALLBACK AboutDlgProc(HWND, UINT, WPARAM, LPARAM);

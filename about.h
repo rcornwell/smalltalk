@@ -29,14 +29,17 @@
  */
 
 /*
- * $Id: $
+ * $Id: about.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: about.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  *
  */
 
-#ifdef _WIN32
+#ifdef WIN32
 #define IDA_PRODUCT	10
 #define IDA_COMPANY	11
 #define IDA_COPY	12
