@@ -1,10 +1,13 @@
 
 " Methods for Class character graphics subclasses"
 
-" $Id: $ "
+" $Id: font.st,v 1.1 2002/01/29 16:41:13 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: font.st,v $
+ Revision 1.1  2002/01/29 16:41:13  rich
+ Initial revision
+
 
 
 "
@@ -115,6 +118,10 @@ printing
 
 extent
 	^ destX @ destY
+!
+
+fontHeight
+	^ font height
 ! !
 
 ! CharacterScanner methodsFor: 'modifying'!
@@ -163,6 +170,15 @@ font: aFont
 	(e isNil or: [e == #characterNotInFont] )
 		ifTrue: [ exceptions at: i put: ne ].
      ].
+!
+
+setRect: aRectangle offset: aInteger
+    clipX <- destX <- startX <- aRectangle left.
+    stopX <- aRectangle right.
+    clipWidth <- width <- aRectangle width.
+    clipHeight <- height <- aRectangle height.
+    clipY <- aRectangle top.
+    destY <- clipY + aInteger.
 ! !
 
 ! CharacterScanner methodsFor: 'character shortcuts'!
@@ -439,10 +455,7 @@ setFromBDFFile: stream
     	   token = 'PIXEL_SIZE'
 		 ifTrue: [size <- Integer readFrom: stream ].
  	   ].
- 	 stderr nextPutAll: 'properties done'.  stderr nl.
 	 name printOn: stderr. stderr space.
-	 ascent printOn: stderr. stderr space.
-	 descent printOn: stderr. stderr space.
 	 bold printOn: stderr. stderr space.
 	 italic printOn: stderr. stderr space.
 	 size printOn: stderr. stderr space.
@@ -470,14 +483,6 @@ setFromBDFFile: stream
     			ox <- Integer readFrom: stream.
 			stream skip: 1.
     			oy <- Integer readFrom: stream.
-"	 w printOn: stderr. stderr space.
-	 h printOn: stderr. stderr space.
-	 ox printOn: stderr. stderr space.
-	 oy printOn: stderr. stderr space.
-	 (w + 1 max: charWidth) printOn: stderr. stderr space.
-	 height printOn: stderr. stderr space.
-	 ascii printOn: stderr. stderr space.
-	 stderr nl."
     			glyph <- Form extent: (w + 1 max: charWidth) @
 				 height; white.
     			maxWidth < glyph width ifTrue:
@@ -523,18 +528,13 @@ setFromBDFFile: stream
 		       extent: width@height
 		       clipRect: (0@0 extent: width@height). 
     1 to: glyphs size do: [ :i |
-"	 i printOn: stderr. stderr space."
 	glyph <- glyphs at: i.
 	xTable at: (i + 1) put: blitter destX.
 	glyph isNil ifFalse: [
 	    blitter sourceForm: glyph.
 	    blitter copyBits.
 	    blitter destX: (blitter destX + (glyph width) + 1).
-"	 glyph width printOn: stderr. stderr space.
-	 glyph height printOn: stderr. stderr space."
 	].
-"	 blitter destX printOn: stderr. stderr space.
-	stderr nl."
     ].
     xTable at: 257 put: blitter destX.
     superscript <- ascent - descent // 3.	
@@ -800,10 +800,10 @@ displayString: aString at: aPoint
 	destForm: self font: Font systemFont
         combinationRule: rule destOrigin: aPoint
         extent: ((self width)@(self height)) clipRect: clipRectangle.
-    scanner stopcode: 8 put: #bs.
-    scanner stopcode: 9 put: #tab.
-    scanner stopcode: 10 put: #nl.
-    scanner stopcode: 12 put: #nl.
+    scanner stopcode: (Character backspace asciiValue + 1)  put: #bs.
+    scanner stopcode: (Character tab asciiValue + 1) put: #tab.
+    scanner stopcode: (Character cr asciiValue + 1) put: #nl.
+    scanner stopcode: (Character nl asciiValue + 1) put: #nl.
     [ code <- scanner scanword: aString size.
       code == #endRun ] whileFalse: [
 	(code == #stopX or: [ code == #nl ]) ifTrue: [ scanner nextline ].
@@ -832,10 +832,10 @@ displayExtent
     scanner <- CharacterScanner text: self 
 	destForm: Display font: Font systemFont.
     scanner printing: false.
-    scanner stopcode: 8 put: #bs.
-    scanner stopcode: 9 put: #tab.
-    scanner stopcode: 10 put: #nl.
-    scanner stopcode: 12 put: #nl.
+    scanner stopcode: (Character backspace asciiValue + 1) put: #bs.
+    scanner stopcode: (Character tab asciiValue + 1) put: #tab.
+    scanner stopcode: (Character cr asciiValue + 1) put: #nl.
+    scanner stopcode: (Character nl asciiValue + 1) put: #nl.
     [ code <- scanner scanword: self size.
       code == #endRun ] whileFalse: [
 	width <- width max: scanner destX.
