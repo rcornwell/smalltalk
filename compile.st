@@ -1,9 +1,12 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.3 2000/08/29 01:06:52 rich Exp rich $ "
+" $Id: compile.st,v 1.5 2001/07/31 14:09:48 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.5  2001/07/31 14:09:48  rich
+ Total rewrite of parser and code generator.
+
  Revision 1.3  2000/08/29 01:06:52  rich
  Converted tokens to symbols.
  Made method to preform actions for tokens.
@@ -646,7 +649,7 @@ init
 
 Object subclass: 'SmallTalkParseNode'
        instanceVariableNames: 'symbols node'
-       classVariableNames: 'ptmp rtmp stmp parg plit pins sins jpt jpf jmp sdspc sdsup snd blk rets ret rett retf retn retb pop pvar pself dup pt pf pn p1 p0 svar specs'
+       classVariableNames: 'ptmp rtmp stmp parg plit pins pint sins jpt jpf jmp sdspc sdsup snd blk rets ret rett retf retn retb pop pvar pself dup pt pf pn pc svar specs'
        poolDictionaries: ''
        category: nil !
 
@@ -675,7 +678,7 @@ initialize
 	jpf  <- 16r90.
 	jmp  <- 16rA0.
 	sdspc <- 16rB0.
-	sdsup <- 16rD0.
+	pint <- 16rD0.
 	snd  <- 16rE0.
 	blk  <- 16r0F.
         rets <- 16rF0.
@@ -691,8 +694,8 @@ initialize
 	pt   <- 16rFA.
 	pf   <- 16rFB.
 	pn   <- 16rFC.
-	p1   <- 16rFD.
-	p0   <- 16rFE.
+	sdsup <- 16rFD.
+	pc   <- 16rFE.
 	svar <- 16rFF.
 	specs <- Dictionary new.
 	tmp <- Smalltalk at: #SpecialSelectors
@@ -1144,13 +1147,27 @@ SmallTalkLeafNode subclass: 'SmallTalkConstantNode'
 ! SmallTalkConstantNode methodsFor: 'generation' !
 
 sizeForEffect: result
-	result ifFalse: [ ^ 1 ] ifTrue: [ ^ 0 ].
+	result ifFalse: [ 
+		(node > -8 and: [node < 8])
+		    ifTrue: [ ^ 1] ifFalse: [ ^ 2]]
+	       ifTrue: [ ^ 0 ].
 !
 
 emitOn: aStream forEffect: result
+	| operand |
 	result ifFalse: [ 
-		node == 0 ifTrue: [ aStream nextPut: p0 ].
-		node == 1 ifTrue: [ aStream nextPut: p1 ]
+		operand <- node.
+		(node > -8 and: [ node < 0])
+		     ifTrue: [ 
+			 aStream nextPut: (pint + (operand + 16)).
+			 ^self ].
+		(node >= 0 and: [ node < 8])
+		     ifTrue: [
+			 aStream nextPut: (pint + operand).
+			 ^self  ].
+		operand < 0 ifTrue: [ operand <- operand + 256 ].
+	 	aStream nextPut: (pint bitShift: -4).
+		aStream nextPut: (operand bitAnd: 16rFF).
 	]
 ! !
 
@@ -1272,7 +1289,7 @@ isSuper
 !
 
 canReturn
-	^ node ~= #super
+	^ node ~= #super and: [ node ~= #thisContext ]
 ! !
 
 ! SmallTalkBuiltinNode methodsFor: 'access' !
@@ -1297,7 +1314,8 @@ emitOn: aStream forEffect: result
 		node == #self ifTrue: [ aStream nextPut: pself ].
 		node == #true ifTrue: [ aStream nextPut: pt ].
 		node == #false ifTrue: [ aStream nextPut: pf ].
-		node == #nil ifTrue: [ aStream nextPut: pn ]
+		node == #nil ifTrue: [ aStream nextPut: pn ].
+		node == #thisContext ifTrue: [ aStream nextPut: pc ]
 	]
 !
 
@@ -1746,7 +1764,8 @@ sizeForEffect: result
 	c <- node sizeForEffect: false.
 	args do: [ :a | c <- c + (a sizeForEffect: false) ].
 	c <- c + 2.
-	(type ~= #spec and: [ selector offset > 15 ]) ifTrue: [ c <- c + 1 ].
+	(type == #simple and: [ selector offset > 15 ]) ifTrue: [ c <- c + 1 ].
+	(type == #super) ifTrue: [ c <- c + 1 ].
 	result ifTrue: [ c <- c + 1 ].
 	^ c
 !
@@ -1757,9 +1776,14 @@ emitOn: aStream forEffect: result
 	args do: [ :a | a emitOn: aStream forEffect: false ].
 	off <- selector offset.
 	opc <- snd.
-	type == #spec ifTrue: [ opc <- sdspc + off. off <- 0 ].
-	type == #super ifTrue: [ opc <- sdsup ].
-	self emitOpcode: aStream opc: opc offset: off.
+	type == #super
+		ifTrue: [ 
+			aStream nextPut: sdsup.
+			aStream nextPut: off ]
+		ifFalse: [
+			type == #spec ifTrue: [ opc <- sdspc + off. off <- 0 ].
+			self emitOpcode: aStream opc: opc offset: off
+		].
 	aStream nextPut: args size.
 	result ifTrue: [ aStream nextPut: pop ].
 ! !
@@ -2041,6 +2065,7 @@ on: aClass using: aParser
     self addSym: (SmallTalkBuiltinNode new: #super table: self).
     self addSym: (SmallTalkBuiltinNode new: #true table: self).
     self addSym: (SmallTalkBuiltinNode new: #false table: self).
+    self addSym: (SmallTalkBuiltinNode new: #thisContext table: self).
     nilnode <- (SmallTalkBuiltinNode new: #nil table: self).
     self addSym: nilnode.
 
@@ -2101,7 +2126,8 @@ addArg: aSym
 addLit: aValue forTerm: aBoolean
     | lit |
     " Check if it is constant value we can emit "
-    (aBoolean and: [ (aValue == 0 or: [ aValue == 1 ])]) ifTrue: [
+    (aBoolean and: [ aValue class == SmallInteger and: [
+		aValue > -127 and: [aValue < 127 ]]]) ifTrue: [
     	     ^ SmallTalkConstantNode new: aValue
 				    table: self ].
     lits do: [ :l | l node == aValue ifTrue: [ ^ l ] ].
@@ -2742,10 +2768,9 @@ printOn: aStream
 		aStream nl.
 	].
 	basic <- #( jmpl pshtmp rettmp sttmp psharg pshlit pshinst
-		    stinst jmpt jmpf jmp sndspc sndspc2 sndsup sndlit blk
+		    stinst jmpt jmpf jmp sndspc sndspc2 pshint sndlit blk
 		    retself rettos rettrue retfalse retnil retblk pop pshvar
-		    pshself dup pshtrue pshfalse pshnil pshone pshzero
-		   						 stvar).
+		    pshself dup pshtrue pshfalse pshnil sndsup pshctx stvar).
 	byte <- 1.
 	[ byte <= done ] whileTrue: [
 		op <- self byteAt: byte.
@@ -2770,12 +2795,13 @@ printOn: aStream
 			" Check if group 2 "
 			op = 16rF ifTrue: [
 				op <- opr + 16.
-				opr <- nil.
-				" Variable operate inst "
-				(op = 23 or: [op = 32 ]) ifTrue: [
+				" Variable operate inst or send super"
+				(op = 23 or: [op = 32 or: [op = 29 ]]) ifTrue: [
 			    		opr <- self byteAt: (byte + 1).
 			    		len <- 2.
-				].
+				] ifFalse: [
+					opr <- nil
+				]
 			].
 		].
 		" Check if send special "
@@ -2788,8 +2814,11 @@ printOn: aStream
 				opr <- '#' , temp asString.
 				opr <- opr asSymbol ].
 		].
+		" Convert short constant "
+		(op = 13 and: [opr > 8 and: [ opr < 16 ]]) ifTrue: [
+			opr <- opr - 16 ].
 		" Convert jump argument to bytecode index "
-		(op = 8 or: [ op = 9 or: [ op = 10 ]]) ifTrue: [
+		(op = 8 or: [ op = 9 or: [ op = 10 or: [ op = 13]]]) ifTrue: [
 			opr > 127 ifTrue: [ opr <- opr - 256 ]].
 		(op = 0 or: [op = 8 or: [ op = 9 or: [ op = 10 ]]]) ifTrue: [
 			opr <- byte + len + opr ].
@@ -2801,7 +2830,7 @@ printOn: aStream
 		    aStream nextPutAll: '  '.
 		    opr printOn: aStream.
 		    " Handle sends "
-		    (op = 11 or: [ op = 13 or: [ op = 14]]) ifTrue: [
+		    (op = 11 or: [ op = 14 or: [ op = 29]]) ifTrue: [
 			aStream nextPut: $(.
 			(self byteAt: (byte + len)) printOn: aStream.
 			aStream nextPut: $).

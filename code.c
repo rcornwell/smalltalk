@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.6  2001/07/31 14:09:47  rich
+ * Made to compile with new cygwin.
+ *
  * Revision 1.5  2001/01/16 01:08:16  rich
  * Code cleanup.
  *
@@ -27,7 +30,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.5 2001/01/16 01:08:16 rich Exp rich $";
+	"$Id: code.c,v 1.6 2001/07/31 14:09:47 rich Exp rich $";
 
 #endif
 
@@ -477,7 +480,7 @@ peephole(Codestate cstate)
 	    if (cur->oper == Literal) {
 		if (is_integer(cur->u.literal->value)) {
 		    i = as_integer(cur->u.literal->value);
-		    if (i == 0 || i == 1)
+		    if (i > -127 && i < 127)
 			cur->u.literal->usage--;
 		}
 	    }
@@ -811,12 +814,22 @@ genblock(Codestate cstate)
 		operand = cur->u.literal->offset;
 		if (is_integer(cur->u.literal->value)) {
 		    i = as_integer(cur->u.literal->value);
-		    if (i == 0) {
-			opcode = PSHZERO;
-			len = 1;
-		    } else if (i == 1) {
-			opcode = PSHONE;
-			len = 1;
+		    if (i > -127 && i < 127) {
+			if (i > -8 && i < 0) {
+			    opcode = PSHINT | ((i + 16) & 0xf);
+			    len = 1;
+			} else if (i >= 8) {
+			    operand = i & 0x7f;
+			    opcode = PSHINT >> 4;
+			    len = 2;
+			} else if (i <= -8) {
+			    opcode = PSHINT >> 4;
+			    operand = (i + 256) & 0xff;
+			    len = 2;
+			} else {
+			    opcode = PSHINT | (i & 0x7);
+			    len = 1;
+			}
 		    }
 		}
 		break;
@@ -824,6 +837,10 @@ genblock(Codestate cstate)
 		opcode = PSHVAR;
 		operand = cur->u.symbol->lit->offset;
 		len = 2;
+		break;
+	    case Context:
+		opcode = PSHCTX;
+		len = 1;
 		break;
 	    default:
 		break;
@@ -888,12 +905,12 @@ genblock(Codestate cstate)
 	    }
 	    break;
 	case SuperSend:
+	    opcode = SNDSUP;
+	    operand = cur->u.literal->offset;
+	    len = 3;
+	    break;
 	case Send:
-	    if (cur->type == Send)
-		opcode = SNDLIT;
-	    else
-		opcode = SNDSUP;
-
+	    opcode = SNDLIT;
 	    operand = cur->u.literal->offset;
 	    if (operand >= 16) {
 		opcode >>= 4;

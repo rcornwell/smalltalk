@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.6  2001/07/31 14:09:48  rich
+ * Fixed to compile under new cygwin.
+ *
  * Revision 1.5  2001/01/17 00:28:17  rich
  * Added display of Float class.
  *
@@ -27,7 +30,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.5 2001/01/17 00:28:17 rich Exp rich $";
+"$Id: dump.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -309,7 +312,7 @@ dump_method(Objptr op)
 	    if (operand == JMPLNG) {
 		if ((i + 2) > bytes)
 		   return;
-		operand = 0xff & get_byte(op, lits + i + 1);
+	    	operand = 0xff & get_byte(op, lits + i + 1);
 		operand += (0xff & get_byte(op, lits + i + 2)) << 8;
 		if (operand > 32768)
 		    operand -= 65536;
@@ -318,13 +321,13 @@ dump_method(Objptr op)
 		break;
 	    }
 	    if (operand == BLKCPY) {
-		operand = 0xff & get_byte(op, lits + i + 1);
+	    	operand = 0xff & get_byte(op, lits + i + 1);
 		sprintf(opc, "blk %d", operand);
 		len = 2;
 		break;
 	    }
 	    opcode = operand << 4;
-	    operand = 0xff & get_byte(op, lits + i + 1);
+    	    operand = 0xff & get_byte(op, lits + i + 1);
 	    len++;
 	    goto loop;
 	case PSHARG:
@@ -339,6 +342,17 @@ dump_method(Objptr op)
 	case PSHTMP:
 	    sprintf(opc, "psh tmp(%d)", operand);
 	    break;
+	case PSHINT:
+	    if (len == 1) {
+		if (operand > 8)
+		   operand -= 16;
+	    } else {
+		operand = get_byte(op, lits + i + 1); 
+		if (operand > 127)
+		   operand -= 256;
+	    }
+	    sprintf(opc, "psh int(%d)", operand);
+	    break;
 	case STRINST:
 	    sprintf(opc, "str ins(%d)", operand);
 	    break;
@@ -350,7 +364,7 @@ dump_method(Objptr op)
 	    break;
 	case JMPT:
 	    if (len == 2) {
-		operand = get_byte(op, lits + i + 1);
+		operand = get_byte(op, lits + i + 1); 
 		if (operand > 127)
 		   operand -= 256;
 	    }
@@ -359,7 +373,7 @@ dump_method(Objptr op)
 	    break;
 	case JMPF:
 	    if (len == 2) {
-		operand = get_byte(op, lits + i + 1);
+		operand = get_byte(op, lits + i + 1); 
 		if (operand > 127)
 		   operand -= 256;
 	    }
@@ -368,7 +382,7 @@ dump_method(Objptr op)
 	    break;
 	case JMP:
 	    if (len == 2) {
-		operand = get_byte(op, lits + i + 1);
+		operand = get_byte(op, lits + i + 1); 
 		if (operand > 127)
 		   operand -= 256;
 	    }
@@ -384,10 +398,6 @@ dump_method(Objptr op)
 	    
 	    operand = get_byte(op, lits + i + 1);
 	    len = 2;
-	    break;
-	case SNDSUP:
-	    sprintf(opc, "sup snd(%d, %d)", operand,
-		     0xff & get_byte(op, lits + i + len++));
 	    break;
 	case SNDLIT:
 	    sprintf(opc, "snd lit(%d, %d)", operand,
@@ -441,12 +451,16 @@ dump_method(Objptr op)
 	    case PSHFALS:
 		sprintf(opc, "psh false");
 		break;
-	    case PSHONE:
-		sprintf(opc, "psh 1");
+	    case PSHCTX:
+		sprintf(opc, "psh ctx");
 		break;
-	    case PSHZERO:
-		sprintf(opc, "psh 0");
-		break;
+	    case SNDSUP:
+		operand = 0xff & get_byte(op, lits + i + 1);
+		len =  0xff & get_byte(op, lits + i + 2);
+	        sprintf(opc, "sup snd(%d, %d)", operand, len);
+		operand = (operand << 8) + len;
+		len = 3;
+	        break;
 	    }
 	}
 	switch (len) {
@@ -561,6 +575,9 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	sprintf(opc, "psh tmp: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
+    case PSHINT:
+	sprintf(opc, "psh int: %d", oprand);
+	break;
     case STRINST:
 	sprintf(opc, "str ins: %d", oprand);
 	dumpflag = TRUE;
@@ -594,10 +611,6 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
     case SNDSPC2:
     case SNDSPC1:
 	sprintf(opc, "snd spc %d", oprand2);
-	dumpflag = TRUE;
-	break;
-    case SNDSUP:
-	sprintf(opc, "sup snd %d", oprand2);
 	dumpflag = TRUE;
 	break;
     case SNDLIT:
@@ -655,11 +668,12 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	case PSHFALS:
 	    sprintf(opc, "psh false [%d]", oprand2);
 	    break;
-	case PSHONE:
-	    sprintf(opc, "psh 1 [%d]", oprand2);
+	case PSHCTX:
+	    sprintf(opc, "psh [%d]", oprand2);
 	    break;
-	case PSHZERO:
-	    sprintf(opc, "psh 0 [%d]", oprand2);
+	case SNDSUP:
+	    sprintf(opc, "sup snd %d", oprand2);
+	    dumpflag = TRUE;
 	    break;
 	}
     }

@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.4 2001/01/17 01:46:03 rich Exp rich $
+ * $Id: interp.h,v 1.5 2001/07/31 14:09:48 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.5  2001/07/31 14:09:48  rich
+ * Reorganized instructions.
+ *
  * Revision 1.4  2001/01/17 01:46:03  rich
  * Added routine to send error message.
  *
@@ -34,7 +37,7 @@
 #define JMP			0xA0
 #define SNDSPC1			0xB0
 #define SNDSPC2			0xC0
-#define SNDSUP			0xD0
+#define PSHINT			0xD0
 #define SNDLIT			0xE0
 #define GRP2			0xF0
 #define JMPLNG			0x00
@@ -54,8 +57,8 @@
 #define PSHTRUE			0xFA
 #define PSHFALS			0xFB
 #define PSHNIL			0xFC
-#define PSHONE			0xFD
-#define PSHZERO			0xFE
+#define SNDSUP			0xFD
+#define PSHCTX			0xFE
 #define STRVAR			0xFF
 
 typedef struct _method_Cache {
