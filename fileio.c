@@ -2,6 +2,9 @@
  * Smalltalk interpreter: File IO routines.
  *
  * $Log: fileio.c,v $
+ * Revision 1.3  2000/02/02 16:05:02  rich
+ * Don't need to include primitive.h
+ *
  * Revision 1.2  2000/02/01 18:09:50  rich
  * error now exits on windows.
  * Added fill_buffer and flush_buffer for stdin and stdout support.
@@ -15,7 +18,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: fileio.c,v 1.2 2000/02/01 18:09:50 rich Exp rich $";
+	"$Id: fileio.c,v 1.3 2000/02/02 16:05:02 rich Exp rich $";
 
 #endif
 
@@ -286,6 +289,25 @@ close_files()
 }
 
 /*
+ * Check that all file objects are still accessable in the system.
+ */
+void
+check_files()
+{
+    struct file_buffer *fp;
+
+    for (fp = files; fp != NULL;) {
+	if (!notFree(fp->file_oop) || get_object_refcnt(fp->file_oop) == 0) {
+	    close_buffer(fp->file_oop);
+	    fp = files;
+	} else {
+	    fp = fp->file_next;
+	}
+    }
+}
+
+
+/*
  * Read the next character off a file stream.
  */
 int
@@ -509,17 +531,17 @@ fill_buffer(int stream, int mode)
     if (mode) 
 	len = ioctl(0, FIONREAD, 0);
     else
-	len = 1024;
+	len = 8193;
     if ((buf = malloc(len)) == NULL)
 	return NULL;
     if (len == 0)
 	return buf;
-    len = read(0, buf, len);
+    len = read(0, buf, len - 1);
     if (len < 0) {
 	free(buf);
 	return NULL;
     }
-    buf[len] = '\0';
+    buf[len + 1] = '\0';
     return buf;
 }
 
@@ -673,12 +695,12 @@ fill_buffer(int stream, int mode)
     ptr = buf;
     while (len > 0) { 
     	ReadFile(in, &c, 1, &did, 0);
+	if (c == '\r') 
+	    c = '\n';
+	*ptr++ = c;
+	len--;
 	if (c == '\n')
 	   break;
-	if (c != '\r') {
-	   *ptr++ = c;
-	   len--;
-	}
     }
     *ptr = '\0';
     return buf;
