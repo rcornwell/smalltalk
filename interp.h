@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: interp.h,v 1.2 2000/02/01 18:09:53 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.2  2000/02/01 18:09:53  rich
+ * Added stack checking to push and pop.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -111,6 +114,7 @@ extern int          semaphoreIndex;
 #define suspendActive transferTo(wakeHighestPriority())
 
 void		    SendToClass(Objptr, int *, int, Objptr);
+void		    dump_stack(Objptr);
 void                interp();
 void                synchronusSignal(Objptr);
 void                transferTo(Objptr);
