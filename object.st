@@ -1,9 +1,13 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: object.st,v 1.4 2001/01/17 02:33:16 rich Exp rich $ "
+" $Id: object.st,v 1.5 2001/07/31 14:09:48 rich Exp rich $ "
 
 "
  $Log: object.st,v $
+ Revision 1.5  2001/07/31 14:09:48  rich
+ Code cleanup
+ Copied Object, Boolean, True, False class from basic.st
+
  Revision 1.4  2001/01/17 02:33:16  rich
  Code cleanup
  Rewrote executeLoop.
@@ -576,6 +580,16 @@ DoSnapShot: aName
 
 snapShot: aName
 	^ self DoSnapShot: aName
+!
+
+newBacktrace 
+    | context aCollection |
+    aCollection <- OrderedCollection new.
+    context <- thisContext.
+    [ context notNil ]
+	 whileTrue: [ aCollection addLast: context backtraceString.
+		      context <- context parentContext ].
+    ^aCollection 
 !
 
 stackTrace
