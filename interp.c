@@ -3,6 +3,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.5  2001/07/31 14:09:48  rich
+ * Fixed to compile under new cygwin.
+ * Added method to flush a method out of cache if removeing it.
+ *
  * Revision 1.4  2001/01/17 01:46:17  rich
  * Added routine to flush method cache.
  * Added routine to send an error message.
@@ -27,7 +31,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.4 2001/01/17 01:46:17 rich Exp rich $";
+"$Id: interp.c,v 1.5 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -47,7 +51,7 @@ int                 semaphoreIndex = -1;
 Objptr              current_context;
 int                 running;
 int                 compiling;
-int                 newContextFlag = 0;
+int                 newContextFlag = 0; 
 
 static INLINE Objptr lookupMethodInClass(Objptr, Objptr, int *, int *);
 static INLINE void   return_Object(Objptr, Objptr);
@@ -308,7 +312,8 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
     Set_object(newContext, BLOCK_REC, reciever);
     Set_integer(newContext, BLOCK_ARGCNT, args);
     current_context = newContext;
-    newContextFlag = 1;
+    newContextFlag = 1; 
+    checkProcessSwitch();
     return;
 }
 
@@ -390,7 +395,6 @@ interp()
     newContextFlag = 1;
     old_context = NilPtr;
     while (running) {
-	checkProcessSwitch();
 	if (old_context != current_context) {
 
 	    if (newContextFlag && old_context != NilPtr) {
@@ -557,6 +561,36 @@ interp()
 	    Push(get_pointer(home, oprand + BLOCK_STACK));
 	    break;
 
+	case PSHINT >> 4:
+	    oprand = methodPointer[instruct_pointer++];
+	    if (oprand > 127)
+		oprand -= 256;
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
+	    Push(as_integer_object(oprand));
+	    break;
+
+	case PSHINT + 0x8:
+	case PSHINT + 0x9:
+	case PSHINT + 0xa:
+	case PSHINT + 0xb:
+	case PSHINT + 0xc:
+	case PSHINT + 0xd:
+	case PSHINT + 0xe:
+	case PSHINT + 0xf:
+	     oprand -= 16;
+
+	case PSHINT + 0x0:
+	case PSHINT + 0x1:
+	case PSHINT + 0x2:
+	case PSHINT + 0x3:
+	case PSHINT + 0x4:
+	case PSHINT + 0x5:
+	case PSHINT + 0x6:
+	case PSHINT + 0x7:
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
+	    Push(as_integer_object(oprand));
+	    break;
+
 	case STRINST >> 4:
 	    oprand = methodPointer[instruct_pointer++];
 	case STRINST + 0x0:
@@ -696,24 +730,8 @@ interp()
 		instruct_pointer += oprand;
 	    break;
 
-	case SNDSUP >> 4:
+	case SNDSUP:
 	    oprand = methodPointer[instruct_pointer++];
-	case SNDSUP + 0x0:
-	case SNDSUP + 0x1:
-	case SNDSUP + 0x2:
-	case SNDSUP + 0x3:
-	case SNDSUP + 0x4:
-	case SNDSUP + 0x5:
-	case SNDSUP + 0x6:
-	case SNDSUP + 0x7:
-	case SNDSUP + 0x8:
-	case SNDSUP + 0x9:
-	case SNDSUP + 0xa:
-	case SNDSUP + 0xb:
-	case SNDSUP + 0xc:
-	case SNDSUP + 0xd:
-	case SNDSUP + 0xe:
-	case SNDSUP + 0xf:
 	   /* Grab class */
 	    argc = LiteralsOf(((int *) methodPointer)[METH_HEADER]);
 	    if (FlagOf(((int *) methodPointer)[METH_HEADER]) == METH_EXTEND)
@@ -910,7 +928,7 @@ interp()
 		tstack = stack_pointer;
 		SendMethod(CannotReturnSelector, &tstack, 1);
 		stack_pointer = tstack;
-	    } else
+	    } else 
 		return_Object(temp, caller);
 	    break;
 
@@ -959,15 +977,11 @@ interp()
 	    Push(FalsePointer);
 	    break;
 
-	case PSHONE:
+	case PSHCTX:
 	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
-	    Push(as_integer_object(1));
+	    Push(current_context);
 	    break;
 
-	case PSHZERO:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
-	    Push(as_integer_object(0));
-	    break;
 
 	}
     }
@@ -997,7 +1011,7 @@ checkProcessSwitch()
 {
     while (semaphoreIndex >= 0)
 	synchronusSignal(semaphoreList[semaphoreIndex--]);
-#if 0
+
     if (newProcessWaiting) {
 	Objptr              sched;
 
@@ -1007,10 +1021,10 @@ checkProcessSwitch()
 		   PROC_SUSPEND, current_context);
 	Set_object(sched, SCHED_INDEX, newProcess);
 	rootObjects[NEWPROC] = newProcess;
-	newContextFlag = 1;
+/*	newContextFlag = 1; */
 	current_context = get_pointer(newProcess, PROC_SUSPEND);
     }
-#endif
+
 }
 
 Objptr
