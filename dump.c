@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.4  2000/08/19 19:24:49  rich
+ * Print out if a node is referenced or not.
+ *
  * Revision 1.3  2000/02/02 00:37:43  rich
  * Exported dump_class_name
  *
@@ -21,7 +24,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.3 2000/02/02 00:37:43 rich Exp rich $";
+"$Id: dump.c,v 1.4 2000/08/19 19:24:49 rich Exp rich $";
 
 #endif
 
@@ -84,6 +87,7 @@ dump_object_value(Objptr op)
     Objptr              cname;
     Objptr              value;
     int                 i, sz, len, base;
+    double		*fval;
 
     if (is_integer(op)) {
 	wsprintf(buffer, "Integer %d", as_integer(op));
@@ -121,6 +125,11 @@ dump_object_value(Objptr op)
 	for (i = 0; i < len; i++)
 	    buffer[sz++] = get_byte(op, i + base);
 	buffer[sz++] = '\0';
+	break;
+    case FloatClass:
+	len = strlen(buffer);
+	fval = (double *) get_object_base(op);
+	wsprintf(&buffer[len], "Float %f", *fval);
 	break;
     default:
 	wsprintf(buffer, "#%d -> Class #%d (", op, class);
@@ -381,6 +390,8 @@ dump_method(Objptr op)
 	case SNDSPC1:
 	    wsprintf(opc, "snd spc(%d, %d)", operand,
 		     0xff & get_byte(op, lits + i + 1));
+	    
+	    operand = get_byte(op, lits + i + 1);
 	    len = 2;
 	    break;
 	case SNDSUP:
@@ -541,6 +552,7 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
     char                opc[20];
     int                 dumpflag = FALSE;
 
+    ip -= LiteralsOf(get_pointer(meth, METH_HEADER)) + METH_LITSTART;
     switch (opcode & 0xf0) {
     case PSHARG:
 	wsprintf(opc, "psh arg: %d [%d]", oprand, oprand2);
