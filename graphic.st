@@ -1,10 +1,15 @@
 
 " Methods for Class graphics subclasses"
 
-" $Id: graphic.st,v 1.1 2001/08/18 16:23:46 rich Exp rich $ "
+" $Id: graphic.st,v 1.2 2001/08/29 20:16:34 rich Exp rich $ "
 
 "
  $Log: graphic.st,v $
+ Revision 1.2  2001/08/29 20:16:34  rich
+ Misc bug fixes.
+ Added OpaqueForm, Cursor, Pen and Commander class.
+ Fixed InputSensor class.
+
  Revision 1.1  2001/08/18 16:23:46  rich
  Initial revision
 
@@ -609,7 +614,7 @@ initialize
     sourceY <- 0
 ! !
 
-! BitBlt methodsFor: 'accessing'!
+! BitBlt methodsFor: 'modifying'!
 
 sourceForm: aForm
             "Set the receiver's source form to be the
@@ -646,11 +651,6 @@ clipWidth: anInteger
             "Set the receiver's clipping area width to be
             the argument, anInteger."
     clipWidth <- anInteger
-!
-
-clipRect
-            "Answer the receiver's clipping rectangle."
-    ^clipX @ clipY extent: clipWidth @ clipHeight
 !
 
 clipRect: aRectangle
@@ -703,11 +703,6 @@ sourceY: anInteger
     sourceY <- anInteger
 !
 
-destRect
-     "Return a rectangle as the area of the destination"
-    ^ Rectangle left: destX right: width top: destY bottom: height
-!
-
 destRect: aRectangle
             "Set the receiver's destination form rectangular
             area to be the argument, aRectangle."
@@ -746,6 +741,98 @@ width: anInteger
             "Set the receiver's destination form width to be
             the argument, anInteger."
     width <- anInteger
+! !
+
+! BitBlt methodsFor: 'accessing'!
+
+clipRect
+            "Answer the receiver's clipping rectangle."
+    ^clipX @ clipY extent: clipWidth @ clipHeight
+!
+
+destRect
+     "Return a rectangle as the area of the destination"
+    ^ Rectangle left: destX right: width top: destY bottom: height
+!
+
+sourceRect
+     "Return a rectangle as the area of the source"
+    ^ Rectangle left: sourceX right: width top: sourceY bottom: height
+!
+
+destForm
+    ^ destForm
+!
+
+sourceForm
+    ^ sourceForm
+!
+
+halftoneForm
+    ^ halftoneForm
+!
+
+combinationRule
+    ^ combinationRule
+!
+
+destX
+    ^ destX
+!
+
+destY
+    ^ destY
+!
+
+destPoint
+    ^ destX @ destY
+
+width
+    ^ width
+!
+
+height
+    ^ height
+!
+
+extent
+   ^ width @ height
+!
+
+clipX
+    ^ clipX
+!
+
+clipY
+    ^ clipY
+!
+
+clipPoint
+    ^ clipX @ clipY
+!
+
+clipWidth
+    ^ clipWidth
+!
+
+clipHeight
+    ^ clipHeight
+!
+
+clipExtent
+    ^ clipwidth @ clipHeight
+!
+
+sourceX
+    ^ sourceX
+!
+
+sourceY
+    ^ sourceY
+!
+
+sourcePoint
+    ^ sourceX @ sourceY
 ! !
 
 ! BitBlt methodsFor: 'copying'!
