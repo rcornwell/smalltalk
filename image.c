@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Image reader/writer.
  *
  * $Log: image.c,v $
+ * Revision 1.3  2001/07/31 14:09:48  rich
+ * Make to work under new cygwin.
+ *
  * Revision 1.2  2000/02/01 18:09:51  rich
  * Support for files in image file.
  * Fix bug in image loading.
@@ -14,7 +17,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: image.c,v 1.2 2000/02/01 18:09:51 rich Exp rich $";
+	"$Id: image.c,v 1.3 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -24,6 +27,8 @@ static char        *rcsid =
 #include "image.h"
 #include "interp.h"
 #include "fileio.h"
+#include "graphic.h"
+#include "system.h"
 
 /* Image consist of a header:
  *    #! interp_path\n        <*Optional*>
@@ -43,6 +48,12 @@ static char        *rcsid =
  *      int         objdata
  * For each file:
  *      Objptr      fileOop     <*Optional, number_files*>
+ * Special objects:
+ * 	Objptr	    display
+ *	Objptr	    cursor
+ *	Objptr	    inputsensor
+ *	Objptr	    ticksemaphore
+ * 	Objptr	    consolelist
  */
 
 char                image_buf[8192];
@@ -197,8 +208,19 @@ load_image(char *name)
 	for (; size > 0; size--)
 	    *ip++ = next_int();
     }
+
+   /* Load in the open files */
     for (; numfiles > 0; numfiles--) 
 	open_buffer(next_int());
+
+   /* Load in the known system objects */
+    display_object = next_int();
+    cursor_object = next_int();
+    input_semaphore = next_int();
+    tick_semaphore = next_int();
+    console.file_oop = next_int();
+
+  /* All dones close input */
     file_close(file_id);
     return TRUE;
 }
@@ -238,8 +260,7 @@ save_image(char *name, char *process)
     put_int(1);			/* Version */
 
    /* Clean off any outstanding signals */
-    while (semaphoreIndex >= 0)
-	synchronusSignal(semaphoreList[semaphoreIndex--]);
+    checkProcessSwitch();
 
    /* Dump header in */
     put_int(otsize);
@@ -264,8 +285,19 @@ save_image(char *name, char *process)
 	for (; size > 0; size--)
 	    put_int(*ip++);
     }
+
+   /* Save out the open files */
     for(fp = files; fp != NULL; fp = fp->file_next) 
 	put_int(fp->file_oop);
+
+   /* Save out the known objects */
+    put_int(display_object);
+    put_int(cursor_object);
+    put_int(input_semaphore);
+    put_int(tick_semaphore);
+    put_int(console.file_oop);
+
+   /* Flush output and close file */
     flush_buf();
     file_close(file_id);
     return TRUE;
