@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.8  2001/08/18 16:17:01  rich
+ * Moved error routines to system.h
+ *
  * Revision 1.7  2001/07/31 14:09:48  rich
  * Fixed to compile under new cygwin
  * Made sure compile without INLINE_OBJECT_MEM works correctly.
@@ -36,7 +39,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.7 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: object.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -47,6 +50,19 @@ static char        *rcsid =
 #include "interp.h"
 #include "fileio.h"
 #include "system.h"
+
+/*
+ * Placed at begining of each region. Used to track free space within
+ * the region.
+ */
+typedef struct _region {
+    struct _region     *next;			/* Pointer to next region */
+    int                 freespace;		/* Space available */
+    int                 totalspace;		/* Size of region */
+    Objhdr              base;			/* Pointer to first word */
+    Objhdr              limit;			/* Pointer to last word */
+    Objhdr              freeptrs[ALLOCSIZE + 1]; /* Free pointers. */
+} region           , *Region;
 
 int                 growsize = 512;		/* Region grow rate */
 Region              regions = NULL;		/* Memory regions */
