@@ -1,9 +1,13 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.4 2001/07/31 14:09:48 rich Exp rich $ "
+" $Id: process.st,v 1.5 2001/08/01 16:42:31 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.5  2001/08/01 16:42:31  rich
+ Enabled process scheduling.
+ Corrected backtraceString and selector methods.
+
  Revision 1.4  2001/07/31 14:09:48  rich
  Code cleanup
  Added methods for backtracing.
@@ -20,10 +24,10 @@
 "
 
 Link subclass: 'Process'
-     instanceVariableNames: 'suspendedContext priority myList'
+     instanceVariableNames: 'suspendedContext priority'
      classVariableNames: ''
      poolDictionaries: ''
-     category: nil
+     category: 'Process-Mangment'
 !
 
 Process comment: 
@@ -31,24 +35,19 @@ Process comment:
 executable blocks that have a priority associated with them, and they
 can suspend themselves and resume themselves however they wish.' !
 
-! Process class methodsFor: 'basic'!
+! Process class methodsFor: 'basic' !
 
 on: aBlock at: aPriority
     ^self new onBlock: aBlock at: aPriority
 ! !
 
-
-! Process methodsFor: 'basic'!
+! Process methodsFor: 'basic' !
 
 terminate
     suspendedContext <- nil.
-    myList notNil
-        ifTrue: [myList remove: self.
-                 myList <- nil].
     Processor activeProcess == self
         ifTrue: [self suspend]
 ! !
-
 
 ! Process methodsFor: 'accessing'!
 
@@ -72,7 +71,6 @@ suspend
    ^self primitiveFailed
 ! !
 
-
 ! Process methodsFor: 'private'!
 
 onBlock: aBlock at: aPriority
@@ -85,7 +83,7 @@ LinkedList subclass: 'Semaphore'
            instanceVariableNames: 'signals'
            classVariableNames: ''
            poolDictionaries: ''
-           category: nil
+           category: 'Process-Mangment'
 !
 
 Semaphore comment: 
@@ -108,7 +106,6 @@ forMutualExclusion
     ^sem
 ! !
 
-
 ! Semaphore methodsFor: 'mutual exclusion'!
 
 critical: aBlock
@@ -118,7 +115,6 @@ critical: aBlock
     self signal.
     ^result
 ! !
-
 
 ! Semaphore methodsFor: 'private'!
 
@@ -138,255 +134,6 @@ signal
 wait
     <primitive 72>
     ^self primitiveFailed
-! !
-
-Object subclass: 'ProcessorScheduler'
-       instanceVariableNames: 'processLists activeProcess'
-       classVariableNames: ''
-       poolDictionaries: ''
-       category: nil
-!
-
-ProcessorScheduler comment: 
-'I provide methods that control the execution of processes.' !
-
-
-! ProcessorScheduler methodsFor: 'basic'!
-
-activeProcess
-    ^activeProcess
-!
-
-terminateActive
-    activeProcess terminate
-!
-
-yield
-    | process priority processList |
-    priority <- activeProcess priority.
-    processList <- processLists at: priority.
-    processList isEmpty
-        ifFalse: [ processList addLast: activeProcess.
-                   activeProcess suspend ]
-!
-
-activePriority
-    ^self activeProcess priority
-!
-
-timingPriority
-    8
-!
-
-highIOPriority
-    7
-!
-
-lowIOPriority
-    6
-!
-
-userInterruptPriority
-    5
-!
-userSchedulingPriority
-    4
-!
-
-userBackgroundPriority
-    3
-!
-
-systemBackgroundPriority
-    2
-
-! !
-
-! ProcessorScheduler methodsFor: 'timed invocation'!
-
-signal: aSemaphore atMilliseconds: millis
-    " signal 'aSemaphore' after 'millis' milliseconds have elapsed" 
-    <primitive 98>
-    ^self primitiveFailed
-! !
-
-! ProcessorScheduler methodsFor: 'creating'!
-
-initialize: aProcess
-	processLists <- Array new: 10.
-	activeProcess <- aProcess
-! !
-
-! ProcessorScheduler class methodsFor: 'initialization'!
-
-initialize
-    | newsched |
-    " Create correct process scheduler object"
-    newsched <- ProcessorScheduler basicNew initialize: 
-    			(Process on: thisContext at: 4).
-    (Smalltalk at: #Processor) become: newsched.
-! !
-
-ProcessorScheduler initialize !
-
-Object subclass: 'Delay'
-       instanceVariableNames: 'resumptionTime isRelative'
-       classVariableNames: 'DelayQueue DelayTimeout DelayIdle'
-       poolDictionaries: ''
-       category: nil
-!
-
-Delay comment: 
-'I am the ultimate agent for frustration in the world.  I cause things to wait 
-(typically much more than is appropriate).  When a process sends one of my insta
-nces a wait message, that process goes to sleep for the interval specified 
-when the instance was created.'
-!
-
-! Delay class methodsFor: 'instance creation'!
-
-forMilliseconds: millisecondCount
-    ^self new init: millisecondCount isRelative: true
-!
-
-forSeconds: secondCount
-    ^self forMilliseconds: secondCount * 1000
-!
-
-untilMilliseconds: millisecondCount
-    ^self new init: millisecondCount isRelative: false
-! !
-
-
-! Delay class methodsFor: 'general inquiries'!
-
-millisecondClockValue
-    ^" Time millisecondClockValue" self
-! !
-
-
-! Delay class methodsFor: 'initialization'!
-
-initialize
-    DelayQueue <- SortedCollection sortBlock:
-        [ :a :b | (a key) <= (b key) ].
-    DelayIdle <- Semaphore forMutualExclusion.
-    DelayTimeout <- Semaphore new.
-    self startDelayLoop
-!
-
-startDelayLoop
-    [ [ true ] whileTrue: 
-          [ DelayTimeout wait.
-            DelayIdle critical: 
-                [ DelayQueue removeFirst value signal.
-                  DelayQueue isEmpty
-                      ifFalse: [ Processor signal: DelayTimeout
-                                           atMilliseconds: 
-                                               (DelayQueue first key) 
-                                     - self millisecondClockValue ]
-                      ]
-                ]
-          ] forkAt: Processor timingPriority
-! !
-
-! Delay methodsFor: 'accessing'!
-
-resumptionTime
-    isRelative
-        ifTrue: [ ^Delay millisecondClockValue + resumptionTime ] 
-        ifFalse: [ ^resumptionTime ] 
-! !
-
-! Delay methodsFor: 'process delay'!
-
-wait
-    | elt sem |
-    DelayQueue isNil
-        ifTrue: [ Delay initialize ].
-    sem <- Semaphore new.
-    elt <- Association key: self resumptionTime
-                      value: sem.
-    DelayIdle critical: [ DelayQueue add: elt.
-                          "If we've become the head of the list, we need to
-                           alter the interrupt time"
-                          DelayQueue first == elt
-                              ifTrue: [ Processor signal: DelayTimeout 
-                                                 atMilliseconds: 
-                                                     (DelayQueue first key) -
-                                                 Delay millisecondClockValue.
-                                            ]
-                              ].
-    sem wait
-! !
-
-! Delay methodsFor: 'comparing'!
-
-= aDelay
-    ^(isRelative = aDelay isRelative)
-        and: [ resumptionTime = aDelay internalResumptionTime ]
-!
-
-hash
-    ^resumptionTime
-! !
-
-! Delay methodsFor: 'private'!
-
-init: milliseconds isRelative: aBoolean
-    isRelative <- aBoolean.
-    resumptionTime <- milliseconds
-!
-
-isRelative
-    ^isRelative
-!
-
-internalResumptionTime
-    ^resumptionTime
-! !
-
-Object subclass: 'SharedQueue'
-       instanceVariableNames: 'queueSem valueReady queue'
-       classVariableNames: ''
-       poolDictionaries: ''
-       category: nil
-!
-
-SharedQueue comment: 
-'My instances provide a guaranteed safe mechanism to allow for communication
-between processes.  All access to the underlying data structures is
-controlled with critical sections so that things proceed smoothly.' !
-
-
-! SharedQueue class methodsFor: 'instance creation'!
-
-new
-    ^super new init
-! !
-
-! SharedQueue methodsFor: 'accessing'!
-
-next
-    | result |
-    valueReady wait.
-    queueSem critical: [ result <- queue removeFirst ].
-    ^result
-!
-
-nextPut: value
-    queueSem critical: [ queue addLast: value ].
-    valueReady signal.
-    ^value
-! !
-
-
-! SharedQueue methodsFor: 'private'!
-
-init
-    queue <- OrderedCollection new: 10.
-    valueReady <- Semaphore new.
-    queueSem <- Semaphore forMutualExclusion
 ! !
 
 BlockContext comment: 
@@ -490,7 +237,6 @@ forkAt: priority
 
 initBlock 
     ip <- iip.
-    sp <- 0.
     caller <- nil
 ! !
 
@@ -594,4 +340,343 @@ selector
 receiver
     ^ receiver
 ! !
+
+Object subclass: 'ProcessorScheduler'
+       instanceVariableNames: 'processLists activeProcess'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Process-Mangment'
+!
+
+ProcessorScheduler comment: 
+'I provide methods that control the execution of processes.' !
+
+
+! ProcessorScheduler methodsFor: 'basic'!
+
+activeProcess
+    ^activeProcess
+!
+
+terminateActive
+    activeProcess terminate
+!
+
+yield
+    | process priority processList |
+    priority <- activeProcess priority.
+    processList <- processLists at: priority.
+    processList isEmpty
+        ifFalse: [ processList addLast: activeProcess.
+                   activeProcess suspend ]
+!
+
+activePriority
+    ^self activeProcess priority
+!
+
+timingPriority
+    8
+!
+
+highIOPriority
+    7
+!
+
+lowIOPriority
+    6
+!
+
+userInterruptPriority
+    5
+!
+userSchedulingPriority
+    4
+!
+
+userBackgroundPriority
+    3
+!
+
+systemBackgroundPriority
+    2
+
+! !
+
+! ProcessorScheduler methodsFor: 'idle task' !
+
+idlewait
+	" Go to sleep until something interesting happens "
+	<primitive 140>
+!
+
+idletask
+	" We need second send so checkProcessSwitch gets run "
+	^ self idlewait
+!
+
+idleproc
+   | block |
+   " Return a Process to call idle task "
+   block <- [ [ true ] whileTrue: [  self idletask ] ].
+   ^ block forkAt: 1
+! !
+
+! ProcessorScheduler methodsFor: 'creating'!
+
+initialize: aProcess
+	| array |
+	array <- Array new: 10.
+	1 to: 10 do: [ :i | array at: i put: (LinkedList new) ].
+	processLists <- array.
+	activeProcess <- aProcess
+! !
+
+! ProcessorScheduler class methodsFor: 'initialization'!
+
+initialize
+    | newsched |
+    " Create correct process scheduler object"
+    newsched <- ProcessorScheduler basicNew initialize: 
+    			(Process on: thisContext at: 4).
+    (Smalltalk at: #Processor) become: newsched.
+    " Install the idle process "
+    (Smalltalk at: #Processor) idleproc.
+! !
+
+ProcessorScheduler initialize !
+
+Object subclass: 'SharedQueue'
+       instanceVariableNames: 'queueSem valueReady queue'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Process-Mangment'
+!
+
+SharedQueue comment: 
+'My instances provide a guaranteed safe mechanism to allow for communication
+between processes.  All access to the underlying data structures is
+controlled with critical sections so that things proceed smoothly.' !
+
+
+! SharedQueue class methodsFor: 'instance creation'!
+
+new
+    ^super new init
+! !
+
+! SharedQueue methodsFor: 'accessing'!
+
+next
+    | result |
+    valueReady wait.
+    queueSem critical: [ result <- queue removeFirst ].
+    ^result
+!
+
+nextPut: value
+    queueSem critical: [ queue addLast: value ].
+    valueReady signal.
+    ^value
+! !
+
+
+! SharedQueue methodsFor: 'private'!
+
+init
+    queue <- OrderedCollection new: 10.
+    valueReady <- Semaphore new.
+    queueSem <- Semaphore forMutualExclusion
+! !
+
+
+Link subclass: 'DelayNode'
+       instanceVariableNames: 'timeleft sema'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Process-Mangment'
+!
+
+DelayNode comment:
+'I am a private class used to manage the list of semaphores waiting to be
+woke up.' !
+
+! DelayNode class methodsFor: 'instance creation' !
+
+after: aTime signal: aSemaphore
+   ^ self new after: aTime signal: aSemaphore
+! !
+
+! DelayNode methodsFor: 'accessing' !
+
+timeleft
+	^ timeleft
+!
+
+signal
+	sema signal.
+! !
+
+! DelayNode methodsFor: 'modifying' !
+
+after: aTime signal: aSemaphore
+	timeleft <- aTime.
+	sema <- aSemaphore.
+	^ self
+!
+
+delta: aTime
+	timeleft <- timeleft - aTime
+!
+
+tick
+	timeleft <- timeleft - 1.
+	^ timeleft <= 0
+! !
+
+! DelayNode methodsFor: 'testing' !
+
+timepast
+	^ timeleft <= 0
+
+! !
+
+Object subclass: 'Delay'
+       instanceVariableNames: 'resumptionTime isRelative'
+       classVariableNames: 'DelayQueue DelayTimeout DelayIdle'
+       poolDictionaries: ''
+       category: 'Process-Mangment'
+!
+
+Delay comment: 
+'I am the ultimate agent for frustration in the world.  I cause things to wait 
+(typically much more than is appropriate).  When a process sends one of my insta
+nces a wait message, that process goes to sleep for the interval specified 
+when the instance was created.'
+!
+
+! Delay class methodsFor: 'instance creation'!
+
+forMilliseconds: millisecondCount
+    ^self new init: millisecondCount isRelative: true
+!
+
+forSeconds: secondCount
+    ^self forMilliseconds: secondCount * 1000
+!
+
+untilMilliseconds: millisecondCount
+    ^self new init: millisecondCount isRelative: false
+! !
+
+
+! Delay class methodsFor: 'general inquiries'!
+
+millisecondClockValue
+    ^ Time millisecondClockValue self
+! !
+
+
+! Delay class methodsFor: 'initialization'!
+
+initialize
+    DelayQueue <- LinkedList new.
+    DelayIdle <- Semaphore forMutualExclusion.
+    DelayTimeout <- Semaphore new.
+    self signalAtTick: DelayTimeout.
+    self startDelayLoop
+!
+
+startDelayLoop
+    | next |
+    [ [ true ] whileTrue: 
+          [ DelayTimeout wait.
+            DelayIdle critical: 
+                [ DelayQueue isEmpty
+                      ifFalse: [
+			    next <- DelayQueue at: 1.
+			    next tick ifTrue: [
+				[ DelayQueue isEmpty not and: [
+					(DelayQueue at: 1) timepast]]
+					whileTrue: [
+						DelayQueue removeFirst signal.
+				]
+			    ]
+                      ]
+                ]
+	  ]
+   ] forkAt: Processor timingPriority
+!
+
+signalAtTick: aSemaphore
+    " signal 'aSemaphore' every millisecond. "
+    <primitive 98>
+    ^self primitiveFailed
+! !
+
+! Delay methodsFor: 'accessing'!
+
+resumptionTime
+    isRelative
+        ifTrue: [ ^Delay millisecondClockValue + resumptionTime ] 
+        ifFalse: [ ^resumptionTime ] 
+! !
+
+! Delay methodsFor: 'process delay'!
+
+wait
+    | sem index last next firetime elt |
+    DelayQueue isNil
+        ifTrue: [ Delay initialize ].
+    sem <- Semaphore new.
+    firetime <- self resumptionTime.
+    DelayIdle critical: [
+	index <- 1.
+	last <- DelayQueue size.
+	[ firetime >= 0 and: [index < last] ] whileTrue: [
+		next <- DelayQueue at: index.
+		(firetime <= next timeleft)
+		    ifTrue: [
+			next delta: firetime.
+			DelayQueue at: index
+		          insertObject: (DelayNode after: firetime signal: sem).
+			firetime <- -1  ]
+		    ifFalse: [ firetime <- firetime - (next timeleft) ].
+		index <- index + 1.
+	].
+	firetime >= 0 ifTrue: [
+		DelayQueue addLast: (DelayNode after: firetime signal: sem)
+	]
+    ].
+    sem wait
+! !
+
+! Delay methodsFor: 'comparing'!
+
+= aDelay
+    ^(isRelative = aDelay isRelative)
+        and: [ resumptionTime = aDelay internalResumptionTime ]
+!
+
+hash
+    ^resumptionTime
+! !
+
+! Delay methodsFor: 'private'!
+
+init: milliseconds isRelative: aBoolean
+    isRelative <- aBoolean.
+    resumptionTime <- milliseconds
+!
+
+isRelative
+    ^isRelative
+!
+
+internalResumptionTime
+    ^resumptionTime
+! !
+
+Delay initialize !
+
 
