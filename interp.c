@@ -3,6 +3,13 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: interp.c,v $
+ * Revision 1.6  2001/08/01 16:42:31  rich
+ * Added Pshint instruction.
+ * Moved sendsuper to group 2.
+ * Added psh context instruction.
+ * Enabled process scheduling.
+ * Moved checkProcessSwitch to sendmethod.
+ *
  * Revision 1.5  2001/07/31 14:09:48  rich
  * Fixed to compile under new cygwin.
  * Added method to flush a method out of cache if removeing it.
@@ -31,7 +38,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: interp.c,v 1.5 2001/07/31 14:09:48 rich Exp rich $";
+"$Id: interp.c,v 1.6 2001/08/01 16:42:31 rich Exp rich $";
 
 #endif
 
@@ -41,13 +48,12 @@ static char        *rcsid =
 #include "interp.h"
 #include "primitive.h"
 #include "dump.h"
-#include "fileio.h"
+#include "system.h"
 
 method_Cache        methodCache[1024];
 int                 newProcessWaiting = 0;
 Objptr              newProcess;
-Objptr              semaphoreList[100];
-int                 semaphoreIndex = -1;
+event_queue         asyncsigs;
 Objptr              current_context;
 int                 running;
 int                 compiling;
@@ -223,11 +229,11 @@ return_Object(Objptr value, Objptr caller)
    /* Clear out old frame */
     object_incr_ref(caller);	/* Mark caller so it does not get freed */
     Set_object(current_context, BLOCK_SENDER, NilPtr);
-    Set_object(current_context, BLOCK_REC, NilPtr);
 
     object_decr_ref(current_context);	/* Caller is now safe from removal */
    /* Mark caller as current */
     rootObjects[CURCONT] = current_context = caller;
+    checkProcessSwitch();
 }
 
 /*
@@ -391,6 +397,9 @@ interp()
    /* Clear Method Cache */
     init_method_cache();
 
+   /* Initialize asynchronous signals queue */
+    init_event(&asyncsigs);
+
    /* Force a load */
     newContextFlag = 1;
     old_context = NilPtr;
@@ -448,6 +457,7 @@ interp()
 	    Set_integer(temp, BLOCK_SP, size_of(temp) / sizeof(Objptr));
 	    Set_object(temp, BLOCK_HOME, home);
 	    Set_integer(temp, BLOCK_IIP, instruct_pointer);
+	/*    Set_object(temp, BLOCK_REC, reciever); */
 	    Set_integer(temp, BLOCK_ARGCNT, argc);
 	    Push(temp);
 	    trace_inst(meth, instruct_pointer, BLKCPY, argc, temp, 0);
@@ -988,6 +998,47 @@ interp()
 }
 
 void
+init_event(Event_queue queue)
+{
+	queue->rdptr = queue->wrptr = &queue->data[0];
+	queue->top = &queue->data[sizeof(queue->data)/sizeof(Objptr)];
+}
+
+void
+add_event(Event_queue queue, Objptr event)
+{
+	Objptr		*next = queue->wrptr + 1;
+
+	/*
+	 * Order is real important since we could get an event read
+	 * during time we are writing an event.
+	 */
+	if (next != queue->rdptr) { 
+	    if (next == queue->top) {
+		next = &queue->data[0];
+	    	if (next == queue->rdptr) 
+		    return;
+	    }
+	    *queue->wrptr = event;
+	    queue->wrptr = next;
+	}
+}
+
+Objptr
+nxt_event(Event_queue queue)
+{
+	Objptr		res;
+
+	/* Check if queue is empty */
+	if(queue->rdptr == queue->wrptr)
+	    return NilPtr;
+	res = *queue->rdptr++;
+	if(queue->rdptr == queue->top)
+	    queue->rdptr = &queue->data[0];
+	return res;
+}
+	
+void
 synchronusSignal(Objptr aSemaphore)
 {
     int                 excess;
@@ -1000,17 +1051,17 @@ synchronusSignal(Objptr aSemaphore)
 }
 
 void
-transferTo(Objptr aProcess)
-{
-    newProcessWaiting = 1;
-    newProcess = aProcess;
-}
-
-void
 checkProcessSwitch()
 {
-    while (semaphoreIndex >= 0)
-	synchronusSignal(semaphoreList[semaphoreIndex--]);
+	
+    /* inline of next_event */
+
+    /* While there are events to read */
+    while(asyncsigs.rdptr != asyncsigs.wrptr) {
+        synchronusSignal(*asyncsigs.rdptr++);
+        if(asyncsigs.rdptr == asyncsigs.top)
+            asyncsigs.rdptr = &asyncsigs.data[0];
+    }
 
     if (newProcessWaiting) {
 	Objptr              sched;
@@ -1020,8 +1071,6 @@ checkProcessSwitch()
 	Set_object(get_pointer(sched, SCHED_INDEX),
 		   PROC_SUSPEND, current_context);
 	Set_object(sched, SCHED_INDEX, newProcess);
-	rootObjects[NEWPROC] = newProcess;
-/*	newContextFlag = 1; */
 	current_context = get_pointer(newProcess, PROC_SUSPEND);
     }
 
@@ -1034,6 +1083,7 @@ removeFirstLinkOf(Objptr aList)
 
     first = get_pointer(aList, LINK_FIRST);
     last = get_pointer(aList, LINK_LAST);
+    object_incr_ref(first);
     if (first == last) {
 	Set_object(aList, LINK_FIRST, NilPtr);
 	Set_object(aList, LINK_LAST, NilPtr);
@@ -1051,7 +1101,7 @@ addLinkLast(Objptr aList, Objptr aLink)
     else
 	Set_object(get_pointer(aList, LINK_LAST), LINK_NEXT, aLink);
     Set_object(aList, LINK_LAST, aLink);
-    Set_object(aLink, PROC_MYLISTINDEX, aList);
+    object_decr_ref(aLink);
 }
 
 Objptr
@@ -1061,7 +1111,7 @@ wakeHighestPriority()
     int                 priority;
 
     sched_list = get_pointer(schedulerPointer, SCHED_LIST);
-    priority = size_of(sched_list);
+    priority = length_of(sched_list);
     while (isEmptyList(list = get_pointer(sched_list, --priority))) ;
     return removeFirstLinkOf(list);
 }
@@ -1073,7 +1123,8 @@ resume(Objptr aProcess)
     int                 priority = get_integer(active, PROC_PRIO);
     int                 newPri = get_integer(aProcess, PROC_PRIO);
 
-    if (newPri > priority) {
+    if (newPri >= priority) {
+	object_incr_ref(active);
 	sleep(active);
 	transferTo(aProcess);
     } else
@@ -1089,8 +1140,32 @@ wait(Objptr aSemaphore)
     if (excess > 0)
 	Set_integer(aSemaphore, SEM_SIGNALS, excess - 1);
     else {
-	addLinkLast(get_pointer(schedulerPointer, SCHED_INDEX),
-		    aSemaphore);
+	Objptr		suspProc;
+
+	suspProc = get_pointer(schedulerPointer, SCHED_INDEX);
+	object_incr_ref(suspProc);
+	addLinkLast(aSemaphore, suspProc);
 	suspendActive;
     }
+}
+
+void
+signal_console(Objptr aLink)
+{
+    Objptr	first;
+
+    first = get_pointer(aLink, LINK_FIRST);
+    if (first != NilPtr)
+        resume(removeFirstLinkOf(aLink));
+}
+
+void
+wait_console(Objptr aLink)
+{
+    Objptr		suspProc;
+
+    suspProc = get_pointer(schedulerPointer, SCHED_INDEX);
+    object_incr_ref(suspProc);
+    addLinkLast(aLink, suspProc);
+    suspendActive;
 }
