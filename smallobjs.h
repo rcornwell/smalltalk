@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.3 2000/02/02 00:33:34 rich Exp rich $
+ * $Id: smallobjs.h,v 1.4 2001/01/07 15:14:02 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.4  2001/01/07 15:14:02  rich
+ * Changed location of flags.
+ *
  * Revision 1.3  2000/02/02 00:33:34  rich
  * Moved assit functions from primitive.c to here.
  *
@@ -73,11 +76,14 @@
 #define BooleanClass		((Objptr)36)
 #define TrueClass		((Objptr)38)
 #define FalseClass		((Objptr)40)
-#define SmallIntegerClass	((Objptr)42)
-#define FloatClass		((Objptr)44)
+#define MagnitudeClass		((Objptr)42)
+#define NumberClass		((Objptr)44)
+#define IntegerClass		((Objptr)46)
+#define SmallIntegerClass	((Objptr)48)
+#define FloatClass		((Objptr)50)
 
 /* Class MethodContext */
-#define MethodContextClass	((Objptr)46)
+#define MethodContextClass	((Objptr)52)
 #define BLOCK_SENDER		0	/* Who Sent message */
 #define BLOCK_IP		1	/* Current Instruct pointer */
 #define BLOCK_SP		2	/* Current Stack Pointer */
@@ -87,14 +93,14 @@
 #define BLOCK_ARGCNT		6	/* Number of arguments */
 #define BLOCK_STACK		7	/* Start of stack */
 
-#define BlockContextClass	((Objptr)48)
+#define BlockContextClass	((Objptr)54)
 #define BLOCK_CALLER		0	/* Who called context */
 #define BLOCK_HOME		3	/* Home for block context */
 #define BLOCK_IIP		4	/* Initial Instruction Pointer */
 #define BLOCK_NOTUSED		5	/* Reciever in methodContext */
 
 /* Class CompiledMethod */
-#define CompiledMethodClass	((Objptr)50)
+#define CompiledMethodClass	((Objptr)56)
 #define METH_DESCRIPTION	0
 #define METH_HEADER		1
 #define METH_LITSTART		2
@@ -118,42 +124,42 @@
 #define PrimitiveOf(ehdr)	(((ehdr) & EMETH_PRIM)>>1)
 
 /* Class MethodInfoClass */
-#define MethodInfoClass		((Objptr)52)
+#define MethodInfoClass		((Objptr)58)
 #define METHINFO_SOURCE		0
 #define METHINFO_POS		1
 #define METHINFO_CAT		2
 
 /* Class Point */
-#define PointClass		((Objptr)54)
+#define PointClass		((Objptr)60)
 #define XINDEX			0
 #define YINDEX			1
 
 /* Class Message */
-#define MessageClass		((Objptr)56)
+#define MessageClass		((Objptr)62)
 #define MESSAGE_ARGS		0
 #define MESSAGE_SELECT		1
 #define MESSAGE_SIZE		2
 
 /* Class CharacterValue */
-#define CharacterClass		((Objptr)58)
+#define CharacterClass		((Objptr)64)
 #define CHARVALUE		0
 
 /* Class Link */
-#define LinkClass		((Objptr)60)
+#define LinkClass		((Objptr)66)
 #define LINK_NEXT		0
 
 /* Class SymLink */
-#define SymLinkClass		((Objptr)62)
+#define SymLinkClass		((Objptr)68)
 #define SYM_VALUE		1
 
 /* Array classes */
-#define StringClass		((Objptr)64)
-#define ArrayClass		((Objptr)66)
+#define StringClass		((Objptr)70)
+#define ArrayClass		((Objptr)72)
 
 /* Collection classes */
-#define SSetClass		((Objptr)68)
-#define DictionaryClass		((Objptr)70)
-#define IdentityDictionaryClass	((Objptr)72)
+#define SSetClass		((Objptr)74)
+#define DictionaryClass		((Objptr)76)
+#define IdentityDictionaryClass	((Objptr)78)
 /* Class Dictionary */
 #define DICT_TALLY		0
 #define DICT_VALUES		1
@@ -173,7 +179,7 @@
 
 
 /* Class Association */
-#define AssociationClass	((Objptr)74)
+#define AssociationClass	((Objptr)80)
 #define ASSOC_KEY		0
 #define ASSOC_VALUE		1
 
