@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: $
+ * $Id: primitive.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: primitive.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -106,6 +109,12 @@
 #define primitiveTimeWordsInto		 96
 #define primitiveTickWordsInto		 97
 #define primitiveSignalAtTick		 98
+#define primitiveStackTrace		 99
+#define primitiveEvaluate		100
+#define primitiveFillBuffer		101
+#define primitiveFlushBuffer		102
+#define primitiveByteAt			103
+#define primitiveByteAtPut		104
  
 
 int                 arrayAt(Objptr, int, Objptr *);
@@ -116,6 +125,7 @@ int                 doSnapShot(Objptr);
 Objptr              internString(char *);
 void                AddSelectorToIDictionary(Objptr, Objptr, Objptr);
 Objptr              FindSelectorInIDictionary(Objptr, Objptr);
+Objptr              FindKeyInIDictionary(Objptr, Objptr);
 Objptr              new_IDictionary();
 void                AddSelectorToDictionary(Objptr, Objptr);
 Objptr              FindSelectorInDictionary(Objptr, Objptr);
