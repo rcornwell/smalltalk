@@ -1,15 +1,17 @@
 /*
  * Smalltalk interpreter: Windows Resource file.
  *
- * $Id: $
+ * $Id: smalltalk.rc,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: smalltalk.rc,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
-#include <windows.h>
-#include <winver.h>
 #include "smalltalk.h"
+#include <winver.h>
 #include "about.h"
 
 SMALLTALK ICON smalltalk.ico
