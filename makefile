@@ -23,13 +23,13 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 	     code.$(O) symbols.$(O) parse.$(O) smallobjs.$(O) $(PROJ).res
 
 BOOTSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
-	   behavior.st object.st
+	   behavior.st object.st boottail.st
 SMALLSRC = stream.st collection.st magnitude.st misc.st compile.st \
 	   behavior.st object.st
 
 all:	$(PROJ).sti 
 
-$(PROJ).sti: $(PROJ).exe $(PROJ).st
+$(PROJ).sti: $(PROJ).exe $(PROJ).st boot.st
 	./$(PROJ).exe boot.st
 
 boot.st: $(BOOTSRC)
