@@ -1,10 +1,13 @@
 
 " Last bits and peices of smalltalk system "
 
-" $Id: $ "
+" $Id: system.st,v 1.1 2001/08/29 20:17:07 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: system.st,v $
+ Revision 1.1  2001/08/29 20:17:07  rich
+ Initial revision
+
 
 "
 
@@ -106,6 +109,14 @@ newSourceFile: aName
    fname <- aName , '.sti'.
    ^ System snapShot: fname
 ! !
+
+! System class methodsFor: 'basic' !
+
+dependenciesAt: anObject
+    ^(Smalltalk at: #Dependencies) at: anObject ifAbsent: [ nil ]
+! !
+
+Smalltalk at: #Dependencies put: (IdentityDictionary new) !
 
 ! Class methodsFor: 'compiler' !
 
