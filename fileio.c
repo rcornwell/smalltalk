@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Log: $
+ * $Log: fileio.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: fileio.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -17,6 +20,10 @@ static char        *rcsid =
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#ifdef sun
+#include <sys/filio.h>
+#endif
 #include <malloc.h>
 #include <memory.h>
 #endif
@@ -37,21 +44,17 @@ Objptr
 new_file(char *name, char *mode)
 {
     Objptr              fp;
-    Objptr		files;
 
     /* Locate file name vector */
-    files = FindSelectorInDictionary(SmalltalkPointer,
-				internString("sourceFiles"));
-    if (files == NilPtr)
+    fp = FindSelectorInDictionary(SmalltalkPointer,
+				internString("initSourceFile"));
+    if (fp == NilPtr)
 	return NilPtr;
 
-    /* Get array of files */
-    files = get_pointer(files, ASSOC_VALUE);
-    if (files == NilPtr)
-	return NilPtr;
+    fp = get_pointer(fp, ASSOC_VALUE);
+    if (fp == NilPtr)
+      return NilPtr;
 
-    fp = create_new_object(ArrayClass, 3);
-    Set_object(files, 0, fp);		/* File zero is main source file */
     Set_object(fp, FILENAME, MakeString(name));
     Set_object(fp, FILEMODE, MakeString(mode));;
     Set_integer(fp, FILEPOS, 0);
@@ -72,28 +75,10 @@ get_chunk(Objptr op)
 {
     char               *buffer;
     char               *ptr;
-    char                c;
-    int                 len, pos, left, size;
+    int 	        c;
+    int                 left, size;
     int                 skip = FALSE;
-    Objptr              temp;
-    struct file_buffer *fp;
 
-   /* Find file buffer */
-    for (fp = files; fp != NULL; fp = fp->file_next)
-	if (fp->file_oop == op)
-	    break;
-
-   /* Exit, if none or not reading */
-    if (fp == NULL || (fp->file_flags & FILE_READ) == 0)
-	return NULL;
-
-   /* Get position of smalltalk file */
-    temp = get_pointer(op, FILEPOS);
-    if (!is_integer(temp))
-	return NULL;
-    pos = as_integer(temp);
-
-    len = fp->file_end - fp->file_buffer - 1;
     if ((buffer = (char *) malloc(BUFSIZE + 1)) == NULL)
 	return NULL;
 
@@ -101,34 +86,8 @@ get_chunk(Objptr op)
     ptr = buffer;
 
     while (1) {
-       /* Check if we have to move buffer */
-	if (pos < fp->file_pos || pos > (fp->file_pos + len)) {
-	    if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-		(FILE_WRITE | FILE_DIRTY) && len > 0) {
-		file_seek(fp->file_id, fp->file_pos);
-		file_write(fp->file_id, fp->file_buffer, len);
-		fp->file_flags &= ~FILE_DIRTY;
-	    }
-	    file_seek(fp->file_id, fp->file_pos = pos);
-	    fp->file_offset = fp->file_buffer;
-	    len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
-	    if (len < 0) {
-		fp->file_end = fp->file_buffer;
-		if (ptr == buffer) {
-			free(buffer);
-			return NULL;
-		}
-		break;
-	    }
-	    fp->file_end = fp->file_buffer + len;
-	}
-	if (len <= 0) {
-	    free(buffer);
-	    return NULL;
-	}
-       /* Get next char */
-	c = (int) *fp->file_offset++;
-	pos++;
+	if (!read_buffer(op, &c)) 
+	    break;
 
        /* Handle end of string character */
 	if (skip) {
@@ -156,17 +115,11 @@ get_chunk(Objptr op)
 	}
     }
  
-    while(ptr[-1] == '\n' || ptr[-1] == '\r' || ptr[-1] == ' ' || 
-		ptr[-1] == '\t') {
-	if (ptr == buffer)
-		break;
-	else
-	    ptr--;
-    }
+    while(ptr != buffer && (ptr[-1] == '\n' || ptr[-1] == '\r' || 
+		ptr[-1] == ' ' || ptr[-1] == '\t')) 
+	ptr--;
 
     *ptr++ = '\0';
-   /* Restore position */
-    Set_integer(op, FILEPOS, pos);
 
     while (peek_for(op, '\r') || peek_for(op, '\n'));
     return buffer;
@@ -178,7 +131,7 @@ get_chunk(Objptr op)
 int 
 peek_for(Objptr op, char c)
 {
-    int                 len, pos;
+    int                 pos;
     Objptr              temp;
     struct file_buffer *fp;
 
@@ -196,31 +149,28 @@ peek_for(Objptr op, char c)
     if (!is_integer(temp))
 	return FALSE;
     pos = as_integer(temp);
-    len = fp->file_end - fp->file_buffer;
 
    /* Check if we have to move buffer */
-    if (pos < fp->file_pos || pos > (fp->file_pos + len)) {
+    if (pos < fp->file_pos || pos >= (fp->file_pos + fp->file_len)) {
         if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-	    (FILE_WRITE | FILE_DIRTY) && len > 0) {
+	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
 	    file_seek(fp->file_id, fp->file_pos);
-	    file_write(fp->file_id, fp->file_buffer, len);
+	    file_write(fp->file_id, fp->file_buffer, fp->file_len);
 	    fp->file_flags &= ~FILE_DIRTY;
         }
         file_seek(fp->file_id, fp->file_pos = pos);
         fp->file_offset = fp->file_buffer;
-        len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
-        if (len < 0) {
-	    fp->file_end = fp->file_buffer;
+        fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+        if (fp->file_len < 0) {
     	    return FALSE;
         }
-        fp->file_end = fp->file_buffer + len;
     }
 
     /* Get next char */
-    if (c == *fp->file_offset) {
+    if (c == fp->file_buffer[pos - fp->file_pos]) {
 	/* Advance if character matches */
-        Set_integer(op, FILEPOS, ++pos);
-	fp->file_offset++;
+	pos++;
+        Set_integer(op, FILEPOS, pos);
 	return TRUE;
     }
  
@@ -252,7 +202,8 @@ open_buffer(Objptr op)
 	free(fp);
 	return FALSE;
     }
-    fp->file_offset = fp->file_end = fp->file_buffer;
+    fp->file_offset = fp->file_buffer;
+    fp->file_len = 0;
     fp->file_pos = -1;
     name = Cstring(get_pointer(op, FILENAME));
     mode = Cstring(get_pointer(op, FILEMODE));
@@ -265,8 +216,10 @@ open_buffer(Objptr op)
     }
     free(name);
     free(mode);
-    if (fp->file_flags & FILE_APPEND)
+    if (fp->file_flags & FILE_APPEND) {
 	fp->file_pos = file_size(fp->file_id);
+	Set_integer(op, FILEPOS, fp->file_pos);
+    }
     fp->file_next = files;
     files = fp;
     return TRUE;
@@ -280,7 +233,6 @@ void
 close_buffer(Objptr op)
 {
     struct file_buffer *fp, *lfp;
-    int                 len;
 
     lfp = NULL;
     for (fp = files; fp != NULL; fp = fp->file_next) {
@@ -290,11 +242,10 @@ close_buffer(Objptr op)
     }
     if (fp == NULL)
 	return;
-    len = fp->file_end - fp->file_buffer;
     if (((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-	 (FILE_WRITE | FILE_DIRTY)) && len > 0) {
+	 (FILE_WRITE | FILE_DIRTY)) && fp->file_len > 0) {
 	file_seek(fp->file_id, fp->file_pos);
-	file_write(fp->file_id, fp->file_buffer, len);
+	file_write(fp->file_id, fp->file_buffer, fp->file_len);
     }
     file_close(fp->file_id);
     if (fp->file_buffer != NULL)
@@ -307,6 +258,30 @@ close_buffer(Objptr op)
 }
 
 /*
+ * Close off all file objects.
+ */
+void
+close_files()
+{
+    struct file_buffer *fp, *lfp;
+
+    lfp = NULL;
+    for (fp = files; fp != NULL; fp = lfp) {
+ 	if (((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
+	        (FILE_WRITE | FILE_DIRTY)) && fp->file_len > 0) {
+	     file_seek(fp->file_id, fp->file_pos);
+	     file_write(fp->file_id, fp->file_buffer, fp->file_len);
+        }
+        file_close(fp->file_id);
+        if (fp->file_buffer != NULL)
+	    free(fp->file_buffer);
+	lfp = fp->file_next;
+        free(fp);
+    }
+    files = NULL;
+}
+
+/*
  * Read the next character off a file stream.
  */
 int
@@ -315,7 +290,6 @@ read_buffer(Objptr op, int *c)
     struct file_buffer *fp;
     Objptr              temp;
     int                 pos;
-    int                 len;
 
    /* Look it up */
     for (fp = files; fp != NULL; fp = fp->file_next)
@@ -334,29 +308,22 @@ read_buffer(Objptr op, int *c)
 	return FALSE;
     pos = as_integer(temp);
 
-    len = fp->file_end - fp->file_buffer;
-
    /* Check if we have to move buffer */
-    if (pos < fp->file_pos || pos > (fp->file_pos + len)) {
+    if (pos < fp->file_pos || pos >= (fp->file_pos + fp->file_len)) {
 	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-	    (FILE_WRITE | FILE_DIRTY) && len > 0) {
+	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
 	    file_seek(fp->file_id, fp->file_pos);
-	    file_write(fp->file_id, fp->file_buffer, len);
+	    file_write(fp->file_id, fp->file_buffer, fp->file_len);
 	    fp->file_flags &= ~FILE_DIRTY;
 	}
 	file_seek(fp->file_id, fp->file_pos = pos);
 	fp->file_offset = fp->file_buffer;
-	len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
-	if (len < 0) {
-	    fp->file_end = fp->file_buffer;
-	    return FALSE;
-	}
-	fp->file_end = fp->file_buffer + len;
+	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
     }
-    if (len <= 0)
+    if (fp->file_len <= 0)
 	return FALSE;
    /* Get next char */
-    *c = (int) *fp->file_offset++;
+    *c = (int) fp->file_buffer[pos - fp->file_pos];
     pos++;
     Set_integer(op, FILEPOS, pos);
     return TRUE;
@@ -369,7 +336,7 @@ int
 size_buffer(Objptr op)
 {
     struct file_buffer *fp;
-    int                 len;
+    int len;
 
    /* Look it up */
     for (fp = files; fp != NULL; fp = fp->file_next)
@@ -381,8 +348,8 @@ size_buffer(Objptr op)
 
     len = file_size(fp->file_id);
     if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-	(FILE_WRITE | FILE_DIRTY) && len == fp->file_pos)
-	len += fp->file_end - fp->file_buffer;
+		 (FILE_WRITE | FILE_DIRTY) && len == fp->file_pos)
+	len += fp->file_len;
     return len;
 }
 
@@ -395,7 +362,6 @@ write_buffer(Objptr op, int c)
     struct file_buffer *fp;
     Objptr              temp;
     int                 pos;
-    int                 len;
 
    /* Look it up */
     for (fp = files; fp != NULL; fp = fp->file_next)
@@ -413,28 +379,24 @@ write_buffer(Objptr op, int c)
     if (!is_integer(temp))
 	return FALSE;
     pos = as_integer(temp);
-    len = fp->file_end - fp->file_buffer;
    /* Check if we have to move buffer */
-    if (pos < fp->file_pos || fp->file_pos > (pos + BUFSIZE) ||
-	len >= (BUFSIZE - 1)) {
+    if (pos < fp->file_pos || pos > (fp->file_pos + BUFSIZE) ||
+	fp->file_len >= (BUFSIZE - 1)) {
 	if ((fp->file_flags & (FILE_WRITE | FILE_DIRTY)) ==
-	    (FILE_WRITE | FILE_DIRTY) && len > 0) {
+	    (FILE_WRITE | FILE_DIRTY) && fp->file_len > 0) {
 	    file_seek(fp->file_id, fp->file_pos);
-	    file_write(fp->file_id, fp->file_buffer, len);
+	    file_write(fp->file_id, fp->file_buffer, fp->file_len);
 	    fp->file_flags &= ~FILE_DIRTY;
 	}
 	file_seek(fp->file_id, fp->file_pos = pos);
 	fp->file_offset = fp->file_buffer;
-	len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
-	if (len < 0) {
-	    fp->file_end = fp->file_offset;
+	fp->file_len = file_read(fp->file_id, fp->file_buffer, BUFSIZE);
+	if (fp->file_len < 0) 
 	    return FALSE;
-	}
-	fp->file_end = fp->file_offset + len;
     }
-    if (fp->file_offset == fp->file_end)
-	fp->file_end++;
-    *fp->file_offset++ = c;
+    if ((pos - fp->file_pos) >= fp->file_len)
+	fp->file_len = pos - fp->file_pos;
+    fp->file_buffer[pos - fp->file_pos] = c;
     fp->file_flags |= FILE_DIRTY;
     pos++;
     Set_integer(op, FILEPOS, pos);
@@ -515,8 +477,7 @@ file_size(long id)
 void
 error(char *str)
 {
-    fprintf(stderr, str);
-    fputc('\n', stderr);
+    dump_string(str);
     exit(-1);
 }
 
@@ -534,6 +495,45 @@ dump_string(char *str)
        fputc('\n', stderr);
 }
 
+char *
+fill_buffer(int stream, int mode)
+{
+    int len;
+    char *buf;
+    if (stream != 0)
+	return NULL;
+    if (mode) 
+	len = ioctl(0, FIONREAD, 0);
+    else
+	len = 1024;
+    if ((buf = malloc(len)) == NULL)
+	return NULL;
+    if (len == 0)
+	return buf;
+    len = read(0, buf, len);
+    if (len < 0) {
+	free(buf);
+	return NULL;
+    }
+    buf[len] = '\0';
+    return buf;
+}
+
+int
+flush_buffer(int stream, char *string)
+{
+    switch (stream) {
+    case 1:
+	    fputs(string, stdout);
+	    break;
+    case 2:
+	    fputs(string, stderr);
+	    break;
+    default:
+	    return FALSE;
+    }
+    return TRUE;
+}
 
 #endif
 
@@ -620,11 +620,8 @@ file_size(long id)
 void 
 error(char *str)
 {
-    DWORD               did;
-
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), str, strlen(str), &did, 0);
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\r\n", 2, &did, 0);
-       
+    dump_string(str);
+    ExitProcess(-1);
 }
 
 void
@@ -643,6 +640,91 @@ dump_string(char *str)
 
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), str, strlen(str), &did, 0);
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\r\n", 2, &did, 0);
+}
+
+static int	needconsole = 1;
+
+char *
+fill_buffer(int stream, int mode)
+{
+    HANDLE	in;
+    int         len;
+    char        *buf, *ptr;
+    char        c;
+    DWORD	did;
+
+    if (stream != 0)
+	return NULL;
+
+    if (needconsole) {
+	if (AllocConsole() == 0)
+	   return NULL;
+	needconsole = 0;
+    }
+
+    in = GetStdHandle(STD_INPUT_HANDLE);
+    len = 1024;
+    if ((buf = malloc(len)) == NULL)
+	return NULL;
+    ptr = buf;
+    while (len > 0) { 
+    	ReadFile(in, &c, 1, &did, 0);
+	if (c == '\n')
+	   break;
+	if (c != '\r') {
+	   *ptr++ = c;
+	   len--;
+	}
+    }
+    *ptr = '\0';
+    return buf;
+}
+
+int
+flush_buffer(int stream, char *string)
+{
+    HANDLE	out;
+    DWORD	did;
+    char	buf[1024];
+    char	*ptr;
+    int		len;
+
+    if (needconsole) {
+	if (AllocConsole() == 0)
+	   return NULL;
+	needconsole = 0;
+    }
+
+    switch (stream) {
+    case 1:
+            out = GetStdHandle(STD_OUTPUT_HANDLE);
+	    break;
+    case 2:
+            out = GetStdHandle(STD_ERROR_HANDLE);
+	    break;
+    default:
+	    return FALSE;
+    }
+
+    ptr = buf;
+    len = 0;
+    while(*string != '\0') {
+	char c = *string++;
+	*ptr++ = c;
+	len++;
+	if (c == '\n') {
+	   *ptr++ = '\r';
+	   len++;
+	}
+	if (len >= (sizeof(buf) - 2)) {
+            WriteFile(out, buf, len, &did, 0);
+	    ptr = buf;
+	    len = 0;
+	}
+    }
+    if (len >= 0) 
+        WriteFile(out, buf, len, &did, 0);
+    return TRUE;
 }
 
 #endif
