@@ -2,6 +2,13 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.2  2000/02/01 18:10:00  rich
+ * Added code to display stack trace on error.
+ * Added support for CompiledMethod class.
+ * Added support for CharStream class.
+ * Fixed error in Divide and Div primitives.
+ * Fixed NextPut and Next primititives.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +17,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: primitive.c,v 1.2 2000/02/01 18:10:00 rich Exp rich $";
 
 #endif
 
@@ -39,15 +46,9 @@ static char        *rcsid =
 #include "fileio.h"
 #include "dump.h"
 
-#define	GetStack(off)	get_pointer(current_context, \
-					*stack_pointer + (args - (off)))
-#define AdjustStack(size, value) { \
-		 int i; \
-		 for(i = (size); i > 0; i--) \
-		     Set_object(current_context, (*stack_pointer)++, NilPtr); \
-		 Set_object(current_context, --(*stack_pointer), (value)); \
-		 return TRUE; \
-		 }
+#define	GetStack(off)	((off > args) ? NilPtr:  \
+				 get_pointer(current_context, \
+					stack_pointer + (args - (off))))
 
 /* Add support for largeinteger */
 #define IsInteger(op, value) \
@@ -60,6 +61,14 @@ static char        *rcsid =
 		  IsInteger(_temp_, (value)); \
 		  }
 
+#define ReturnInteger(value) { \
+	    Objptr  _temp_ = (value); \
+	    if (canbe_integer(_temp_)) { \
+		res = as_integer_object(_temp_); \
+		success = TRUE; \
+	    } \
+	    }
+
 #define CheckIndex(array, index) { \
 	int _temp_ = length_of(array); \
 	if (_temp_ < 0 || index < 0 || index > _temp_) \
@@ -71,14 +80,27 @@ static char        *rcsid =
 #define newFloat(x)	res = create_new_object(FloatClass, 0); \
 			*((double *)get_object_base(res))=(x);
 
-#define PushInteger(value, args) \
-	    if (canbe_integer((value))) \
-		AdjustStack((args), as_integer_object((value)));
 
-#define PushFloat(expr, args) {newFloat((expr)); AdjustStack((args), res); }
+#define ReturnFloat(expr) {newFloat((expr)); success = TRUE; }
 
-#define PushBoolean(expr, args) \
-	 { res = ((expr))? TruePointer: FalsePointer; AdjustStack((args), res);}
+#define ReturnBoolean(expr) \
+	 { res = ((expr))? TruePointer: FalsePointer; success = TRUE; }
+
+#define ReturnChar(expr) { \
+	    int _temp_  = (expr); \
+	    if (_temp_ < 0 || _temp_ > 255) \
+		break; \
+	    res = get_pointer(CharacterTable, \
+		     _temp_ + (fixed_size(CharacterTable) / sizeof(Objptr))); \
+	    success = TRUE; \
+	}
+
+#define IsChar(x)	(class_of((x)) == CharacterClass)
+#define charValue(x)    (get_pointer((x), CHARVALUE))
+
+#define ReturnValidObject(expr) { res = (expr); success = res != NilPtr; }
+
+#define ReturnObject(expr) { res = (expr); success = TRUE; }
 
 Objptr		compClass;
 Objptr		compCatagory;
@@ -130,583 +152,13 @@ arrayPutAt(Objptr array, int index, Objptr value)
     return TRUE;
 }
 
-/*
- * Convert a string into a string object.
- */
-Objptr
-MakeString(char *str)
-{
-    Objptr              value;
-    int                 i;
-
-    value = create_new_object(StringClass, strlen(str));
-    for (i = fixed_size(value); *str != '\0'; set_byte(value, i++, *str++)) ;
-    return value;
-}
-
-/*
- * Convert a string object into a C string.
- */
-char               *
-Cstring(Objptr op)
-{
-    char               *str;
-    int                 size;
-    int                 base;
-    int                 i;
-
-    if (!is_byte(op))
-	return NULL;
-
-    base = fixed_size(op);
-    size = length_of(op);
-
-    if ((str = (char *) malloc(size + 1)) == NULL)
-	return NULL;
-    for (i = 0; i < size; i++)
-	str[i] = get_byte(op, i + base);
-    str[i] = '\0';
-    return str;
-}
-
-/*
- * Force a snapshot.
- */
-int
-doSnapShot(Objptr op)
-{
-    char               *name;
-    int                 ret;
-
-   /* Make sure we can have valid argument */
-    if ((name = Cstring(op)) == NULL)
-	return FALSE;
-
-   /* Do the work */
-    ret = save_image(name, NULL);
-
-    free(name);
-    return ret;
-}
-
-/*
- * Convert a string into a Symbol.
- */
-Objptr
-internString(char *str)
-{
-    unsigned int        hash;
-    char               *ptr;
-    Objptr              link;
-    Objptr              value;
-    int                 size;
-    int                 base;
-    int                 symbase;
-    int                 i;
-
-   /* Compute a hash value */
-    for (hash = 0, ptr = str; *ptr != '\0';
-		 hash = 0x0fffffff & ((hash << 2) + (0xff & *ptr++))) ;
-
-    symbase = fixed_size(SymbolTable) / sizeof(Objptr);
-
-   /* Find first link in symboltable. */
-    size = length_of(SymbolTable);
-    hash = hash % size;
-    link = get_pointer(SymbolTable, hash + symbase);
-    size = strlen(str);
-
-   /* Follow change, comparing strings */
-    while (link != NilPtr) {
-	value = get_pointer(link, SYM_VALUE);
-       /* Check if length matches */
-	if (size == length_of(value)) {
-	    base = fixed_size(value);
-	    for (i = 0; i < size; i++)
-		if (str[i] != get_byte(value, i + base))
-		    break;
-	   /* If current byte is zero, we matched */
-	    if (str[i] == '\0')
-		return link;
-	}
-	link = get_pointer(link, LINK_NEXT);
-    }
-
-   /* Create a new entry */
-    link = create_new_object(SymLinkClass, 0);
-    value = get_pointer(SymbolTable, hash + symbase);
-    Set_object(link, LINK_NEXT, value);
-    Set_object(SymbolTable, hash + symbase, link);
-    Set_object(link, SYM_VALUE, MakeString(str));
-    return link;
-}
-
-/*
- * Add a selector into a identity dictionary.
- */
-void
-AddSelectorToIDictionary(Objptr dict, Objptr select, Objptr value)
-{
-    int                 length = length_of(dict);
-    int                 index; 
-    int                 wrapAround = 0;
-    int                 newDict;
-    int                 tally = 0;
-    Objptr              key;
-
-    index = as_integer(select) % (length - 1);
-    while (1) {
-	key = get_pointer(dict, index + DICT_KEY);
-
-	if (key == NilPtr) {
-	   /* Save value */
-	    Set_object(dict, index + DICT_KEY, select);
-	    Set_object(get_pointer(dict, DICT_VALUES),
-		       index, value);
-	    tally = get_integer(dict, DICT_TALLY) + 1;
-	    Set_integer(dict, DICT_TALLY, tally);
-	    return;
-	}
-	if (key == select) {
-	   /* Set this value */
-	    Set_object(get_pointer(dict, DICT_VALUES),
-		       index, value);
-	    return;
-	}
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-   /* Get here not found and no empty spots. Grow dictionary */
-    newDict = create_new_object(IdentityDictionaryClass, length + 32);
-    rootObjects[TEMP0] = newDict;		/* Save till done */
-    Set_object(newDict, DICT_VALUES,
-	       create_new_object(ArrayClass, length + 32));
-    index =  as_integer(select) % (length + 31);
-    Set_object(newDict, index + DICT_KEY, select);
-    Set_object(get_pointer(newDict, DICT_VALUES), index, value);
-    tally = 1;
-    for (index = 0; index < length; index++) {
-	int index2;
-
-	select = get_pointer(dict, index + DICT_KEY);
-	if (select == NilPtr)
-	    continue;
-	value = get_pointer(get_pointer(dict, DICT_VALUES), index);
-	index2 = as_integer(select) % (length + 31);
-	wrapAround = 0;
-	while (1) {
-	    key = get_pointer(newDict, index2 + DICT_KEY);
-
-	    if (key == NilPtr) {
-	       /* Save value */
-		Set_object(newDict, index2 + DICT_KEY, select);
-		Set_object(get_pointer(newDict, DICT_VALUES),
-			   index2, value);
-		tally++;
-		break;
-	    }
-	    if (key == select) {
-	       /* Set this value */
-		Set_object(get_pointer(newDict, DICT_VALUES),
-			   index2, value);
-		break;
-	    }
-	    if (++index2 == (length + 32)) {
-		if (wrapAround++)
-		    break;
-		index2 = 0;
-	    }
-	}
-    }
-    Set_integer(newDict, DICT_TALLY, tally);
-    swapPointers(newDict, dict);
-    rootObjects[TEMP0] = NilPtr;		/* Done */
-    object_decr_ref(newDict);
-}
-
-/*
- * Find an object in a identity dictionary.
- */
-Objptr
-FindSelectorInIDictionary(Objptr dict, Objptr selector)
-{
-    int                 length = length_of(dict);
-    int                 index = as_integer(selector) % (length - 1);
-    int                 wrapAround = 0;
-    Objptr		key;
-
-    while (1) {
-	key = get_pointer(dict, index + DICT_KEY);
-
-	if (key == NilPtr)
-	    break;
-	if (key == selector)
-	    return get_pointer(get_pointer(dict, DICT_VALUES), index);
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-    return NilPtr;
-}
-
-/*
- * Find the selector for an object in a identity dictionary.
- */
-Objptr
-FindKeyInIDictionary(Objptr dict, Objptr key)
-{
-    int                 length = length_of(dict);
-    int                 index;
-    Objptr		values;
-
-
-    values = get_pointer(dict, DICT_VALUES);
-    for (index = 0; index < length; index++) {
-	if (key == get_pointer(values, index))
-	    return get_pointer(dict, index + DICT_KEY);
-    }
-    return NilPtr;
-}
-
-/*
- * Create a new identity dictionary.
- */
-Objptr
-new_IDictionary()
-{
-    int                 newDict;
-
-    newDict = create_new_object(IdentityDictionaryClass, 32);
-    rootObjects[TEMP0] = newDict;
-    Set_object(newDict, DICT_VALUES, create_new_object(ArrayClass, 32));
-    Set_integer(newDict, DICT_TALLY, 0);
-    rootObjects[TEMP0] = NilPtr;
-    return (newDict);
-}
-
-/*
- * Add a association to a dictionary.
- */
-void
-AddSelectorToDictionary(Objptr dict, Objptr assoc)
-{
-    int                 length = length_of(dict);
-    int                 index;
-    int                 wrapAround = 0;
-    int                 newDict;
-    int                 tally = 0;
-    Objptr              key;
-    Objptr		select;
-    Objptr		value;
-
-    /* Get key */
-    select = get_pointer(assoc, ASSOC_KEY);
-    index = as_integer(select) % (length - 1);
-    while (1) {
-	key = get_pointer(dict, index + DICT_VALUES);
-
-	if (key == NilPtr) {
-	   /* Save value */
-	    Set_object(dict, index + DICT_VALUES, assoc);
-	    tally = get_integer(dict, DICT_TALLY) + 1;
-	    Set_integer(dict, DICT_TALLY, tally);
-	    return;
-	}
-
-	/* Check Key */
-	value = get_pointer(key, ASSOC_KEY);
-	if (value == select) {
-	   /* Set this value */
-	    Set_object(key, ASSOC_VALUE, get_pointer(assoc, ASSOC_VALUE));
-	    return;
-	}
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-   /* Get here not found and no empty spots. Grow dictionary */
-    newDict = create_new_object(DictionaryClass, length + 32);
-    rootObjects[TEMP0] = newDict;
-    index = as_integer(select) % (length + 31);
-    Set_object(newDict, index + DICT_VALUES, assoc);
-    tally = 1;
-    for (index = 0; index < length; index++) {
-	int index2;
-
-	assoc = get_pointer(dict, index + DICT_VALUES);
-	if (assoc == NilPtr)
-	    continue;
-	select = get_pointer(assoc, ASSOC_KEY);
-	index2 = as_integer(select) % (length + 31); 
-	wrapAround = 0;
-	while (1) {
-	    key = get_pointer(newDict, index2 + DICT_VALUES);
-
-	    if (key == NilPtr) {
-	       /* Save value */
-		Set_object(newDict, index2 + DICT_VALUES, assoc);
-	        tally++;
-		break;
-	    }
-	    value = get_pointer(key, ASSOC_KEY);
-	    if (value == select) {
-	       /* Set this value */
-	        Set_object(key, ASSOC_VALUE, get_pointer(assoc, ASSOC_VALUE));
-	        break;
-	    }
-	    if (++index2 == (length + 32)) {
-		if (wrapAround++)
-		    break;
-		index2 = 0;
-	    }
-	}
-    }
-    Set_integer(newDict, DICT_TALLY, tally);
-    swapPointers(newDict, dict);
-    rootObjects[TEMP0] = NilPtr;
-    object_decr_ref(newDict);
-}
-
-/*
- * Find a association to a dictionary.
- */
-Objptr
-FindSelectorInDictionary(Objptr dict, Objptr select)
-{
-    int                 length = length_of(dict);
-    int                 index;
-    int                 wrapAround = 0;
-    Objptr              key;
-    Objptr		value;
-
-    index = as_integer(select) % (length - 1);
-    while (1) {
-	key = get_pointer(dict, index + DICT_VALUES);
-
-	if (key == NilPtr) 
-	    break;
-
-	/* Check Key */
-	value = get_pointer(key, ASSOC_KEY);
-	if (value == select) {
-	    return key;
-	}
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-    return NilPtr;
-}
-
-/*
- * Create a new assocition.
- */
-Objptr
-create_association(Objptr key, Objptr value)
-{
-    Objptr		assoc;
-
-    assoc = create_new_object(AssociationClass, 0);
-    Set_object(assoc, ASSOC_KEY, key);
-    Set_object(assoc, ASSOC_VALUE, value);
-    return assoc;
-}
-
-/*
- * Create a new identity dictionary.
- */
-Objptr
-new_Dictionary()
-{
-    int                 newDict;
-
-    newDict = create_new_object(DictionaryClass, 32);
-    Set_integer(newDict, DICT_TALLY, 0);
-    return (newDict);
-}
-
-/*
- * Add a key to a set.
- */
-void
-AddSelectorToSet(Objptr set, Objptr select)
-{
-    int                 length = length_of(set);
-    int                 index;
-    int                 wrapAround = 0;
-    int                 newSet;
-    int                 tally = 0;
-    Objptr              key;
-
-    /* Get key */
-    index = as_integer(select) % (length - 1);
-    while (1) {
-	key = get_pointer(set, index + DICT_VALUES);
-
-	if (key == NilPtr) {
-	   /* Save value */
-	    Set_object(set, index + DICT_VALUES, select);
-	    tally = get_integer(set, DICT_TALLY) + 1;
-	    Set_integer(set, DICT_TALLY, tally);
-	    return;
-	}
-
-	/* Check Key */
-	if (key == select) {
-	   /* Already there */
-	    return;
-	}
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-   /* Get here not found and no empty spots. Grow set */
-    newSet = create_new_object(SSetClass, length + 32);
-    rootObjects[TEMP0] = newSet;
-    index = as_integer(select) % (length + 31);
-    Set_object(newSet, index + DICT_VALUES, select);
-    tally = 1;
-    for (index = 0; index < length; index++) {
-	int  index2;
-
-	select = get_pointer(set, index + DICT_VALUES);
-	if (select == NilPtr)
-	    continue;
-	index2 = as_integer(select) % (length + 31);
-	wrapAround = 0;
-	while (1) {
-	    key = get_pointer(newSet, index2 + DICT_VALUES);
-
-	    if (key == NilPtr) {
-	       /* Save value */
-		Set_object(newSet, index2 + DICT_VALUES, select);
-		tally++;
-		break;
-	    }
-	    if (key == select) {
-	       /* Duplicate? */
-	        break;
-	    }
-	    if (++index2 == (length + 32)) {
-		if (wrapAround++)
-		    break;
-		index2 = 0;
-	    }
-	}
-    }
-    Set_integer(newSet, DICT_TALLY, tally);
-    swapPointers(newSet, set);
-    rootObjects[TEMP0] = NilPtr;
-    object_decr_ref(newSet);
-}
-
-/*
- * Find a key in a set.
- */
-Objptr
-FindSelectorInSet(Objptr set, Objptr select)
-{
-    int                 length = length_of(set);
-    int                 index;
-    int                 wrapAround = 0;
-    Objptr              key;
-
-    index = as_integer(select) % (length - 1);
-    while (1) {
-	key = get_pointer(set, index + DICT_VALUES);
-
-	if (key == NilPtr) 
-	    break;
-
-	/* Check Key */
-	if (key == select) {
-	    return TruePointer;
-	}
-	if (++index == length) {
-	    if (wrapAround++)
-		break;
-	    index = 0;
-	}
-    }
-    return FalsePointer;
-}
-
-/*
- * Create a new set.
- */
-Objptr
-new_Set()
-{
-    int                 newSet;
-
-    newSet = create_new_object(SSetClass, 32);
-    Set_integer(newSet, DICT_TALLY, 0);
-    return (newSet);
-}
-
-/*
- * Do a stack trace back of offending send.
- */
-void
-dump_stack(Objptr op)
-{
-    char		buffer[1024];
-    Objptr		context = current_context;
-
-    context = get_pointer(context, BLOCK_SENDER);
-    while (context != NilPtr) {
-	Objptr		rec, meth, class, dict;
-	Objptr		select = NilPtr;
-
-	/* Figure out info about call */
-	if (get_integer(context, BLOCK_IIP) != 0) {
-	    Objptr	home = get_pointer(context, BLOCK_HOME);
-	    rec = get_pointer(home, BLOCK_REC);
-	    meth = get_pointer(home, BLOCK_METHOD);
-	    strcpy(buffer, "Block: ");
-	} else  {
-	    rec = get_pointer(context, BLOCK_REC);
-	    meth = get_pointer(context, BLOCK_METHOD);
-	    strcpy(buffer, "Called: ");
-	}
-
-	/* Find method name */
-	for (class = class_of(rec);
-	     class != NilPtr;
-	     class = get_pointer(class, SUPERCLASS)) {
-	  if ((dict = get_pointer(class, METHOD_DICT)) != NilPtr &&
-	      (select = FindKeyInIDictionary(dict, meth)) != NilPtr)
-	     break;
-	}
-
-	/* Sanity check */
-	if (select == NilPtr)
-	   break;
-	strcat(buffer, dump_object_value(rec));
-	strcat(buffer, " Selector: ");
-	strcat(buffer, dump_object_value(select));
-	dump_string(buffer);
-        context = get_pointer(context, BLOCK_SENDER);
-    }
-}
 
 /*
  * Process a primitive function.
  */
 int
 primitive(int primnum, Objptr reciever, Objptr newClass, int args,
-	  int *stack_pointer)
+	  int *tstack)
 {
     Objptr              argument;
     Objptr              res;
@@ -716,195 +168,190 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
     int                 temp;
     int                 index;
     char		*str;
+    int			success = FALSE;
+    int			stack_pointer = *tstack;
+    int			stack_top = size_of(current_context) / sizeof(Objptr);
 
    /* Grab first argument if there is one */
+    if (args >= 2)
+	otemp = GetStack(2);
+    else
+	otemp = NilPtr;
     if (args >= 1)
 	argument = GetStack(1);
     else
 	argument = NilPtr;
+    res = reciever;
 
     switch (primnum) {
     case primitiveAdd:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) + as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp + iarg);
 	break;
 
     case primitiveSub:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) - as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp - iarg);
 	break;
 
     case primitiveMult:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) * as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp * iarg);
 	break;
 
     case primitiveDivide:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    iarg = as_integer(reciever);
-	    temp = as_integer(argument);
-	    if (temp == 0 || (iarg % temp) != 0)
-		break;
-	    
-	    result = iarg / temp;
-	    
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	if (iarg == 0 || (temp % iarg) != 0)
+	   break;
+	ReturnInteger(temp / iarg);
 	break;
 
     case primitiveMod:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    if ((temp = as_integer(argument)) == 0)
-		break;
-	    result = as_integer(reciever) % temp;
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	if (iarg== 0)
+	    break;
+	ReturnInteger(temp % iarg);
 	break;
 
     case primitiveDiv:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    iarg = as_integer(reciever);
-	    temp = as_integer(argument);
-	    if (temp == 0)
-		break;
-	    result = iarg / temp;
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	if (iarg == 0)
+	    break;
+	ReturnInteger(temp / iarg);
 	break;
 
     case primitiveBitAnd:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) % as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp & iarg);
 	break;
 
     case primitiveBitOr:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) | as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp | iarg);
 	break;
 
     case primitiveBitXor:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = as_integer(reciever) ^ as_integer(argument);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnInteger(temp ^ iarg);
 	break;
 
     case primitiveBitShift:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    iarg = as_integer(argument);
-	    temp = as_integer(reciever);
-	    result = (iarg < 0) ? (temp >> (-iarg)) : (temp << iarg);
-	    PushInteger(result, 2);
-	}
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	result = (iarg < 0) ? (temp >> (-iarg)) : (temp << iarg);
+	ReturnInteger(result);
 	break;
 
     case primitiveEqual:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) == as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp == iarg);
 	break;
 
     case primitiveNotEqual:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) != as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp != iarg);
 	break;
 
     case primitiveLess:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) < as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp < iarg);
 	break;
 
     case primitiveGreater:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) > as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp > iarg);
 	break;
 
     case primitiveLessEqual:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) <= as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp <= iarg);
 	break;
 
     case primitiveGreaterEqual:
-	if (is_integer(reciever) && is_integer(argument))
-	    PushBoolean((as_integer(reciever) >= as_integer(argument)), 2);
+	IsInteger(reciever, temp);
+	IsInteger(argument, iarg);
+	ReturnBoolean(temp >= iarg);
 	break;
 
     case primitiveMakePoint:
-	if (is_integer(reciever) && is_integer(argument)) {
-	    result = create_new_object(PointClass, 0);
-	    Set_object(result, XINDEX, reciever);
-	    Set_object(result, YINDEX, argument);
-	    AdjustStack(2, result);
-	}
+	res = create_new_object(PointClass, 0);
+	Set_object(res, XINDEX, reciever);
+	Set_object(res, YINDEX, argument);
+	success = TRUE;
 	break;
 
     case primitiveAsFloat:
-	if (is_integer(reciever))
-	    PushFloat((float) as_integer(reciever), 1);
+	IsInteger(reciever, temp);
+	ReturnFloat((float) temp);
 	break;
 
     case primitiveFloatAdd:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushFloat(floatValue(reciever) + floatValue(argument), 2);
+	    ReturnFloat(floatValue(reciever) + floatValue(argument));
 	break;
 
     case primitiveFloatSub:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushFloat(floatValue(reciever) - floatValue(argument), 2);
+	    ReturnFloat(floatValue(reciever) - floatValue(argument));
 	break;
 
     case primitiveFloatMult:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushFloat(floatValue(reciever) * floatValue(argument), 2);
+	    ReturnFloat(floatValue(reciever) * floatValue(argument));
 	break;
 
     case primitiveFloatDivide:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushFloat(floatValue(reciever) / floatValue(argument), 2);
+	    ReturnFloat(floatValue(reciever) / floatValue(argument));
 	break;
     case primitiveFloatEqual:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) == floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) == floatValue(argument)));
 	break;
 
     case primitiveFloatNotEqual:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) != floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) != floatValue(argument)));
 	break;
 
     case primitiveFloatLess:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) < floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) < floatValue(argument)));
 	break;
 
     case primitiveFloatGreater:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) > floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) > floatValue(argument)));
 	break;
 
     case primitiveFloatLessEqual:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) <= floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) <= floatValue(argument)));
 	break;
 
     case primitiveFloatGreaterEqual:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushBoolean((floatValue(reciever) >= floatValue(argument)), 2);
+	    ReturnBoolean((floatValue(reciever) >= floatValue(argument)));
 	break;
 
     case primitiveFloatTruncate:
 	if (IsFloat(reciever)) {
 	    result = (long) floatValue(reciever);
-	    PushInteger(result, 1);
+	    ReturnInteger(result);
 	}
 	break;
 
@@ -915,7 +362,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
 	    if (fvalue < 0.0)
 		fvalue = -fvalue;
-	    PushFloat(modf(floatValue(reciever), &fdummy), 1);
+	    ReturnFloat(modf(floatValue(reciever), &fdummy));
 	}
 	break;
 
@@ -927,106 +374,102 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 		result = 1;
 	    else
 		frexp(fvalue, &result);
-	    PushInteger(result, 1);
+	    ReturnInteger(result);
 	}
 	break;
 
     case primitiveFloatTimesTwoPower:
 	if (IsFloat(reciever) && is_integer(argument))
-	    PushFloat(ldexp(floatValue(reciever), as_integer(argument)), 2);
+	    ReturnFloat(ldexp(floatValue(reciever), as_integer(argument)));
 	break;
 
     case primitiveFloatExp:
 	if (IsFloat(reciever))
-	    PushFloat(exp(floatValue(reciever)), 1);
+	    ReturnFloat(exp(floatValue(reciever)));
 	break;
 
     case primitiveFloatLn:
 	if (IsFloat(reciever))
-	    PushFloat(log(floatValue(reciever)), 1);
+	    ReturnFloat(log(floatValue(reciever)));
 	break;
 
     case primitiveFloatPow:
 	if (IsFloat(reciever) && IsFloat(argument))
-	    PushFloat(pow(floatValue(reciever), floatValue(argument)), 2);
+	    ReturnFloat(pow(floatValue(reciever), floatValue(argument)));
 	break;
 
     case primitiveFloatSqrt:
 	if (IsFloat(reciever))
-	    PushFloat(sqrt(floatValue(reciever)), 1);
+	    ReturnFloat(sqrt(floatValue(reciever)));
 	break;
 
     case primitiveFloatCeil:
 	if (IsFloat(reciever))
-	    PushFloat(exp(floatValue(reciever)), 1);
+	    ReturnFloat(exp(floatValue(reciever)));
 	break;
 
     case primitiveFloatFloor:
 	if (IsFloat(reciever))
-	    PushFloat(exp(floatValue(reciever)), 1);
+	    ReturnFloat(exp(floatValue(reciever)));
 	break;
 
     case primitiveFloatSin:
 	if (IsFloat(reciever))
-	    PushFloat(sin(floatValue(reciever)), 1);
+	    ReturnFloat(sin(floatValue(reciever)));
 	break;
 
     case primitiveFloatCos:
 	if (IsFloat(reciever))
-	    PushFloat(cos(floatValue(reciever)), 1);
+	    ReturnFloat(cos(floatValue(reciever)));
 	break;
 
     case primitiveFloatTan:
 	if (IsFloat(reciever))
-	    PushFloat(tan(floatValue(reciever)), 1);
+	    ReturnFloat(tan(floatValue(reciever)));
 	break;
 
     case primitiveFloatASin:
 	if (IsFloat(reciever))
-	    PushFloat(asin(floatValue(reciever)), 1);
+	    ReturnFloat(asin(floatValue(reciever)));
 	break;
 
     case primitiveFloatACos:
 	if (IsFloat(reciever))
-	    PushFloat(acos(floatValue(reciever)), 1);
+	    ReturnFloat(acos(floatValue(reciever)));
 	break;
 
     case primitiveFloatATan:
 	if (IsFloat(reciever))
-	    PushFloat(atan(floatValue(reciever)), 1);
+	    ReturnFloat(atan(floatValue(reciever)));
 	break;
 
     case primitiveAt:
 	IsInteger(argument, index);
-	if (arrayAt(reciever, index, &res))
-	    AdjustStack(2, res);
+	success = arrayAt(reciever, index, &res);
 	break;
 
     case primitivePutAt:
 	IsInteger(argument, index);
-	res = GetStack(2);
-	if (arrayPutAt(reciever, index, res))
-	    AdjustStack(3, res);
+	res = otemp;
+	success = arrayPutAt(reciever, index, res); 
 	break;
 
     case primitiveSize:
-	temp = length_of(reciever);
-	if (temp >= 0)
-	    AdjustStack(1, as_integer_object(temp));
+	ReturnInteger(length_of(reciever));
 	break;
 
     case primitiveStringAt:
-	IsInteger(argument, index);
-	if (arrayAt(reciever, index, &res) && is_integer(res))
-	    AdjustStack(2, get_pointer(CharacterTable, as_integer(res)
-		       + (fixed_size(CharacterTable) / sizeof(Objptr))));
+	IsInteger(argument, index); 
+	if (arrayAt(reciever, index, &res) && is_integer(res)) 
+	    ReturnChar(as_integer(res));
 	break;
 
     case primitiveStringAtPut:
 	IsInteger(argument, index);
-	res = GetStack(2);
-	if (arrayPutAt(reciever, index, get_pointer(res, CHARVALUE)))
-	    AdjustStack(3, res);
+	res = otemp;
+	if (!IsChar(res))
+	   break;
+	success = arrayPutAt(reciever, index, charValue(res));
 	break;
 
     case primitiveNext:
@@ -1040,13 +483,14 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	if (index > temp || !arrayAt(argument, index, &res))
 	    break;
 	if (otemp == StringClass) {
-	    if (!is_integer(res))
+	    if (is_integer(res)) {
+	        ReturnChar(as_integer(res));
+	    } else
 		break;
-	    res = get_pointer(CharacterTable, as_integer(res)
-			+ (fixed_size(CharacterTable) / sizeof(Objptr)));
 	}
 	Set_integer(reciever, STREAMINDEX, index);
-	AdjustStack(1, res);
+	success = TRUE;
+	break;
 
     case primitiveNextPut:
 	res = get_pointer(reciever, STREAMARRAY);
@@ -1060,27 +504,33 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	otemp = class_of(res);
 	if (otemp != ArrayClass || otemp != StringClass)
 	    break;
-	if (otemp == StringClass)
-	    argument = get_pointer(argument, CHARVALUE);
-	if (index > temp || !arrayPutAt(res, index, argument))
+	if (otemp == StringClass) {
+	    if (IsChar(argument)) 
+	         argument = charValue(argument);
+	    else
+		 break;
+ 	}
+	if (!arrayPutAt(res, index, argument))
 	    break;
 	if (index > temp)
 	   Set_integer(reciever, STREAMREADL, index - 1);
 	Set_integer(reciever, STREAMINDEX, index);
-	AdjustStack(2, argument);
+	success = TRUE;
+	break;
 
     case primitiveAtEnd:
 	argument = get_pointer(reciever, STREAMARRAY);
 	IntValue(reciever, STREAMINDEX, index);
 	IntValue(reciever, STREAMREADL, iarg);
-	AdjustStack(1, (index > iarg) ? TruePointer : FalsePointer);
+	ReturnBoolean(index > iarg);
+	break;
 
     case primitiveObjectAt:
 	IsInteger(argument, index);
 	temp = get_pointer(reciever, METH_HEADER);
 	index--;
-	if (index >= 0 && index <= LiteralsOf(temp))
-	    AdjustStack(2, get_pointer(reciever, index + METH_HEADER));
+	if (index >= 0 && index <= LiteralsOf(temp)) 
+	    ReturnObject(get_pointer(reciever, index + METH_HEADER));
 	break;
 
     case primitiveObjectAtPut:
@@ -1088,69 +538,63 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	temp = get_pointer(reciever, METH_HEADER);
 	index--;
 	if (index >= 0 && index <= LiteralsOf(temp)) {
-	    res = GetStack(2);
-	    Set_object(reciever, index + METH_HEADER, res);
-	    AdjustStack(3, res);
+	    Set_object(reciever, index + METH_HEADER, otemp);
+	    ReturnObject(otemp);
 	}
 	break;
 
     case primitiveNew:
-	AdjustStack(1, create_new_object(reciever, 0));
+	ReturnValidObject(create_new_object(reciever, 0));
 	break;
 
     case primitiveNewWithArg:
 	IsInteger(argument, temp);
 	if (temp < 0)
 	   break;
-	res = create_new_object(reciever, temp);
-	if (res == NilPtr)
-	   break;
-	AdjustStack(2, res);
+	ReturnValidObject(create_new_object(reciever, temp));
 	break;
 
     case primitiveBecome:
 	if (swapPointers(reciever, argument))
-	    AdjustStack(2, reciever);
+	    success = TRUE;
 	break;
 
     case primitiveInstVarAt:
 	IsInteger(argument, index);
-	if (index > 0 && index <= (fixed_size(reciever) / sizeof(Objptr)))
-	    AdjustStack(2, get_pointer(reciever, index - 1));
+	if (index > 0 && index <= (fixed_size(reciever) / sizeof(Objptr))) 
+	    ReturnObject(get_pointer(reciever, index - 1));
 	break;
 
     case primitiveInstVarPutAt:
 	IsInteger(argument, index);
 	if (index > 0 && index <= (fixed_size(reciever) / sizeof(Objptr))) {
-	    res = GetStack(2);
-	    Set_object(reciever, index - 1, res);
-	    AdjustStack(3, res);
+	    Set_object(reciever, index - 1, otemp);
+	    ReturnObject(otemp);
 	}
 	break;
 
     case primitiveAsOop:
-	if (is_object(reciever))
-	    AdjustStack(1, as_oop(reciever));
+	if (is_object(reciever)) 
+	    ReturnObject(as_oop(reciever))
 	break;
 
     case primitiveAsObject:
 	if (is_integer(reciever)) {
 	    res = as_object(reciever);
 	    if (notFree(res))
-		AdjustStack(1, res);
+		success = TRUE;
 	}
 	break;
 
     case primitiveSomeInstance:
-	AdjustStack(1, initialInstance(reciever));
+	ReturnObject(initialInstance(reciever));
 	break;
 
     case primitiveNextInstance:
-	AdjustStack(1, nextInstance(reciever));
+	ReturnObject(nextInstance(reciever));
 	break;
 
     case primitiveNewMethod:
-	otemp = GetStack(2);
 	IsInteger(argument, temp);
        /* Round size to multiple of object pointer size */
 	temp = (temp + (sizeof(Objptr) - 1)) / sizeof(Objptr);
@@ -1158,7 +602,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	temp += LiteralsOf(otemp) + 1;
 	if ((res = create_new_object(CompiledMethodClass, temp)) != NilPtr) {
 	    set_pointer(res, METH_HEADER, otemp);
-	    AdjustStack(3, res);
+	    success = TRUE;
 	}
 	break;
 
@@ -1172,13 +616,13 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
        /* Copy argument to stack of block */
 	for (; args > 0; args--) {
-	    otemp = get_pointer(current_context, *stack_pointer);
+	    otemp = TopStack();
 	    Set_object(reciever, --index, otemp);
-	    Set_object(current_context, (*stack_pointer)++, NilPtr);
+	    PopStack();
 	}
 
        /* Remove the block from top of stack */
-        Set_object(current_context, (*stack_pointer)++, NilPtr);
+        PopStack();
 
        /* Set new block context registers */
 	Set_integer(reciever, BLOCK_SP, index);
@@ -1188,6 +632,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
        /* Switch to context */
 	current_context = reciever;
 	newContextFlag = 1;
+	*tstack = stack_pointer;
 	return TRUE;
 
     case primitiveValueWithArgs:
@@ -1208,51 +653,51 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	Set_object(reciever, BLOCK_CALLER, current_context);
 
        /* Remove arguments from stack */
-	Set_object(current_context, (*stack_pointer)++, NilPtr);
-	Set_object(current_context, (*stack_pointer)++, NilPtr);
+	PopStack();
+	PopStack();
 
        /* Switch to context */
 	current_context = reciever;
 	newContextFlag = 1;
+	*tstack = stack_pointer;
 	return TRUE;
 
     case primitivePreform:
 	/* Redo for new stack order */
-	object_incr_ref(reciever);
 	args--;
 	object_incr_ref(argument);
-	Set_object(current_context, (*stack_pointer)++, NilPtr);
-	Set_object(current_context, (*stack_pointer)++, NilPtr);
-	Set_object(current_context, (*stack_pointer)++, NilPtr);
-	AdjustStack(2, reciever);
-	object_decr_ref(reciever);
-	SendMethod(argument, stack_pointer, args);
+	for (temp = args; temp > 0; temp--) {
+	   Set_object(current_context, stack_pointer + temp + 1,
+		get_pointer(current_context, stack_pointer + temp));
+	}
+	PopStack();		/* Pop Last argument */
+	*tstack = stack_pointer;	/* Do the call */
+	SendMethod(argument, tstack, args);
 	object_decr_ref(argument);
 	return TRUE;
 
     case primitivePreformWithArgs:
 	/* Redo for new stack order */
-	object_incr_ref(reciever);
 	object_incr_ref(argument);
-	res = GetStack(2);
+	res = otemp;
 	object_incr_ref(res);
 	args = length_of(argument);
-	for (temp = args; temp >= 0; temp++)
-	    Set_object(current_context, --(*stack_pointer),
-		       get_pointer(res, temp));
-	Set_object(current_context, --(*stack_pointer), reciever);
+	PopStack();		/* Pop Array. */
+	PopStack();		/* Pop selector. */
+	for (temp = args; temp >= 0; temp--)
+	    Push(get_pointer(res, temp));
 	object_decr_ref(res);
-	object_decr_ref(reciever);
-	SendMethod(argument, stack_pointer, args);
+	*tstack = stack_pointer;
+	SendMethod(argument, tstack, args);
 	object_decr_ref(argument);
 	return TRUE;
 
     case primitiveEquivalence:
-	AdjustStack(2, (reciever == argument) ? TruePointer : FalsePointer);
+	ReturnBoolean(reciever == argument);
 	break;
 
     case primitiveClass:
-	AdjustStack(1, class_of(reciever));
+	ReturnObject(class_of(reciever));
 	break;
 
     case primitiveSignal:
@@ -1269,22 +714,23 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveSuspend:
 	if (reciever == activeProcess) {
-	    AdjustStack(1, NilPtr);
 	    suspendActive;
+	    res = NilPtr;
+	    success = TRUE;
 	}
 	break;
 
     case primitiveCoreUsed:
-	AdjustStack(1, coreUsed());
-	return TRUE;
+	ReturnObject(coreUsed());
+	break;
 
     case primitiveFreeCore:
-	AdjustStack(1, freeSpace());
-	return TRUE;
+	ReturnObject(freeSpace());
+	break;
 
     case primitiveOopsLeft:
-	AdjustStack(1, freeOops());
-	return TRUE;
+	ReturnObject(freeOops());
+	break;
 
     case primitiveQuit:
 	running = FALSE;
@@ -1295,35 +741,37 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
         * Fix stack so we save a false pointer onto stack.
         * This is what the saved image will see.
         */
-	Set_object(current_context, *stack_pointer, FalsePointer);
+	Set_object(current_context, stack_pointer, FalsePointer);
+
+       /* Make sure we can have valid argument */
+        if ((str = Cstring(argument)) == NULL)
+	    break;
 
        /* Do Snapshot, if we fail, let primitive fail handle problem */
-	if (doSnapShot(argument)) {
-	    PushBoolean(TRUE, 2); /* Now return a TRUE to running system */
-	} else
-	    return FALSE;
+	if (save_image(str, NULL)) 
+	    ReturnBoolean(TRUE); /* Now return a TRUE to running system */
+        free(str);
 	break;
 
     case primitiveFileOpen:
-	PushBoolean (open_buffer(reciever), 1);
-	return TRUE;
+	ReturnBoolean (open_buffer(reciever));
+	break;
 
     case primitiveFileClose:
 	close_buffer(reciever);
-	PushBoolean (TRUE, 1);
-	return TRUE;
+	ReturnBoolean (TRUE);
+	break;
 
     case primitiveFileNext:
-	if (read_buffer(reciever, &temp)) {
-	    AdjustStack(1, get_pointer(CharacterTable, temp)
-			+ (fixed_size(CharacterTable) / sizeof(Objptr)));
-	}
+	if (read_buffer(reciever, &temp)) 
+	    ReturnChar(temp);
 	break;
 
     case primitiveFileNextPut:
-	if (write_buffer(reciever, 
-			as_integer(get_pointer(argument, CHARVALUE))))
-	    AdjustStack(2, temp);
+	if (!IsChar(argument))
+	    break;
+	if (write_buffer(reciever, as_integer(charValue(argument))))
+	    success = TRUE;
 	break;
 
     case primitiveFileGet:
@@ -1335,7 +783,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	break;
 
     case primitiveFileSize:
-	AdjustStack(1, as_integer_object(size_buffer(reciever)));
+	ReturnInteger(size_buffer(reciever));
 	break;
 
     case primitiveFileDir:
@@ -1344,14 +792,13 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveInternString:
 	str = Cstring(reciever);
-	temp = internString(str);
+	ReturnObject(internString(str));
 	free(str);
-	AdjustStack(1, temp);
 	break;
 
     case primitiveClassComment:
 	Set_object(reciever, CLASS_COMMENT, argument);
-	AdjustStack(1, argument);
+	success = TRUE;
 	break;
 
     case primitiveMethodsFor:
@@ -1360,7 +807,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	free(str);
 	rootObjects[METHFOR0] = compClass = reciever;
 	rootObjects[METHFOR1] = compCatagory = argument;
- 	AdjustStack(1, reciever); 
+ 	success = TRUE;
 	break;
 
     case primitiveError:
@@ -1368,11 +815,12 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	str = Cstring(argument);
 	error(str);
 	free(str);
-        AdjustStack(2, NilPtr);
+	success = TRUE;
 
     case primitiveDumpObject:
 	dump_object(reciever);
-	return TRUE;
+	success = TRUE;
+	break;
 
     case primitiveTimeWordsInto:
 	/* Creates and initializes a new time object */
@@ -1390,7 +838,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
     case primitiveStackTrace:
 	/* Print out a stack trace */
 	dump_stack(reciever);
-	return TRUE;
+	break;
 
     case primitiveEvaluate:
 	/* Evalutate a CompiledMethod. */
@@ -1401,57 +849,52 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
        /* Check type of method */
         switch (FlagOf(otemp)) {
         case METH_RETURN:
-	     res = get_pointer(reciever, temp);
-	     AdjustStack(1, res);
-	     return TRUE;
+	     ReturnObject(get_pointer(reciever, temp));
+	     break;
         case METH_SETINST:
-	    return FALSE;
+	     break;
         case METH_EXTEND:
 	    index = PrimitiveOf(get_pointer(reciever, temp + METH_HEADER));
 	    if (index > 0 &&
-	        primitive(index, reciever, newClass, 0, stack_pointer)) {
-	        return TRUE;
+	        primitive(index, reciever, newClass, 0, tstack)) {
+		success = TRUE;
+		break;
 	    }
-	    break;
         default:
-	    break;
+	    index += StackOf(otemp);
+             /* Initialize a new method. */
+            res = create_new_object(MethodContextClass, index);
+            Set_object(res, BLOCK_SENDER, current_context);
+            Set_integer(res, BLOCK_IP, sizeof(Objptr) * (temp + METH_LITSTART));
+            Set_integer(res, BLOCK_SP, size_of(res) / sizeof(Objptr));
+            Set_object(res, BLOCK_METHOD, reciever);
+            Set_integer(res, BLOCK_IIP, 0);
+            Set_object(res, BLOCK_REC, reciever);
+            Set_integer(res, BLOCK_ARGCNT, 0);
+    
+           /* Switch to context */
+	    current_context = res;
+	    newContextFlag = 1;
+	    return TRUE;
         }
-	index += StackOf(otemp);
-         /* Initialize a new method. */
-        res = create_new_object(MethodContextClass, index);
-        Set_object(res, BLOCK_SENDER, current_context);
-        Set_integer(res, BLOCK_IP, sizeof(Objptr) * (temp + METH_LITSTART));
-        Set_integer(res, BLOCK_SP, size_of(res) / sizeof(Objptr));
-        Set_object(res, BLOCK_METHOD, reciever);
-        Set_integer(res, BLOCK_IIP, 0);
-        Set_object(res, BLOCK_REC, reciever);
-        Set_integer(res, BLOCK_ARGCNT, 0);
-
-       /* Switch to context */
-	current_context = res;
-	newContextFlag = 1;
-	return TRUE;
+	break;
 
      case primitiveFillBuffer:
 	IsInteger(argument, index);
-	res = GetStack(2);
-	IsInteger(res, temp);
-	if ((str = fill_buffer(index, temp)) == NULL)
-	   break;
-    	res = MakeString(str);
-	free(str);
-	AdjustStack(2, res);
+	IsInteger(otemp, temp);
+	if ((str = fill_buffer(index, temp)) != NULL) {
+    	    ReturnObject(MakeString(str));
+	    free(str);
+	}
  	break;
 
      case primitiveFlushBuffer:
 	IsInteger(argument, index);
-	res = GetStack(2);
-	if ((str = Cstring(res)) == NULL)
+	if ((str = Cstring(otemp)) == NULL)
 	   break;
-        temp = flush_buffer(index, str);
+        if(flush_buffer(index, str))
+	   success = TRUE;
         free(str);
-        if (temp)
-	   AdjustStack(2, reciever);
 	break;
 
     case primitiveByteAt:
@@ -1462,27 +905,37 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	if (index >= 0 &&
 		 index < ((length_of(reciever) * sizeof(Objptr)) - temp)) {
 	    temp += fixed_size(reciever);
-	    AdjustStack(2, as_integer_object(get_byte(reciever, index + temp)));
+	    ReturnInteger(get_byte(reciever, index + temp));
 	}
 	break;
 
     case primitiveByteAtPut:
 	IsInteger(argument, index);
-        res = GetStack(2);
-	IsInteger(res, iarg);
+	IsInteger(otemp, iarg);
 	temp = get_pointer(reciever, METH_HEADER);
 	temp = (LiteralsOf(temp) * sizeof(Objptr));
 	index--;
 	if (index >= 0 &&
 		 index <= (1 + (length_of(reciever) * sizeof(Objptr)) - temp)) {
 	    temp += fixed_size(reciever);
+	    res = otemp;
 	    set_byte(reciever, index + temp, iarg);
-	    AdjustStack(3, res);
+	    success = TRUE;
 	}
 	break;
     default:
     }
-    return FALSE;
+    if (success) {
+	 int i; 
+	 object_incr_ref(res);
+	 for(i = args; i >= 0; i--) 
+	     PopStack();
+	 Push(res);
+	 object_decr_ref(res);
+	 *tstack = stack_pointer;
+	 return TRUE; 
+    }
+    return success;
 }
 
 
