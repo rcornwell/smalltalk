@@ -3,6 +3,13 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.2  2000/02/01 18:09:49  rich
+ * Exposed dump_object_value.
+ * Renamed trace_inst to dump_inst.
+ * Added stack pointer display to push instructions.
+ * Added trace code to display set and get of instance variable
+ * Added dump of code tree.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -11,7 +18,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+"$Id: dump.c,v 1.2 2000/02/01 18:09:49 rich Exp rich $";
 
 #endif
 
@@ -41,7 +48,7 @@ static char        *rcsid =
 /*
  * Pretty print and dump a class name.
  */
-static char        *
+char        *
 dump_class_name(Objptr op)
 {
     static char         buffer[30];
