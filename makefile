@@ -10,7 +10,7 @@ INCLUDE=$(SDK)/include
 CC = gcc 
 RC = windres -I rc -O coff -DWIN32 -DINLINE_OBJECT_MEM #--include-dir $(INCLUDE)
 HC = $(SDK)/bin/hcw
-CFLAGS = -Wall -O4 -DWIN32 -DINLINE_OBJECT_MEM #-I$(INCLUDE) -g 
+CFLAGS = -g -Wall -O2 -DWIN32 -DINLINE_OBJECT_MEM #-I$(INCLUDE) -g 
 LDFLAGS = -g -mwindows -mno-cygwin
 LIBS=-lversion
 
@@ -27,7 +27,8 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
 	   behavior.st system.st boottail.st
 SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
-	   behavior.st process.st system.st graphic.st font.st
+	   behavior.st process.st system.st graphic.st font.st mvc.st \
+	   guiapps.st
 
 all:	$(PROJ).sti 
 
