@@ -1,10 +1,14 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: $ "
+" $Id: process.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: process.st,v $
+ Revision 1.1  1999/09/02 15:57:59  rich
+ Initial revision
+
 "
+
 Link subclass: 'Process'
      instanceVariableNames: 'suspendedContext priority myList'
      classVariableNames: ''
@@ -27,7 +31,6 @@ on: aBlock at: aPriority
 !Process methodsFor: 'basic'!
 
 terminate
-    | processList priority process |
     suspendedContext <- nil.
     myList notNil
         ifTrue: [myList remove: self.
@@ -50,12 +53,12 @@ priority: anInteger
 !Process methodsFor: 'builtins'!
 
 resume
-    <primitive: 73>
+    <primitive 73>
    ^self primitiveFailed
 !
 
 suspend
-    <primitive: 74>
+    <primitive 74>
    ^self primitiveFailed
 ! !
 
@@ -67,7 +70,6 @@ onBlock: aBlock at: aPriority
     priority <- aPriority
 
 ! !
-
 
 LinkedList subclass: 'Semaphore'
            instanceVariableNames: 'signals'
@@ -119,12 +121,12 @@ initSemaphore
 "communication"
 
 signal
-    <primitive: 71>
+    <primitive 71>
     ^self primitiveFailed
 !
 
 wait
-    <primitive: 72>
+    <primitive 72>
     ^self primitiveFailed
 ! !
 
@@ -138,8 +140,6 @@ Object subclass: 'ProcessorScheduler'
 ProcessorScheduler comment: 
 'I provide methods that control the execution of processes.' !
 
-" Create correct process scheduler object"
-(Smalltalk at: #Processor) become: (ProcessScheduler basicNew). !
 
 !ProcessorScheduler methodsFor: 'basic'!
 
@@ -196,14 +196,18 @@ systemBackgroundPriority
 
 signal: aSemaphore atMilliseconds: millis
     " signal 'aSemaphore' after 'millis' milliseconds have elapsed" 
-    <primitive: 100>
-    ^self primitiveFailed
-!
-
-signal: aSemaphore onInterrupt: anIntegerSignalNumber
-    <primitive: 152>
+    <primitive 98>
     ^self primitiveFailed
 ! !
+
+!ProcessorScheduler class methodsFor: 'initialization'!
+
+initialize
+    " Create correct process scheduler object"
+     (Smalltalk at: #Processor) become: (ProcessorScheduler basicNew). 
+! !
+
+"ProcessorScheduler initialize "!
 
 Object subclass: 'Delay'
        instanceVariableNames: 'resumptionTime isRelative'
@@ -218,7 +222,6 @@ Delay comment:
 nces a wait message, that process goes to sleep for the interval specified 
 when the instance was created.'
 !
-           
 
 !Delay class methodsFor: 'instance creation'!
 
@@ -238,7 +241,7 @@ untilMilliseconds: millisecondCount
 !Delay class methodsFor: 'general inquiries'!
 
 millisecondClockValue
-    ^Time millisecondClockValue
+    ^" Time millisecondClockValue" self
 ! !
 
 
@@ -427,7 +430,7 @@ forkAt: priority
 !BlockContext methodsFor: 'private'!
 
 initBlock 
-    ip <- initialIP.
+    ip <- iip.
     sp <- 0.
     caller <- nil
 ! !
