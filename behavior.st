@@ -1,9 +1,14 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.7 2001/08/01 16:42:31 rich Exp rich $ "
+" $Id: behavior.st,v 1.8 2001/08/18 16:17:00 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.8  2001/08/18 16:17:00  rich
+ Placed classes and methods in correct category.
+ Added methods for building new source file.
+ Fixed bugs in addSelector:withMethod:classified:
+
  Revision 1.7  2001/08/01 16:42:31  rich
  Make sure we have a method dictionary before we go accessing it.
 
@@ -63,7 +68,12 @@ fileInFrom: aStream
 	[ Compiler compile: aString forClass: myClass classified: myCategory ].
 ! !
 
-MethodInfo category: 'CompiledMethods' !
+Object subclass: 'MethodInfo'
+   instanceVariableNames: 'sourceFile sourcePos category'
+   classVariableNames: ''
+   poolDictionaries: ''
+   category: 'Compiled-Methods'
+!
 
 MethodInfo comment: 'I represent information about compiled methods' !
 
@@ -160,7 +170,12 @@ sourceCode: aString forClass: aClass forCategory: aCategory
 	^ self new sourceCode: aString forClass: aClass forCategory: aCategory
 ! !
 
-Behavior category: 'Class Management' !
+Object subclass: 'Behavior'
+   instanceVariableNames: 'superclass subclasses methoddict flags'
+   classVariableNames: ''
+   poolDictionaries: ''
+   category: 'Class-Mangement'
+!
 
 Behavior comment: 
 	'I manage the basic behavior of Classes'. !
@@ -349,19 +364,33 @@ isVariable
 ! Behavior methodsFor: 'updating source' !
 
 adjustMethodsSourceChannel: aChannel
-	| desc |
+	| desc missing |
 	" Point all methods on channel aChannel to channel 1. "
 	methoddict isNil ifFalse: [
 		methoddict do: [ :meth |
 			desc <- meth description.
-			desc sourceFile	= aChannel ifTrue: [
-				desc sourceFile: 1
-			].
+			desc sourceFile	= aChannel 
+				ifTrue: [ desc sourceFile: 1 ]
+				ifFalse: [
+		missing <- methoddict keyAtValue: meth ifAbsent: [ nil ].
+		self name printOn: stderr.
+		stderr space.
+		missing printOn: stderr.
+		stderr space.
+		desc sourceFile printOn: stderr.
+		stderr nextPutAll: ' method not on sourcefile '.
+		stderr nl.
+				]
 		]
 	].
 ! !
 
-Class category: 'Class Managment' !
+Behavior subclass: 'Class'
+   instanceVariableNames: 'name vars comment category classvars pool methcats'
+   classVariableNames: ''
+   poolDictionaries: ''
+   category: 'Class-Mangement'
+!
 
 Class comment: 'I manage information about classes not needed to execute code' !
 
@@ -1083,7 +1112,12 @@ StringasArray: aString
     ^array
 ! !
 
-MetaClass category: 'Class Managment' !
+Class subclass: 'MetaClass'
+   instanceVariableNames: 'instanceClass'
+   classVariableNames: ''
+   poolDictionaries: ''
+   category: 'Class-Mangement'
+!
 
 MetaClass comment: 'I manage the hieharchy of classes within the system.' !
 
@@ -1152,8 +1186,8 @@ name: newName
 	" Update subclass chain "
 	aClass superclass notNil ifTrue: [
 		aClass superclass ~= superClass ifTrue:
-		      [ aClass superclass removeSubclass: aClass
-			superClass addSubclass: aClass ].
+		      [ aClass superclass removeSubclass: aClass ].
+		superClass addSubclass: aClass.
 	].
 	aClass superclass: superClass.
 	superClass notNil
@@ -1205,4 +1239,44 @@ newMeta: newName
 	^ aClass
 ! !
 
+! Stream methodsFor: 'file I/O' !
+
+fileIn
+	| aString sawExclaim |
+	[ self atEnd] whileFalse: [
+	    sawExclaim <- self peekFor: $!!.
+	    aString <- self nextChunk.
+	    sawExclaim
+	       ifFalse: [ Compiler evaluate: aString]
+	       ifTrue: [ (Compiler evaluate: aString) fileInFrom: self]]
+!
+
+executeLoop
+	| aString chunk char |
+	stderr nextPutAll: 'Smalltalk Started'.
+	stderr nl.
+	chunk <- WriteStream on: (String new: 0).
+	[ self atEnd] whileFalse: [
+	    char <- self next.
+	    char == $!!
+	       ifTrue: [
+		    char <- self next.
+		    ((Character nl == char) or: [ (Character cr == char) ])
+		        ifTrue: [
+			    aString <- chunk contents.
+	    		    Compiler evaluate: aString.
+	    		    chunk <- WriteStream on: (String new: 0). 
+	    		    stderr nextPutAll: 'Ready'.
+			    stderr nl. ]
+		        ifFalse: [
+			    chunk nextPut: $!!.
+			    chunk nextPut: char.
+		     ]]
+	       ifFalse: [
+		    ((Character nl == char) or: [ (Character cr == char)])
+		        ifFalse: [ chunk nextPut: char ]
+			ifTrue: [ chunk nextPut: (Character space) ]
+	      ]
+	]
+! !
 
