@@ -1,9 +1,15 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.6 2001/08/01 16:42:31 rich Exp rich $ "
+" $Id: compile.st,v 1.7 2001/08/18 16:17:01 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.7  2001/08/18 16:17:01  rich
+ Placed classes and methods in correct categories.
+ Added compiler error dump.
+ Fixed compiler bug in emiting conditionals for results.
+ Fixed compiler bug causing infinite loop on some errors.
+
  Revision 1.6  2001/08/01 16:42:31  rich
  Added Pshint instruction.
  Moved sendsuper to group 2.
@@ -401,9 +407,9 @@ scannumber
    " Got a number now convert it to a object "
     (fseen or: [eseen]) ifTrue: [
 	 value <- integer asFloat + fraction.
-	 eseen ifTrue: [ value <- value raisedToInteger: exp ]
+	 eseen ifTrue: [ value <- value raisedToInteger: exp ].
     ] ifFalse: [ value <- integer ].
-    sign ifTrue: [ value <- value negated ]
+    sign ifTrue: [ value <- value negated ].
 !
 
 " Scan a name and return it in string. "
@@ -2151,7 +2157,7 @@ addLit: aValue forTerm: aBoolean
 		aValue > -127 and: [aValue < 127 ]]]) ifTrue: [
     	     ^ SmallTalkConstantNode new: aValue
 				    table: self ].
-    lits do: [ :l | l node == aValue ifTrue: [ ^ l ] ].
+    lits do: [ :l | l node == aValue ifTrue: [ ^ l ]. ].
     lit <- lits add: (SmallTalkLiteralNode new: aValue
 					   offset: litcount 
 					   table: self).
@@ -2678,6 +2684,15 @@ compile: aString forClass: aClass classified: aCategory notify: aBlock
        		    classified: aCategory.
     ]
 ! !
+
+"Object variableSubclass: 'CompiledMethod'
+       instanceVariableNames: 'description header'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Compiled-Methods' "
+Object addSubclass: CompiledMethod !
+
+CompiledMethod category: 'Compiled-Methods' !
 
 ! CompiledMethod methodsFor: 'evaluation' !
 
