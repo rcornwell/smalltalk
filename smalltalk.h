@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Global Definitions.
  *
- * $Id: smalltalk.h,v 1.2 2000/02/01 18:10:04 rich Exp rich $
+ * $Id: smalltalk.h,v 1.3 2001/07/31 14:09:49 rich Exp rich $
  *
  * $Log: smalltalk.h,v $
+ * Revision 1.3  2001/07/31 14:09:49  rich
+ * Fixed to compile under new cygwin.
+ *
  * Revision 1.2  2000/02/01 18:10:04  rich
  * Fixed image load code.
  *
@@ -51,5 +54,6 @@
 void                smallinit(int);
 void		    load_file(char *);
 void                parsefile(char *);
+extern char	   *geometry;
 
 #endif
