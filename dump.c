@@ -2,13 +2,16 @@
 /*
  * Smalltalk interpreter: Object space dump utilities.
  *
- * $Log: $
+ * $Log: dump.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-"$Id: $";
+"$Id: dump.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -31,6 +34,8 @@ static char        *rcsid =
 #include "fileio.h"
 #include "interp.h"
 #include "lex.h"
+#include "symbols.h"
+#include "code.h"
 #include "dump.h"
 
 /*
@@ -61,7 +66,7 @@ dump_class_name(Objptr op)
 /*
  * Dump contents of simple objects.
  */
-static char        *
+char        *
 dump_object_value(Objptr op)
 {
     static char         buffer[1000];
@@ -99,7 +104,7 @@ dump_object_value(Objptr op)
 	break;
     case SymLinkClass:
 	op = get_pointer(op, SYM_VALUE);
-	strcat(buffer, "Symbol $");
+	strcat(buffer, "Symbol #");
 	len = length_of(op);
 	base = fixed_size(op);
 	sz = strlen(buffer);
@@ -292,9 +297,13 @@ dump_method(Objptr op)
 	switch (opcode & 0xf0) {
 	case LONGOP:
 	    if (operand == JMPLNG) {
+		if ((i + 2) > bytes)
+		   return;
 		operand = 0xff & get_byte(op, lits + i + 1);
 		operand += (0xff & get_byte(op, lits + i + 2)) << 8;
-		wsprintf(opc, "j %d", operand);
+		if (operand > 32768)
+		    operand -= 65536;
+		wsprintf(opc, "j %d", operand + lits);
 		len = 3;
 		break;
 	    }
@@ -330,21 +339,30 @@ dump_method(Objptr op)
 	    wsprintf(opc, "ret tmp(%d)", operand);
 	    break;
 	case JMPT:
-	    if (len == 2)
+	    if (len == 2) {
 		operand = get_byte(op, lits + i + 1);
-	    wsprintf(opc, "jpt Byte %d(%d)", i + len + operand,
+		if (operand > 127)
+		   operand -= 256;
+	    }
+	    wsprintf(opc, "jpt Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 	case JMPF:
-	    if (len == 2)
+	    if (len == 2) {
 		operand = get_byte(op, lits + i + 1);
-	    wsprintf(opc, "jpf Byte %d(%d)", i + len + operand,
+		if (operand > 127)
+		   operand -= 256;
+	    }
+	    wsprintf(opc, "jpf Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 	case JMP:
-	    if (len == 2)
+	    if (len == 2) {
 		operand = get_byte(op, lits + i + 1);
-	    wsprintf(opc, "jmp Byte %d(%d)", i + len + operand,
+		if (operand > 127)
+		   operand -= 256;
+	    }
+	    wsprintf(opc, "jmp Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 
@@ -419,11 +437,24 @@ dump_method(Objptr op)
 		break;
 	    }
 	}
-	wsprintf(buffer, " Byte %d: %02x %s", i, opcode, opc);
+	switch (len) {
+	case 1:
+   	    wsprintf(buffer, " Byte %d: %02x      %s", i + lits, opcode, opc);
+	    break;
+ 	case 2:
+   	    wsprintf(buffer, " Byte %d: %02x %02x   %s", i + lits, opcode,
+			0xff & operand, opc);
+	    break;
+	case 3:
+   	    wsprintf(buffer, " Byte %d: %02x %04x %s", i + lits, opcode,
+			0xffff & operand, opc);
+	    break;
+	}
 	dump_string(buffer);
     }
 }
 
+#ifdef SHOW_TOKEN
 /*
  * Dump a token out.
  */
@@ -486,13 +517,15 @@ dump_token(int tok, void *state)
 	dump_object(get_token_object(tstate));
     dump_string("");
 }
+#endif
 
 
+#ifdef TRACE_INST
 /*
  * Dump a instruction execute out.
  */
 void
-trace_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
+dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 {
     char                buffer[1024];
     char                opc[20];
@@ -500,19 +533,19 @@ trace_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 
     switch (opcode & 0xf0) {
     case PSHARG:
-	wsprintf(opc, "psh arg: %d", oprand);
+	wsprintf(opc, "psh arg: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHLIT:
-	wsprintf(opc, "psh lit: %d", oprand);
+	wsprintf(opc, "psh lit: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHINST:
-	wsprintf(opc, "psh ins: %d", oprand);
+	wsprintf(opc, "psh ins: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHTMP:
-	wsprintf(opc, "psh tmp: %d", oprand);
+	wsprintf(opc, "psh tmp: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case STRINST:
@@ -578,7 +611,7 @@ trace_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	    wsprintf(opc, "ret nil");
 	    break;
 	case DUPTOS:
-	    wsprintf(opc, "dup");
+	    wsprintf(opc, "dup [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case RETBLK:
@@ -589,31 +622,31 @@ trace_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	    wsprintf(opc, "pop");
 	    break;
 	case PSHVAR:
-	    wsprintf(opc, "psh var ");
+	    wsprintf(opc, "psh var [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case STRVAR:
-	    wsprintf(opc, "str var ");
+	    wsprintf(opc, "str var");
 	    dumpflag = TRUE;
 	    break;
 	case PSHSELF:
-	    wsprintf(opc, "psh self ");
+	    wsprintf(opc, "psh self [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case PSHNIL:
-	    wsprintf(opc, "psh nil");
+	    wsprintf(opc, "psh nil [%d]", oprand2);
 	    break;
 	case PSHTRUE:
-	    wsprintf(opc, "psh true");
+	    wsprintf(opc, "psh true [%d]", oprand2);
 	    break;
 	case PSHFALS:
-	    wsprintf(opc, "psh false");
+	    wsprintf(opc, "psh false [%d]", oprand2);
 	    break;
 	case PSHONE:
-	    wsprintf(opc, "psh 1");
+	    wsprintf(opc, "psh 1 [%d]", oprand2);
 	    break;
 	case PSHZERO:
-	    wsprintf(opc, "psh 0");
+	    wsprintf(opc, "psh 0 [%d]", oprand2);
 	    break;
 	}
     }
@@ -624,7 +657,47 @@ trace_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	wsprintf(buffer, "#%d Exec: %d %02x %s", meth, ip, opcode, opc);
     dump_string(buffer);
 }
+/*
+ * Dump set instance variable.
+ */
+void 
+dump_setinst(Objptr op, int inst, Objptr value)
+{
+    char                buffer[1024];
 
+    wsprintf(buffer, "Set: %s [%d] to ", dump_object_value(op), inst);
+    strcat(buffer, dump_object_value(value));
+    dump_string(buffer);
+}
+
+/*
+ * Dump get instance variable.
+ */
+void 
+dump_getinst(Objptr op, int inst, Objptr value)
+{
+    char                buffer[1024];
+
+    wsprintf(buffer, "Get: %s [%d] is ", dump_object_value(op), inst);
+    strcat(buffer, dump_object_value(value));
+    dump_string(buffer);
+}
+
+/*
+ * Report on success or failure of a primitive.
+ */
+void
+dump_primitive(int flag, int number)
+{
+   char			buffer[1024];
+   wsprintf(buffer, "Primitive: %d ", number);
+   strcat(buffer, (flag)?"Success":"Failed");
+   dump_string(buffer);
+}
+#endif
+
+
+#ifdef TRACE_SEND
 /*
  * Dump message send information.
  */
@@ -639,6 +712,7 @@ dump_send(Objptr op, Objptr sel, Objptr meth)
     strcat(buffer, dump_object_value(meth));
     dump_string(buffer);
 }
+#endif
 
 /*
  * Dump string and object message.
@@ -651,3 +725,143 @@ dump_str(char *str, Objptr op)
     wsprintf(buffer, "%s #%d", str, op);
     dump_string(buffer);
 }
+
+#ifdef DUMP_CODETREE
+/*
+ * Dump a list of code.
+ */
+void
+dump_code(void *state)
+{
+    Codestate 		cstate = (Codestate) state;
+    Codenode            cur;
+    char                buffer[1024];
+    char                line[1024];
+
+    for (cur = cstate->code; cur != NULL; cur = cur->next) {
+	switch (cur->type) {
+	case Nop:
+	     strcpy(buffer, "Nop");
+	     break;
+	case Store:
+	    switch (cur->oper) {
+	    case Temp:
+		wsprintf(buffer, "Store Temp %s", cur->u.symbol->name);
+		break;
+	    case Variable:
+		wsprintf(buffer, "Store Var %s", cur->u.symbol->name);
+		break;
+	    case Inst:
+		wsprintf(buffer, "Store Inst %s", cur->u.symbol->name);
+		break;
+	    default:
+		strcpy(buffer, "Store xxx");
+		break;
+	    }
+	    break;
+	case Push:
+	    switch (cur->oper) {
+	    case Super:
+	    case Self:
+		strcpy(buffer, "Push Self");
+		break;
+	    case True:
+		strcpy(buffer, "Push True");
+		break;
+	    case False:
+		strcpy(buffer, "Push False");
+		break;
+	    case Nil:
+		strcpy(buffer, "Push Nil");
+		break;
+	    case Temp:
+		wsprintf(buffer, "Push Temp %s", cur->u.symbol->name);
+		break;
+	    case Inst:
+		wsprintf(buffer, "Push Inst %s", cur->u.symbol->name);
+		break;
+	    case Arg:
+		wsprintf(buffer, "Push Arg %s", cur->u.symbol->name);
+		break;
+	    case Literal:
+		wsprintf(buffer, "Push Lit %s",
+			 dump_object_value(cur->u.literal->value));
+		break;
+	    case Variable:
+		wsprintf(buffer, "Push Var %s", cur->u.symbol->name);
+		break;
+	    default:
+		strcpy(buffer, "Push xxx");
+		break;
+	    }
+	    break;
+	case Duplicate:
+	    strcpy(buffer, "Dup");
+	    break;
+	case PopStack:
+	    strcpy(buffer, "Pop");
+	    break;
+	case Break:
+	    strcpy(buffer, "Break");
+	    break;
+	case Return:
+	    switch (cur->oper) {
+	    case Self:
+	        strcpy(buffer, "Ret Self");
+		break;
+	    case True:
+	        strcpy(buffer, "Ret True");
+		break;
+	    case False:
+	        strcpy(buffer, "Ret False");
+		break;
+	    case Nil:
+	        strcpy(buffer, "Ret Nil");
+		break;
+	    case Temp:
+		wsprintf(buffer, "Ret Temp %s", cur->u.symbol->name);
+		break;
+	    case Stack:
+	        strcpy(buffer, "Ret TOS");
+		break;
+	    case Block:
+	        strcpy(buffer, "Ret Blk");
+		break;
+	    default:
+	        strcpy(buffer, "Ret xxx");
+		break;
+	    }
+	    break;
+	case SuperSend:
+	    wsprintf(buffer, "Send Sup %d %s", cur->argcount,
+		 dump_object_value(cur->u.literal->value));
+	    break;
+	case Send:
+	    wsprintf(buffer, "Send Lit %d %s", cur->argcount,
+		 dump_object_value(cur->u.literal->value));
+	    break;
+	case SendSpec:
+	    wsprintf(buffer, "Send Spc %d %d", cur->argcount, cur->u.operand);
+	    break;
+	case JTrue:
+	    wsprintf(buffer, "Jmp True %x", cur->u.jump);
+	    break;
+	case JFalse:
+	    wsprintf(buffer, "Jmp False %x", cur->u.jump);
+	    break;
+	case Jump:
+	    wsprintf(buffer, "Jump %x", cur->u.jump);
+	    break;
+	case BlockCopy:
+	    wsprintf(buffer, "BlkCpy %d %x", cur->argcount, cur->u.jump);
+	    break;
+	default:
+	    break;
+	}
+        wsprintf(line, "%x: %s", cur, buffer);
+        dump_string(line);
+    }
+}
+#endif
+
+
