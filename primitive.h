@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: primitive.h,v 1.2 2000/02/01 18:10:02 rich Exp rich $
+ * $Id: primitive.h,v 1.3 2000/02/02 00:33:47 rich Exp rich $
  *
  * $Log: primitive.h,v $
+ * Revision 1.3  2000/02/02 00:33:47  rich
+ * Moved assitent functions to smallobjs.c
+ *
  * Revision 1.2  2000/02/01 18:10:02  rich
  * Added code to display stack trace on error.
  * Added support for CompiledMethod class.
@@ -120,6 +123,7 @@
 #define primitiveFlushBuffer		102
 #define primitiveByteAt			103
 #define primitiveByteAtPut		104
+#define primitiveByteCodes		105
  
 
 int                 arrayAt(Objptr, int, Objptr *);
