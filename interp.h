@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.2 2000/02/01 18:09:53 rich Exp rich $
+ * $Id: interp.h,v 1.3 2000/02/23 00:14:39 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.3  2000/02/23 00:14:39  rich
+ * Moved Dump_stack here.
+ *
  * Revision 1.2  2000/02/01 18:09:53  rich
  * Added stack checking to push and pop.
  *
@@ -61,7 +64,7 @@ typedef struct _method_Cache {
 
 #define Push(obj) { if (stack_pointer == BLOCK_STACK)  {	  \
 			int tstack = stack_pointer;		  \
-			SendMethod(InterpStackFault, &tstack, 0); \
+			SendError(InterpStackFault, &tstack);     \
 			stack_pointer = tstack;			  \
 		    } else  					  \
 		        Set_object(current_context, --stack_pointer, obj); \
@@ -75,7 +78,7 @@ typedef struct _method_Cache {
 
 #define PopStack() { if (stack_pointer == stack_top) {	 	  \
 			int tstack = stack_pointer;		  \
-			SendMethod(InterpStackFault, &tstack, 0); \
+			SendError(InterpStackFault, &tstack);     \
 			stack_pointer = tstack;			  \
 		      } else  					  \
 			Set_object(current_context, stack_pointer++, NilPtr); \
@@ -124,3 +127,5 @@ void                addLinkLast(Objptr, Objptr);
 Objptr              wakeHighestPriority();
 void                resume(Objptr);
 void                wait(Objptr);
+void		    SendError(Objptr, int *);
+void		    flushCache(Objptr);
