@@ -1,9 +1,14 @@
 " Bootstrap methods to define classes"
 
-" $Id: basic.st,v 1.2 2000/02/01 18:09:44 rich Exp rich $ "
+" $Id: basic.st,v 1.3 2000/08/27 12:24:04 rich Exp rich $ "
         
 "
  $Log: basic.st,v $
+ Revision 1.3  2000/08/27 12:24:04  rich
+ Make sure objects respond to basicNew.
+ New Method to return number of bytecodes in a method.
+ Misc code cleanup.
+
  Revision 1.2  2000/02/01 18:09:44  rich
  Added Stack checking.
  Added CompiledMethod class.
@@ -143,6 +148,7 @@ basicNew: aNumber
 ! !
 
 ! Object methodsFor: 'Creation' !
+
 basicNew
 	^ self class basicNew
 !
@@ -189,6 +195,10 @@ nextInstance
 	"Return next instance of object, nil if no more"
 	<primitive 63>
 	^ nil
+!
+
+flushCache
+	<primitive 107>
 ! !
 
 ! Object methodsFor: 'Message Handling'!
@@ -324,11 +334,11 @@ temporaries
 !
 
 stacksize
-	^ (self header bitShift: -16) bitAnd: 16r7FF
+	^ (self header bitShift: -16) bitAnd: 16r3FF
 !
 
 flags
-	^ (self header bitShift: -27) bitAnd: 16rF
+	^ (self header bitShift: -26) bitAnd: 16rF
 !
 
 primitiveOf
@@ -670,6 +680,7 @@ bitShift: aNumber
     ^ super > aNumber
     
 !
+
 <= aNumber
     <primitive 15>
     ^ super <= aNumber
@@ -792,7 +803,7 @@ add: newObject
 
 remove: anObject 
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ nil ].
+	index <- self findIndexOrNil: anObject ifFull: [ nil ].
 	index notNil ifTrue: [ 
 		tally <- tally - 1.
 		self rehashAfterIndex: index
@@ -802,7 +813,8 @@ remove: anObject
 
 remove: anObject ifAbsent: aBlock
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ aBlock value ].
+	index <- self findIndexOrNil: anObject ifFull: [ nil ].
+	index isNil ifTrue: [ ^ aBlock value ].
 	tally <- tally - 1.
 	self rehashAfterIndex: index.
 	^ anObject
