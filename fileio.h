@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Id: fileio.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: fileio.h,v 1.2 2000/02/01 18:09:51 rich Exp rich $
  *
  * $Log: fileio.h,v $
+ * Revision 1.2  2000/02/01 18:09:51  rich
+ * Added fill_buffer and flush_buffer for stdin and stdout support.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -20,6 +23,7 @@ int                 read_buffer(Objptr op, int *c);
 int                 size_buffer(Objptr op);
 int                 write_buffer(Objptr op, int c);
 void		    close_files();
+void		    check_files();
 
 /* OS Wrapper functions */
 long                file_open(char *, char *, int *);
