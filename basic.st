@@ -1,9 +1,14 @@
 " Bootstrap methods to define classes"
 
-" $Id: basic.st,v 1.3 2000/08/27 12:24:04 rich Exp rich $ "
+" $Id: basic.st,v 1.4 2001/01/17 02:00:53 rich Exp rich $ "
         
 "
  $Log: basic.st,v $
+ Revision 1.4  2001/01/17 02:00:53  rich
+ Added flushCache
+ Changed location of flags field in header.
+ Fixed bug in remove: and remove:ifAbsent:
+
  Revision 1.3  2000/08/27 12:24:04  rich
  Make sure objects respond to basicNew.
  New Method to return number of bytecodes in a method.
@@ -233,7 +238,7 @@ preform: aSymbol withArguments: anArray
 	^ self primitiveFailed
 ! !
 
-!Object methodsFor: 'private'!
+! Object methodsFor: 'private'!
 
 species
     ^self class
@@ -752,7 +757,7 @@ hash
 	^ key hash + (value hash)
 ! !
 
-! Association methodsFor: 'printing'!
+! Association methodsFor: 'printing' !
 
 printOn: aStream
     key printOn: aStream.
@@ -760,7 +765,7 @@ printOn: aStream
     value printOn: aStream
 ! !
 
-! Association methodsFor: 'storing'!
+! Association methodsFor: 'storing' !
 
 storeOn: aStream
     aStream nextPutAll: '(Association key: '.
@@ -870,7 +875,7 @@ findIndexOrNil: anObject ifFull: aBlock
 	wrap <- false.
 	[ true ] whileTrue: [
 		key <- self basicAt: index.
-		(key isNil  or: [key = anObject ] ) ifTrue: [ ^ index ].
+		(key isNil or: [key = anObject ]) ifTrue: [ ^ index ].
  		index <- index + 1.
 		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
@@ -901,8 +906,7 @@ rehashAfterIndex: index
 	  count > 0 and: [ element notNil ] ]
 	    whileTrue:
 		[ self basicAt: i put: nil.
-		  self basicAt: (self findObjectIndex: element) put: element ].
-	^ self
+		  self basicAt: (self findObjectIndex: element) put: element ]
 !
 
 grow
@@ -924,8 +928,7 @@ at: key
 
 at: key ifAbsent: aBlock
 	| index temp |
-	index <- self findIndexOrNil: key ifFull: [ nil ].
-	index isNil ifTrue: [ ^ aBlock value ]. 
+	index <- self findIndexOrNil: key ifFull: [ ^ aBlock value ].
 	temp <- self basicAt: index.
 	temp isNil ifTrue: [ ^ aBlock value ].
 	^ temp value 
@@ -972,7 +975,7 @@ removeAssociation: anAssociation
 
 removeKey: aKey ifAbsent: aBlock
 	| index assoc |
-	index <- self findIndexOrNil: aKey ifAbsent: [ ^ aBlock value ].
+	index <- self findIndexOrNil: aKey ifFull: [ ^ aBlock value ].
 	assoc <- self basicAt: index.
 	tally <- tally - 1.
 	self basicAt: index put: nil.
@@ -1000,7 +1003,7 @@ findIndexOrNil: aKey ifFull: aBlock
 	wrap <- false.
 	[ true ] whileTrue: [
 		assoc <- self basicAt: index.
-		assoc isNil or: [assoc key = aKey ] ifTrue: [ ^ index ].
+		(assoc isNil or: [assoc key = aKey ]) ifTrue: [ ^ index ].
 		index <- index + 1.
 		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
@@ -1018,21 +1021,23 @@ findObjectIndex: aKey
 		].
 !
 
-rehashAfterIndex: index
+rehashAfterIndex: startIndex
 	"Adjust objects if after index"
-	| i size count element |
+	| index i size count element |
+	index <- startIndex.
 	i <- index.
 	size <- self basicSize.
 	count <- size.
-	self basicAt: index put: nil.
-	[ count <- count - 1.
-	  i <- 1 + (i \\ size).
-	  element <- self basicAt: i.
-	  count > 0 and: [ element notNil ] ]
-	    whileTrue:
-		[ self basicAt: i put: nil.
-		  self basicAt: (self findObjectIndex: element) put: element ].
-	^ self
+	[ count > 0 ] whileTrue: 
+		[ i <- i \\ size + 1.
+		  element <- self basicAt: i.
+		  element isNil ifTrue: [ ^ self ].
+		  (1 + (element key hash \\ (size - 1))) = index
+			ifTrue: [ self basicAt: index put: element.
+				  self basicAt: i put: nil.
+				  index <- i ].
+		  count <- count - 1
+	]
 !
 
 grow
@@ -1151,21 +1156,6 @@ name
 
 instVarNames
 	^ vars
-!
-
-allInstVarNames
-    | svars index index2 newarray |
-    svars <- superclass allInstVarNames.
-    newarray <- (vars size) + (svars size).
-    index <- 1.
-    [ index < (svars size) ] whileTrue:
-	[ newarray at: index put: (svars at: index).
-	  index <- index + 1. ].
-    index2 <- 1.
-    [ index2 < (vars size) ] whileTrue:
-	[ newarray at: index put: (vars at: index2).
-	  index <- index + 1. index2 <- index2 + 1. ].
-    ^ newarray
 !
 
 comment
@@ -1365,18 +1355,18 @@ metaclassFor: classNameString
 StringasArray: aString
     | len str index index1 index2 c offset array |
     len <- aString size.
-    len = 0 ifTrue: [ ^ Array new: 0.  ].
+    len = 0 ifTrue: [ ^ Array new: 0  ].
     index <- 1.
     index1 <- 1.
     offset <- 0.
     [ index <= len ] whileTrue: [
 	c <- aString at: index.
 	c = $  ifTrue: [
-	           index1 ~= index ifTrue: [ offset <- offset + 1. ].
+	           index1 ~= index ifTrue: [ offset <- offset + 1 ].
 		   index1 <- index + 1 ].
         index <- index + 1.
     ].
-    index1 ~= index ifTrue: [ offset <- offset + 1. ].
+    index1 ~= index ifTrue: [ offset <- offset + 1 ].
     array <- Array new: offset.
     offset = 0 ifTrue: [ ^ array ].
     offset <- 1.
@@ -1398,7 +1388,7 @@ StringasArray: aString
 			offset <- offset + 1
 		   ].
 		   index1 <- index + 1 ].
-                index <- index + 1.
+                index <- index + 1
     ].
     index1 <= len ifTrue: [
 	" Build a new string "
@@ -1523,98 +1513,6 @@ newMeta: newName
 	^ aClass
 ! !
 
-Object subclass: 'File' instanceVariableNames: 'name mode position'
-       classVariableNames: '' poolDictionaries: '' category: nil!
-
-!File class methodsFor: 'creation' !
-
-open: aName mode: aMode ifFail: aBlock
-	| file |
-	^ self open: aName mode: aMode ifFail: 
-		[ ^ self error: 'Failed to open ''', aName, '''' ]
-!
-
-open: aName mode: aMode ifFail: aBlock
-	| file |
-	file <- self new setName: aName mode: aMode.
-	file open ifFalse: [ ^ aBlock value ].
-	^ file
-!
-
-fromArray: aArray
-	| n m pos nFile |
-	n <- aArray at: 1.
-	m <- aArray at: 2.
-	pos <- aArray at: 3.
-	nFile <- self new setName: n mode: m.
-	nFile position: pos.
-	^ nFile
-! !
-
-!File methodsFor: 'basic' !
-
-setName: aName mode: aMode
-	name <- aName.
-	mode <- aMode.
-	position <- 0.
-!
-
-name
-	^name
-!
-
-mode
-	^ mode
-!
-
-position
-	^ position
-!
-
-position: anInteger
-	position <- anInteger
-!
-
-skip: anInteger
-	position <- position + anInteger
-!
-
-atEnd
-	^ position = (self size)
-! !
-
-!File methodsFor: 'control' !
-
-open
-	<primitive 80>
-	^ false
-!
-
-close
-	<primitive 81>
-
-! !
-
-!File methodsFor: 'accesss'!
-
-next
-	<primitive 84>
-	^ 0 asCharacter
-!
-
-read: anArray
-	<primitive 86>
-!
-
-nextPut: anInteger
-	<primitive 85>
-!
-
-write: anArray
-	<primitive 87>
-!
-
-size
-	<primitive 88>
-! !
+" Put a place holder in for later. "
+Smalltalk at: #sourceFiles put: nil !
 
