@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.5  2001/01/17 01:02:12  rich
+ * Changed location of flags in header.
+ * Fixed compile bug in generation of send super messages.
+ *
  * Revision 1.4  2000/08/27 01:17:50  rich
  * Don't pop tos before else part of conditional.
  *
@@ -26,26 +30,11 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.4 2000/08/27 01:17:50 rich Exp rich $";
+	"$Id: parse.c,v 1.5 2001/01/17 01:02:12 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <memory.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "lex.h"
