@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.5 2001/07/31 14:09:49 rich Exp rich $
+ * $Id: smallobjs.h,v 1.6 2001/08/18 16:17:02 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.6  2001/08/18 16:17:02  rich
+ * Added support for LargeInteger and graphics system.
+ *
  * Revision 1.5  2001/07/31 14:09:49  rich
  * Added Magnitude, Number and Integer classes.
  *
@@ -230,6 +233,7 @@
 #define FORM_HEIGHT		1		/* DisplayObject */
 #define FORM_OFFSET		2		/* DisplayObject */
 #define FORM_BITMAP		3		/* Form */
+#define FORM_MASK		4		/* OpaqueForm */
 
 /* Event types */
 #define	EVENT_TIMER		0		/* Sent to tick_semaphore */
