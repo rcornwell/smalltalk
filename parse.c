@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.4  2000/08/27 01:17:50  rich
+ * Don't pop tos before else part of conditional.
+ *
  * Revision 1.3  2000/03/04 22:28:13  rich
  * Removed extra includes.
  * Converted local references to static.
@@ -23,7 +26,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.3 2000/03/04 22:28:13 rich Exp rich $";
+	"$Id: parse.c,v 1.4 2000/08/27 01:17:50 rich Exp rich $";
 
 #endif
 
@@ -217,7 +220,7 @@ CompileForClass(char *text, Objptr class, Objptr aCatagory, int pos)
         header = (METH_NUMLITS & (litsize << 1)) +
 			(METH_NUMTEMPS & (nstate->tempcount << 9)) +
 			(METH_STACKSIZE & (cstate->maxstack << 17)) +
-			(METH_FLAG & (numargs << 28));
+			(METH_FLAG & (numargs << 27));
 	eheader = 0;
     }
     size = ((cstate->code->len) + (sizeof(Objptr) - 1)) / sizeof(Objptr); 
@@ -256,6 +259,7 @@ CompileForExecute(char *text)
 
     noreclaim = TRUE;
     initcompile();
+    for_class(nstate, ObjectClass);
     tstate = new_tokscanner(text);
     (void) get_token(tstate);
     doTemps();
@@ -278,7 +282,7 @@ CompileForExecute(char *text)
         header = (METH_NUMLITS & (litsize << 1)) +
 			(METH_NUMTEMPS & (nstate->tempcount << 9)) +
 			(METH_STACKSIZE & (cstate->maxstack << 17)) +
-			(METH_FLAG & (0 << 28));
+			(METH_FLAG & (0 << 27));
 	eheader = 0;
     }
     size = ((cstate->code->len) + (sizeof(Objptr) - 1)) / sizeof(Objptr);
@@ -643,7 +647,7 @@ doBinaryContinue(int superFlag)
 	lit = add_literal(nstate, internString(get_token_spec(tstate)));
 	(void) get_token(tstate);
 	sTerm = doTerm();
-	superFlag = doUnaryContinue(sTerm);
+	sTerm = doUnaryContinue(sTerm);
         genSend(cstate, lit, 1, superFlag);
     }
     return superFlag;
