@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Global Definitions.
  *
- * $Id: smalltalk.h,v 1.3 2001/07/31 14:09:49 rich Exp rich $
+ * $Id: smalltalk.h,v 1.4 2001/08/29 20:16:35 rich Exp rich $
  *
  * $Log: smalltalk.h,v $
+ * Revision 1.4  2001/08/29 20:16:35  rich
+ * Added support for X.
+ *
  * Revision 1.3  2001/07/31 14:09:49  rich
  * Fixed to compile under new cygwin.
  *
@@ -35,6 +38,7 @@
 #define SMALLTALK	1
 #define SMALLIMAGE	2
 #define SMALLFILE	3
+#define SMALLCHANGE	4
 
 /* System stuff */
 #include <stddef.h>
