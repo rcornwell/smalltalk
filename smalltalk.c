@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main routine.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.4  2000/08/27 00:59:21  rich
+ * Changed default grow size to 512k.
+ *
  * Revision 1.3  2000/02/02 16:07:38  rich
  * Don't need to include primitive.h
  *
@@ -16,17 +19,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smalltalk.c,v 1.3 2000/02/02 16:07:38 rich Exp rich $";
-#endif
-
-#ifdef _WIN32
-
-#include <stddef.h>
-#include <windows.h>
-#endif
-
-#ifdef unix
-#include <stdio.h>
+	"$Id: smalltalk.c,v 1.4 2000/08/27 00:59:21 rich Exp rich $";
 #endif
 
 #include "smalltalk.h"
@@ -42,7 +35,7 @@ int                 defotsize = 512;
 
 static int          getnum(char *, int *);
 
-#ifdef _WIN32
+#ifdef WIN32
 static void         CreateWindows(HINSTANCE, HWND, LPARAM);
 static void         DoWinCommand(HINSTANCE, HWND, WPARAM);
 static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -291,8 +284,7 @@ parseCmd(char *cmdstr)
 
 }
 
-#endif
-#ifdef unix
+#else
 
 int
 main(int argc, char *argv[])
