@@ -1,9 +1,16 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: stream.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: stream.st,v 1.2 2000/02/01 18:10:04 rich Exp rich $ "
 
 "
  $Log: stream.st,v $
+ Revision 1.2  2000/02/01 18:10:04  rich
+ Fixed some compile errors.
+ Added chunk read/write code.
+ Added CharStream class.
+ Use primitives for Next, NextPut, and atEnd.
+ Fixed errors.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -422,9 +429,12 @@ stream: aInteger
 
 initialize
     " Define built in streams "
-       Smalltalk at: #stdin put: (CharStream on: 0).
-       Smalltalk at: #stdout put: (CharStream on: 1).
-       Smalltalk at: #stderr put: (CharStream on: 2; setUnbuffered).
+       Smalltalk at: #stdin ifAbsent: 
+		[ Smalltalk at: #stdin put: (CharStream on: 0)].
+       Smalltalk at: #stdout ifAbsent: 
+       		[ Smalltalk at: #stdout put: (CharStream on: 1)].
+       Smalltalk at: #stderr ifAbsent: 
+       		[ Smalltalk at: #stderr put: (CharStream on: 2; setUnbuffered)].
 ! !
 
 CharStream initialize !
@@ -479,35 +489,28 @@ close
 
 next
     | ch |
-    buffer isNil ifTrue: [
-	 file position: position.
-	 file atEnd ifTrue: [ ^ 0 asCharacter ].
-	 position <- position + 1.
-	 ^ file next.  ]
-     ifFalse: [ ch <- buffer. position <- position + 1. buffer <- nil. ^ ch ]
+    buffer isNil ifTrue: [ ^ file next ]
+                ifFalse: [ ch <- buffer. buffer <- nil. ^ ch ]
 !
 
 nextPut: aChar
-    file position: position.
     file nextPut: aChar.
-    position <- position + 1.
 !
 
 peek
-    buffer
-        isNil ifTrue: [ buffer <- self next. position <- position - 1 ].
+    buffer isNil ifTrue: [ buffer <- file next ].
     ^buffer
 !
 
 position: aInteger
     buffer <- nil.
-    position <- aInteger.
+    file position: aInteger.
     ^ aInteger
 ! 
 
 position
-    buffer isNil ifTrue: [ ^position ]
-	         ifFalse: [ ^position - 1]
+    ^ buffer isNil ifTrue: [ file position ]
+	          ifFalse: [ file position - 1]
 !
 
 contents
@@ -532,8 +535,8 @@ setToEnd
 
 skip: anInteger
     | pos |
-    pos <- ((self position + anInteger) max: 0) min: self size - 1.
-    self position: pos
+    pos <- ((file position + anInteger) max: 0) min: self size - 1.
+    file position: pos
 !
 
 reverseContents
@@ -572,9 +575,16 @@ nextChunk
     chunk <- WriteStream on: (String new: 0).
     [ self atEnd ] whileFalse: [
 	char <- self next.
-	char == $!! and: [ self next ~= $!! ] ifTrue: [ ^ chunk contents ].
+	char == $!! and: [ (self peekFor: $!!) not ] ifTrue: [ 
+		char <- self next.	" Grab next character "
+    		" Eat all newline and carage returns before chunk "
+		[ (Character nl == char) or: [ Character cr == char ] ]
+		     whileTrue:
+			 [ self next. char <- self peek ].
+	        ^ chunk contents ].
 	chunk nextPut: char.
     ].
+    ^ chunk contents
 ! !
 
 !Stream methodsFor: 'writing chunks' !
