@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.5  2001/01/17 01:42:25  rich
+ * ReclaimSpace before dumping an image.
+ * Added primitives to call flushCache.
+ *
  * Revision 1.4  2000/08/20 00:19:49  rich
  * Added primitive to return number of bytecodes in method.
  *
@@ -24,27 +28,12 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.4 2000/08/20 00:19:49 rich Exp rich $";
+	"$Id: primitive.c,v 1.5 2001/01/17 01:42:25 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
+#include "smalltalk.h"
 #include <math.h>
-#include <memory.h>
-#include <malloc.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
 #include "image.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -682,8 +671,8 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	args--;
 	object_incr_ref(argument);
 	for (temp = args; temp > 0; temp--) {
-	   Set_object(current_context, stack_pointer + temp + 1,
-		get_pointer(current_context, stack_pointer + temp));
+	   Set_object(current_context, stack_pointer + temp,
+		get_pointer(current_context, stack_pointer + temp - 1));
 	}
 	PopStack();		/* Pop Last argument */
 	*tstack = stack_pointer;	/* Do the call */
