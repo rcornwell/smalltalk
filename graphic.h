@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Interface to graphics system
  *
- * $Id: $
+ * $Id: graphic.h,v 1.1 2001/08/18 16:20:57 rich Exp rich $
  *
- * $Log: $
+ * $Log: graphic.h,v $
+ * Revision 1.1  2001/08/18 16:20:57  rich
+ * Initial revision
+ *
  *
  */
 
@@ -47,7 +50,7 @@ extern event_queue  input_queue;
 int                 copybits(Objptr);
 
 /* Primitive to scan a character array and display it.  */
-Objptr              character_scanword(Objptr, Objptr);
+int                 character_scanword(Objptr, Objptr, Objptr *);
 
 /* Line drawing primitive.  */
 int                 drawLoop(Objptr, int, int);
