@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.4  2000/08/20 00:19:49  rich
+ * Added primitive to return number of bytecodes in method.
+ *
  * Revision 1.3  2000/03/02 00:30:52  rich
  * Moved functions to manipulate smalltalk system to smallobjs.c
  * Localize stack_pointer in primitive(), improved preformace.
@@ -21,7 +24,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.3 2000/03/02 00:30:52 rich Exp rich $";
+	"$Id: primitive.c,v 1.4 2000/08/20 00:19:49 rich Exp rich $";
 
 #endif
 
@@ -81,7 +84,7 @@ static char        *rcsid =
 
 #define IsFloat(x)	(class_of((x)) == FloatClass)
 #define floatValue(x)	(*((double *)get_object_base((x))))
-#define newFloat(x)	res = create_new_object(FloatClass, 0); \
+#define newFloat(x)	res = create_new_object(FloatClass, sizeof(double)); \
 			*((double *)get_object_base(res))=(x);
 
 
@@ -760,6 +763,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    break;
 
        /* Do Snapshot, if we fail, let primitive fail handle problem */
+	reclaimSpace();
 	if (save_image(str, NULL)) 
 	    ReturnBoolean(TRUE); /* Now return a TRUE to running system */
         free(str);
@@ -934,6 +938,14 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    set_byte(reciever, index + temp, iarg);
 	    success = TRUE;
 	}
+	break;
+    case primitiveFlushCacheSelect:
+	flushCache(reciever);
+	success = TRUE;
+	break;
+    case primitiveFlushCache:
+	flushCache(NilPtr);
+	success = TRUE;
 	break;
     default:
     }
