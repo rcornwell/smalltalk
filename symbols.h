@@ -1,15 +1,18 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: $
+ * $Id: symbols.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: symbols.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */  
 
 enum oper_type {
     Arg, Inst, Literal, Temp, Variable, Self, True, False, Nil, Stack, Super,
-		 Label, Block
+	 Label, Block, Operand
 };
 
 
