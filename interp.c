@@ -2,13 +2,16 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Log: $
+ * $Log: interp.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-"$Id: $";
+"$Id: interp.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -22,11 +25,6 @@ static char        *rcsid =
 #include "primitive.h"
 #include "dump.h"
 #include "fileio.h"
-
-#if 0
-#define	trace_inst(a, b, c, d, f, g)
-#define dump_send(reciever, selector, newMethod)
-#endif
 
 method_Cache        methodCache[1024];
 int                 newProcessWaiting = 0;
@@ -137,7 +135,7 @@ return_Object(Objptr value, Objptr caller)
 
    /* Remove arguments, if original sender was a methodContext */
     if (get_integer(prev, BLOCK_IIP) == 0)
-	for (args = get_integer(prev, BLOCK_ARGCNT) + 1; args > 0; args--)
+	for (args = get_integer(prev, BLOCK_ARGCNT); args >= 0; args--)
 	    Set_object(caller, sstack++, NilPtr);
 
    /* Push return value */
@@ -179,8 +177,10 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
     } else {
 	newMethod = lookupMethodInClass(newClass, selector, stack_pointer,
 					&args);
-	if (newMethod == NilPtr)
+	if (newMethod == NilPtr) {
+	    running = 0;
 	    return;
+	}
 	methodCache[hash].select = selector;
 	methodCache[hash].class = newClass;
 	methodCache[hash].method = newMethod;
@@ -189,7 +189,7 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
 
    /* Grab header information */
     reciever = get_pointer(current_context, *stack_pointer + args);
-    dump_send(reciever, selector, newMethod);
+    trace_send(reciever, selector, newMethod);
     newHeader = methodCache[hash].header;
     literals = LiteralsOf(newHeader);
     temps = TempsOf(newHeader);
@@ -199,6 +199,7 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
     case METH_RETURN:
 	value = get_pointer(reciever, temps);
 	Set_object(current_context, *stack_pointer, value);
+	trace_getinst(reciever, temps, value);
 	return;
     case METH_SETINST:
 	value = get_pointer(current_context, *stack_pointer);
@@ -206,13 +207,17 @@ SendToClass(Objptr selector, int *stack_pointer, int args, Objptr newClass)
 	Set_object(current_context, (*stack_pointer)++, NilPtr);
        /* Return is value */
 	Set_object(current_context, *stack_pointer, value);
+	trace_setinst(reciever, temps, value);
 	return;
     case METH_EXTEND:
 	value = get_pointer(newMethod, literals + METH_HEADER);
 	value = PrimitiveOf(value);
 	if (value > 0 &&
-	    primitive(value, reciever, newClass, args, stack_pointer))
+	    primitive(value, reciever, newClass, args, stack_pointer)) {
+	    trace_primitive(TRUE, value);
 	    return;
+	}
+	trace_primitive(FALSE, value);
 	break;
     default:
 	break;
@@ -244,11 +249,12 @@ interp()
     Objptr              old_context = NilPtr;
     int                 instruct_pointer = 0;
     int                 stack_pointer = 0;
+    int			stack_top = 0;		/* Top of stack */
     int                 reciever = 0;
     int                 opcode;
     int                 oprand;
     int                 argc;
-    int                 tstack;
+    int                 tstack;			/* Place to save stack */
     Objptr              value, temp;
     Objptr              caller = NilPtr;
     Objptr              sender = NilPtr;
@@ -287,6 +293,7 @@ interp()
 	    methodPointer = get_object_base(meth);
 	    stack_pointer = GetInteger(BLOCK_SP);
 	    instruct_pointer = GetInteger(BLOCK_IP);
+	    stack_top = size_of(current_context) / sizeof(Objptr);
 	    newContextFlag = 0;
 	}
 	opcode = methodPointer[instruct_pointer++];
@@ -312,6 +319,7 @@ interp()
 	   /* Build block */
 	    temp = create_new_object(BlockContextClass,
 				     length_of(current_context));
+	    methodPointer = get_object_base(meth);
 	    Set_integer(temp, BLOCK_IP, 0);
 	    Set_integer(temp, BLOCK_SP, size_of(temp) / sizeof(Objptr));
 	    Set_object(temp, BLOCK_HOME, home);
@@ -354,7 +362,7 @@ interp()
 	   /* Arguments are in reverse order on stack */
 	    trace_inst(meth, instruct_pointer, PSHARG, oprand,
 		 get_pointer(sender, (get_integer(sender, BLOCK_SP) - 1) +
-		 (get_integer(home, BLOCK_ARGCNT) - oprand)), 0);
+		 (get_integer(home, BLOCK_ARGCNT) - oprand)), stack_pointer);
 	    Push(get_pointer(sender,
 			     (get_integer(sender, BLOCK_SP) - 1) +
 			     (get_integer(home, BLOCK_ARGCNT) - oprand)));
@@ -379,7 +387,7 @@ interp()
 	case PSHLIT + 0xe:
 	case PSHLIT + 0xf:
 	    trace_inst(meth, instruct_pointer, PSHLIT, oprand, Literal(oprand),
-			 0);
+			 stack_pointer);
 	    Push(Literal(oprand));
 	    break;
 
@@ -402,7 +410,7 @@ interp()
 	case PSHINST + 0xe:
 	case PSHINST + 0xf:
 	    trace_inst(meth, instruct_pointer, PSHINST, oprand,
-			 get_pointer(reciever, oprand), 0);
+			 get_pointer(reciever, oprand), stack_pointer);
 	    Push(get_pointer(reciever, oprand));
 	    break;
 
@@ -425,7 +433,7 @@ interp()
 	case PSHTMP + 0xe:
 	case PSHTMP + 0xf:
 	    trace_inst(meth, instruct_pointer, PSHTMP, oprand,
-		       get_pointer(home, oprand + BLOCK_STACK), 0);
+		       get_pointer(home, oprand + BLOCK_STACK), stack_pointer);
 	    Push(get_pointer(home, oprand + BLOCK_STACK));
 	    break;
 
@@ -596,7 +604,11 @@ interp()
 	    tstack = stack_pointer;
 	    trace_inst(meth, instruct_pointer, SNDSUP, oprand, Literal(oprand),
 		 argc);
-	    SendToClass(Literal(oprand), &tstack, argc, temp);
+	    if ((stack_pointer + argc) >= stack_top)  
+		SendMethod(InterpStackFault, &tstack, 0);
+	    else
+	        SendToClass(Literal(oprand), &tstack, argc, temp);
+	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
 	    break;
 
@@ -622,7 +634,11 @@ interp()
 	    trace_inst(meth, instruct_pointer, SNDLIT, oprand, Literal(oprand), 
 			argc);
 	    tstack = stack_pointer;
-	    SendMethod(Literal(oprand), &tstack, argc);
+	    if ((stack_pointer + argc) >= stack_top)  
+		SendMethod(InterpStackFault, &tstack, 0);
+	    else
+	        SendMethod(Literal(oprand), &tstack, argc);
+	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
 	    break;
 
@@ -663,7 +679,11 @@ interp()
 	    trace_inst(meth, instruct_pointer, opcode, oprand,
 		       get_pointer(SpecialSelectors, oprand), argc);
 	    tstack = stack_pointer;
-	    SendMethod(get_pointer(SpecialSelectors, oprand), &tstack, argc);
+	    if ((stack_pointer + argc) >= stack_top)  
+		SendMethod(InterpStackFault, &tstack, 0);
+	    else
+	       SendMethod(get_pointer(SpecialSelectors, oprand), &tstack, argc);
+	    methodPointer = get_object_base(meth);
 	    stack_pointer = tstack;
 	    break;
 
@@ -773,7 +793,7 @@ interp()
 	    break;
 
 	case DUPTOS:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, TopStack(), 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, TopStack(), stack_pointer);
 	    Push(TopStack());
 	    break;
 
@@ -785,7 +805,7 @@ interp()
 	case PSHVAR:
 	    oprand = methodPointer[instruct_pointer++];
 	    temp = Literal(oprand);
-	    trace_inst(meth, instruct_pointer, opcode, oprand, get_pointer(temp, ASSOC_VALUE), 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, get_pointer(temp, ASSOC_VALUE), stack_pointer);
 	    Push(get_pointer(temp, ASSOC_VALUE));
 	    break;
 
@@ -798,32 +818,32 @@ interp()
 	    break;
 
 	case PSHSELF:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, reciever, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, reciever, stack_pointer);
 	    Push(reciever);
 	    break;
 
 	case PSHNIL:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
 	    Push(NilPtr);
 	    break;
 
 	case PSHTRUE:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
 	    Push(TruePointer);
 	    break;
 
 	case PSHFALS:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
 	    Push(FalsePointer);
 	    break;
 
 	case PSHONE:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
 	    Push(as_integer_object(1));
 	    break;
 
 	case PSHZERO:
-	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, 0);
+	    trace_inst(meth, instruct_pointer, opcode, oprand, NilPtr, stack_pointer);
 	    Push(as_integer_object(0));
 	    break;
 
