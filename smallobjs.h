@@ -2,9 +2,13 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: smallobjs.h,v 1.2 2000/02/01 18:10:03 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.2  2000/02/01 18:10:03  rich
+ * Added stack checking.
+ * Added method categories dictionary to Class.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -184,4 +188,18 @@
 #define FILEPOS			2
 
 
+Objptr              MakeString(char *);
+char               *Cstring(Objptr);
+Objptr              internString(char *);
+void                AddSelectorToIDictionary(Objptr, Objptr, Objptr);
+Objptr              FindSelectorInIDictionary(Objptr, Objptr);
+Objptr              FindKeyInIDictionary(Objptr, Objptr);
+Objptr              new_IDictionary();
+void                AddSelectorToDictionary(Objptr, Objptr);
+Objptr              FindSelectorInDictionary(Objptr, Objptr);
+Objptr              create_association(Objptr, Objptr);
+Objptr              new_Dictionary();
+void                AddSelectorToSet(Objptr, Objptr);
+Objptr              FindSelectorInSet(Objptr, Objptr);
+Objptr              new_Set();
 
