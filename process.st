@@ -1,9 +1,13 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.3 2001/01/07 16:49:24 rich Exp rich $ "
+" $Id: process.st,v 1.4 2001/07/31 14:09:48 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.4  2001/07/31 14:09:48  rich
+ Code cleanup
+ Added methods for backtracing.
+
  Revision 1.3  2001/01/07 16:49:24  rich
  Code cleanup.
 
@@ -206,16 +210,24 @@ signal: aSemaphore atMilliseconds: millis
     ^self primitiveFailed
 ! !
 
+! ProcessorScheduler methodsFor: 'creating'!
+
+initialize: aProcess
+	processLists <- Array new: 10.
+	activeProcess <- aProcess
+! !
+
 ! ProcessorScheduler class methodsFor: 'initialization'!
 
 initialize
     | newsched |
     " Create correct process scheduler object"
-    newsched <- ProcessorScheduler basicNew.
+    newsched <- ProcessorScheduler basicNew initialize: 
+    			(Process on: thisContext at: 4).
     (Smalltalk at: #Processor) become: newsched.
 ! !
 
-"ProcessorScheduler initialize "!
+ProcessorScheduler initialize !
 
 Object subclass: 'Delay'
        instanceVariableNames: 'resumptionTime isRelative'
@@ -539,12 +551,16 @@ parentContext
 !
 
 backtraceString
-    | aString |
-    aString <- '#', receiver class printString.
+    | aString methClass aSelector |
+    aString <- '#', receiver class name.
+    aSelector <- self selector.
+    methClass <- receiver class whichClassIncludesSelector: aSelector.
+    (methClass notNil and: [ receiver class ~= methClass]) ifTrue: [
+	aString <- aString,  '(', (methClass name), ')' ].
     aString <- aString, '>>'.
-    (self selector isKindOf: Symbol)
+    (aSelector isKindOf: Symbol)
         ifTrue: [ aString <- aString, '#' ].
-    aString <- aString, self selector printString.
+    aString <- aString, aSelector printString.
     ^aString
 !
 
@@ -565,7 +581,14 @@ method
 !
 
 selector
-    ^ ''
+    | class meth |
+    class <- receiver class.
+    [ class isNil ] whileFalse: [
+	class selectors do: [ :key |
+	    (class compiledMethodAt: key) == method ifTrue: [ ^ key ].].
+	class <- class superclass
+    ].
+    ^ #UnknownSelector
 !
 
 receiver
