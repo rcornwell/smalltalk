@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: symbols.c,v $
+ * Revision 1.3  2000/02/02 16:12:24  rich
+ * Don't need to include primitive or interper anymore.
+ *
  * Revision 1.2  2000/02/01 18:10:05  rich
  * Class instance variables now stored in a Array.
  * Fixed some errors in Literal table generation.
@@ -14,7 +17,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: symbols.c,v 1.2 2000/02/01 18:10:05 rich Exp rich $";
+	"$Id: symbols.c,v 1.3 2000/02/02 16:12:24 rich Exp rich $";
 
 #endif
 
@@ -256,9 +259,14 @@ find_symbol(Namenode nstate, char *name)
 
     /* Look for name in class dictionary */
     if (nstate->classptr != NilPtr) {
-	var = get_pointer(nstate->classptr, CLASS_DICT);
-	if (var != NilPtr)
-	    var = FindSelectorInDictionary(var, sym);
+	Objptr		class = nstate->classptr;
+	for(class = nstate->classptr;
+	   var == NilPtr && class != NilPtr; 
+	   class = get_pointer(class, SUPERCLASS)) {
+	     var = get_pointer(class, CLASS_DICT);
+	     if (var != NilPtr)
+	         var = FindSelectorInDictionary(var, sym);
+	}
     }
 
     /* If not found try Smalltalk dictionary */
