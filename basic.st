@@ -1,9 +1,18 @@
 " Bootstrap methods to define classes"
 
-" $Id: basic.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: basic.st,v 1.2 2000/02/01 18:09:44 rich Exp rich $ "
         
 "
  $Log: basic.st,v $
+ Revision 1.2  2000/02/01 18:09:44  rich
+ Added Stack checking.
+ Added CompiledMethod class.
+ Instance variables now stored in a Array.
+ Support for class variables.
+ Fixed bug in instance flags reading methods.
+ Fixed bug in dictionary, set access.
+ Fixes to File class.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -131,6 +140,15 @@ basicNew
 basicNew: aNumber
 	<primitive 56>
 	^ self primitiveFailed
+! !
+
+! Object methodsFor: 'Creation' !
+basicNew
+	^ self class basicNew
+!
+
+basicNew: aNumber
+	^ self class basicNew: aNumber
 ! !
 
 ! SmallInteger methodsFor: 'System Primitive'!
@@ -315,7 +333,7 @@ flags
 
 primitiveOf
 	self flags = 16rF
-	     ifTrue: [ ^ (self objectAt: (self literals)) bitAnd: 16r1FF ]
+	     ifTrue: [ ^ (self objectAt: (self literals + 1)) bitAnd: 16r1FF ]
 	     ifFalse: [ ^ 0 ]
 !
 	
@@ -324,14 +342,20 @@ argcount
 	temp <- self flags.
 	temp < 16rD ifTrue: [ ^ temp ].
 	temp = 16rF 
-	     ifTrue: [ ^ ((self objectAt: (self literals)) 
-			bitShift: -15) bitAnd: 16rFF ].
+	     ifTrue: [ ^ ((self objectAt: (self literals + 1)) 
+			bitShift: -16) bitAnd: 16rFF ].
 	temp = 16rE ifTrue: [ ^ 1 ].
 	^ 0
 !
 
 description
 	^ description
+!
+
+" Returns number of bytecodes in method "
+bytecodes
+	<primitive 105>
+	^ self primitiveFailed
 ! !
 
 ! CompiledMethod methodsFor: 'Modifying' !
@@ -466,15 +490,6 @@ ifTrue: trueBlock
 
 ifFalse: falseBlock
 	^ falseBlock value
-! !
-
-! Object methodsFor: 'private'!
-
-classNameString
-	| name |
-	name <- self class name.
-	name isNil ifTrue: [ name <- self name , ' class' ].
-	^ name
 ! !
 
 ! Object methodsFor: 'Copying' !
@@ -729,9 +744,9 @@ hash
 ! Association methodsFor: 'printing'!
 
 printOn: aStream
-    self key printOn: aStream.
+    key printOn: aStream.
     aStream nextPutAll: '->'.
-    self value printOn: aStream
+    value printOn: aStream
 ! !
 
 ! Association methodsFor: 'storing'!
@@ -1123,7 +1138,6 @@ name
 !
 
 instVarNames
-        vars isNil ifTrue: [ ^ vars <- Array new: 0. ].
 	^ vars
 !
 
@@ -1347,9 +1361,8 @@ StringasArray: aString
 	c <- aString at: index.
 	c = $  ifTrue: [
 	           index1 ~= index ifTrue: [ offset <- offset + 1. ].
-		   index <- index + 1.
-                   index1 <- index ]
-               ifFalse: [ index <- index + 1]
+		   index1 <- index + 1 ].
+        index <- index + 1.
     ].
     index1 ~= index ifTrue: [ offset <- offset + 1. ].
     array <- Array new: offset.
@@ -1372,9 +1385,8 @@ StringasArray: aString
 			array at: offset put: str.
 			offset <- offset + 1
 		   ].
-		   index <- index + 1.
-                   index1 <- index ]
-               ifFalse: [ index <- index + 1]
+		   index1 <- index + 1 ].
+                index <- index + 1.
     ].
     index1 <= len ifTrue: [
 	" Build a new string "
@@ -1551,6 +1563,10 @@ position: anInteger
 	position <- anInteger
 !
 
+skip: anInteger
+	position <- position + anInteger
+!
+
 atEnd
 	^ position = (self size)
 ! !
@@ -1571,6 +1587,7 @@ close
 
 next
 	<primitive 84>
+	^ 0 asCharacter
 !
 
 read: anArray
