@@ -1,9 +1,14 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.7 2001/08/29 20:16:35 rich Exp rich $ "
+" $Id: process.st,v 1.8 2002/01/16 19:11:51 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.8  2002/01/16 19:11:51  rich
+ Added willBlock method to Semaphore class.
+ Fixed priority returns for ProcessScheduler.
+ Added isEmpty method to SharedQueue.
+
  Revision 1.7  2001/08/29 20:16:35  rich
  Added class definitions.
 
@@ -192,8 +197,8 @@ parentContext
 !
 
 backtraceString
-    ^'#[] in ', home methodClass printString,
-                     '>>#', home selector printString
+    ^'[] in ', home methodClass printString,
+                     '>>', home selector printString
 !
 
 caller
@@ -323,7 +328,7 @@ parentContext
 
 backtraceString
     | aString methClass aSelector |
-    aString <- '#', receiver class name.
+    aString <- receiver class name.
     aSelector <- self selector.
     methClass <- receiver class whichClassIncludesSelector: aSelector.
     (methClass notNil and: [ receiver class ~= methClass]) ifTrue: [
@@ -332,6 +337,16 @@ backtraceString
     (aSelector isKindOf: Symbol)
         ifTrue: [ aString <- aString, '#' ].
     aString <- aString, aSelector printString.
+    ^aString
+!
+
+methodClass
+    | aString methClass aSelector |
+    aString <- receiver class name.
+    aSelector <- self selector.
+    methClass <- receiver class whichClassIncludesSelector: aSelector.
+    (methClass notNil and: [ receiver class ~= methClass]) ifTrue: [
+	aString <- aString,  '(', (methClass name), ')' ].
     ^aString
 !
 
@@ -520,6 +535,13 @@ init
     queueSem <- Semaphore forMutualExclusion
 ! !
 
+! SharedQueue methodsFor: 'printing' !
+
+printOn: aStream
+	aStream nextPutAll: 'SharedQueue: '.
+	queueSem critical: [ queue printOn: aStream ].
+	aStream nl.
+! !
 
 Link subclass: 'DelayNode'
        instanceVariableNames: 'timeleft sema'
@@ -709,5 +731,4 @@ internalResumptionTime
 ! !
 
 Delay initialize !
-
 
