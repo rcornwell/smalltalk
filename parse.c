@@ -2,6 +2,14 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.2  2000/02/01 18:09:59  rich
+ * Added code to detect get and set of instance variable short methods.
+ * Added errors for failing to add symbols.
+ * Redid doBody to generate correct code.
+ * Functions now propogate error status to caller.
+ * Fixed jump targets.
+ * Added support for method categories.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +18,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: parse.c,v 1.2 2000/02/01 18:09:59 rich Exp rich $";
 
 #endif
 
@@ -32,13 +40,11 @@ static char        *rcsid =
 
 #include "object.h"
 #include "smallobjs.h"
-#include "primitive.h"
-#include "interp.h"
-#include "fileio.h"
 #include "lex.h"
 #include "symbols.h"
 #include "code.h"
 #include "parse.h"
+#include "fileio.h"
 #include "dump.h"
 
 Token		    tstate;
@@ -49,11 +55,33 @@ char               *sel = NULL;
 int                 inBlock;
 int                 optimBlk;
 
+static void         initcompile();
+static void         messagePattern();
+static void         keyMessage();
+static void         doTemps();
+static int	    isVarSep();
+static void         doBody();
+static void         doExpression();
+static int          doTerm();
+static int          parsePrimitive();
+static int          nameTerm(Symbolnode);
+static void         doContinue(int);
+static int          keyContinue(int);
+static int          doBinaryContinue(int);
+static int          doUnaryContinue(int);
+static int          doBlock();
+static int          optimBlock();
+static int          doIfTrue();
+static int          doIfFalse();
+static int          doWhileTrue();
+static int          doWhileFalse();
+static int          doAnd();
+static int          doOr();
 
 /*
  * Initialize the compiler for a new compile.
  */
-void
+static void
 initcompile()
 {
     nstate = newname();
@@ -131,7 +159,7 @@ CompileForClass(char *text, Objptr class, Objptr aCatagory, int pos)
     (void) get_token(tstate);
     messagePattern();
     doTemps();
-    if (parseBinary() == -1) {
+    if (parsePrimitive() == -1) {
         done_scan(tstate);
 	return FALSE;
     }
@@ -271,7 +299,7 @@ CompileForExecute(char *text)
 /*
  * Parse the message pattern.
  */
-void
+static void
 messagePattern()
 {
     int                 tok;
@@ -305,7 +333,7 @@ messagePattern()
 /*
  * Parse a keywork selector pattern.
  */
-void
+static void
 keyMessage()
 {
     int                 tok;
@@ -332,7 +360,7 @@ keyMessage()
 /*
  * Parse temporaries.
  */
-void
+static void
 doTemps()
 {
     int                 tok;
@@ -357,7 +385,7 @@ doTemps()
 /*
  * Determine if next token is a variable seperator.
  */
-int
+static int
 isVarSep()
 {
     char	*str;
@@ -374,7 +402,7 @@ isVarSep()
 /*
  * Parse body of definition.
  */
-void
+static void
 doBody()
 {
     int                 tok;
@@ -411,6 +439,8 @@ doBody()
 	} else if (tok == KeyRBrack) {
 	    if (inBlock && !optimBlk)
 	       genDupTOS(cstate); 
+	    if (!inBlock)
+	    	parseError(tstate, "Extra ]", NULL);
 	    return;
 	} else {
 	    parseError(tstate, "Invalid statement ending", NULL);
@@ -423,7 +453,7 @@ doBody()
 /*
  * Parse Expression.
  */
-void
+static void
 doExpression()
 {
     int                 superFlag = FALSE;
@@ -458,7 +488,7 @@ doExpression()
 /*
  * Parse a term.
  */
-int
+static int
 doTerm()
 {
     int                 tok = get_cur_token(tstate);
@@ -490,10 +520,10 @@ doTerm()
 }
 
 /*
- * Parse a binary special character.
+ * Parse a primitive description.
  */
-int
-parseBinary()
+static int
+parsePrimitive()
 {
     int                 tok;
 
@@ -519,7 +549,7 @@ parseBinary()
 /*
  * Parse a name terminal.
  */
-int
+static int
 nameTerm(Symbolnode sym)
 {
     if (sym == NULL) {
@@ -535,21 +565,23 @@ nameTerm(Symbolnode sym)
  * message expression or
  * message expression ; message expression
  */
-int
+static void
 doContinue(int superFlag)
 {
     superFlag = keyContinue(superFlag);
     while (superFlag != -1 && get_cur_token(tstate) == KeyCascade) {
+	genDupTOS(cstate);
 	get_token(tstate); 
 	superFlag = keyContinue(superFlag);
+	genPopTOS(cstate);
     }
-    return superFlag;
+    return;
 }
 
 /*
  * Handle keyword continuation.
  */
-int
+static int
 keyContinue(int superFlag)
 {
     int                 argc = 0;
@@ -595,7 +627,7 @@ keyContinue(int superFlag)
 /*
  * Handle binary continuation
  */
-int
+static int
 doBinaryContinue(int superFlag)
 {
     int                 sTerm;
@@ -615,7 +647,7 @@ doBinaryContinue(int superFlag)
 /*
  * Handle unary continuations.
  */
-int
+static int
 doUnaryContinue(int superFlag)
 {
     Literalnode         lit;
@@ -632,7 +664,7 @@ doUnaryContinue(int superFlag)
 /*
  * Parse a block of code.
  */
-int
+static int
 doBlock()
 {
     int                 savetemps = nstate->tempcount;
@@ -699,7 +731,7 @@ doBlock()
 /*
  * Compile a optimized block.
  */
-int
+static int
 optimBlock()
 {
     int                 saveInblock = inBlock;
@@ -734,7 +766,7 @@ optimBlock()
 /*
  * Compile ifTrue: as a built in.
  */
-int
+static int
 doIfTrue()
 {
     Codenode            block;
@@ -757,7 +789,7 @@ doIfTrue()
 /*
  * Compile ifFalse: as a built in.
  */
-int
+static int
 doIfFalse()
 {
     Codenode            block, eblock = NULL;
@@ -781,7 +813,7 @@ doIfFalse()
 /*
  * Compile whileTrue: as built in.
  */
-int
+static int
 doWhileTrue()
 {
     Codenode            loop, block;
@@ -801,7 +833,7 @@ doWhileTrue()
 /*
  * Compile whileFalse: as built in.
  */
-int
+static int
 doWhileFalse()
 {
     Codenode            loop, block;
@@ -829,7 +861,7 @@ doWhileFalse()
  * L1:
  *  
  */
-int
+static int
 doAnd()
 {
     Codenode            block;
@@ -858,7 +890,7 @@ doAnd()
 /*
  * Compile or: as a built in.
  */
-int
+static int
 doOr()
 {
     Codenode            block;
