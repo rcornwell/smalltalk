@@ -1,9 +1,22 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.2 2000/03/08 04:13:19 rich Exp rich $ "
+" $Id: compile.st,v 1.3 2000/08/29 01:06:52 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.3  2000/08/29 01:06:52  rich
+ Converted tokens to symbols.
+ Made method to preform actions for tokens.
+ Method to print out tokens.
+ Cleaned up printing on symbols and code nodes.
+ Fixed bug in removeNode.
+ Converted optimizer from do: to loops.
+ Fixed bug in relabel.
+ Moved return self to compiler methods.
+ When compiling for execution return tos not self.
+ Code cleanup.
+ Added code to print out a compiled method.
+
  Revision 1.2  2000/03/08 04:13:19  rich
  Major bug fixes.
 
@@ -18,13 +31,14 @@ Object subclass: 'SmallTalkToken'
        classVariableNames: 'chartable actiontable arraytable tokentable'
        poolDictionaries: '' category: nil !
 
-! SmallTalkToken class methodsFor: 'creation'!
+!SmallTalkToken class methodsFor: 'creation' !
 
 on: aStream
 	^ super new initOn: aStream.
 ! !
 
-! SmallTalkToken methodsFor: 'testing'!
+!SmallTalkToken methodsFor: 'testing' !
+
 isKeyString
 	^ #KeyString = token
 !
@@ -315,12 +329,10 @@ scannumber
    char = $- ifTrue: [
 	self peeknext isDigit ifFalse: [
 	" Nope, make it a special token "
-		 token <- #KeySpecial.
-		 value <- '-'.
-		^ self
+		^ self scanspecial
 	] ifTrue: [
 		sign <- true.
-	 	char <- self nextchar
+	 	char <- self nextchar.
 	]
    ].
 
@@ -367,7 +379,8 @@ scannumber
 		           ifFalse: [
        	           		fraction <- fraction + (multi * (dig asFloat)).
 		   		multi <- multi / (base asFloat).
-			   ]
+			   ].
+		     char <- self nextchar.
               ]
 	 ] ifFalse: [ char <- $. ].
     ].
@@ -461,6 +474,7 @@ scanliteral
 			whileTrue: [
 				 value nextPut: char.
 				 char <- self nextchar ].
+		self pushback.
 		value <- value contents asSymbol.
 		^ self ].
      (self isSpecial: char) ifTrue: [
@@ -507,18 +521,24 @@ scanarray
 	" Do this first since rest will set themself to literal "
 	self action: arraytable with: char.
 
-	" All done scanning, see if we should add it "
-	self isKeyLiteral
-	    ifTrue: [ array add: value ]
+        " Clean up names and keywords. "
+	self isKeyName or: [ self isKeyKeyword ]
+	    ifTrue: [ array add: (value asSymbol) ]
 	    ifFalse: [
-        	 self isKeyLParen ifTrue: [
-			value <- WriteStream on: (Array new: (array size)).
-			array do: [ :v | value nextPut: v ].
-			value <- value contents.
-			token <- #KeyLiteral.
-		 ].
-		 self isKeyEOS ifFalse: [ ^ self ]
-	   ].
+
+	" All done scanning, see if we should add it "
+	    self isKeyLiteral
+	        ifTrue: [ array add: value ]
+	        ifFalse: [
+        	     self isKeyLParen ifTrue: [
+			    value <- WriteStream on: (Array new: (array size)).
+			    array do: [ :v | value nextPut: v ].
+			    value <- value contents.
+			    token <- #KeyLiteral.
+		     ].
+		     self isKeyEOS ifFalse: [ ^ self ]
+	       ]
+	 ].
      ].
 ! !
 
@@ -538,6 +558,17 @@ print
 			[self isKeyVariable ]]]] ifTrue:
 		[ str <- str , ' '. str <- str , (value printString)].
 	str print.
+!
+
+nextchunk
+	| str pos cnt |
+	str <- WriteStream on: (String new: 0).
+	pos <- stream position.	 " Save the position. "
+	cnt <- 0.
+	[ cnt < 20 and: [ stream atEnd not]] whileTrue: [
+		str nextPut: stream next ].
+	stream position: pos.	" Back up. "
+	^ str contents
 !
 
 " Return the next token from input stream. "
@@ -647,6 +678,7 @@ offset: aOffset
 ! !
 
 ! SmallTalkSymbol methodsFor: 'compiling' !
+
 genByte: aByte
    | array |
    array <- ByteArray new: 1.
@@ -961,7 +993,7 @@ genOpr: byteOne
    | array len opc |
    (offset between: 0 and: 15)
 	 ifTrue: [ len <- 1.  opc <- byteOne bitOr: offset ]
-	 ifFalse: [ len < 2.  opc <- byteOne bitShift: -4 ].
+	 ifFalse: [ len <- 2.  opc <- byteOne bitShift: -4 ].
    array <- ByteArray new: len.
    array at: 1 put: opc.
    len == 2 ifTrue: [ array at: 2 put: offset ].
@@ -1008,6 +1040,7 @@ canReturn
 ! !
 
 ! SmallTalkSymbolTemp methodsFor: 'compiling' !
+
 genPush
    ^ self genOpr: 16r40.
 !
@@ -1035,6 +1068,7 @@ canAssign
 ! !
 
 ! SmallTalkSymbolInst methodsFor: 'compiling' !
+
 genPush
    ^self genOpr: 16r30.
 !
@@ -1058,6 +1092,7 @@ canAssign
 ! !
 
 ! SmallTalkSymbolVar methodsFor: 'compiling' !
+
 genSize
 	^ 2
 !
@@ -1089,6 +1124,7 @@ value: aValue
 ! !
 
 ! SmallTalkLiteral methodsFor: 'testing' !
+
 isSymbolLiteral
 	^ true
 ! !
@@ -1124,6 +1160,7 @@ release
 ! !
 
 ! SmallTalkLiteral methodsFor: 'compiling' !
+
 genSize
      value == 0 or: [ value == 1 ] ifTrue: [ ^ 1 ].
      offset < 17 ifTrue: [ ^ 1 ]
@@ -1141,10 +1178,10 @@ genSend: superFlag argcount: count
    superFlag ifTrue: [ opr <- 16rD0 ] ifFalse: [ opr <- 16rE0 ].
    (offset between: 0 and: 15)
 	 ifTrue: [ len <- 2.  opr <- opr bitOr: offset]
-	 ifFalse: [ len < 2.  opr <- opr bitShift: -4 ].
+	 ifFalse: [ len <- 3.  opr <- opr bitShift: -4 ].
    array <- ByteArray new: len.
    array at: 1 put: opr.
-   len == 2 ifTrue: [ array at: 2 put: offset ].
+   len == 3 ifTrue: [ array at: 2 put: offset ].
    array at: len put: count.
    ^ array
 ! !
@@ -1190,6 +1227,7 @@ printOn: aStream
 ! !
 
 ! SmallTalkSymbolSpecial methodsFor: 'compiling' !
+
 genSize
      ^ 1
 !
@@ -1432,11 +1470,28 @@ advance
 	^ self
 !
 
+" Replace current node with a new node "
 replace: aNode
 	aNode nextLink: self nextLink.
 	self value: nil.
 	self become: aNode.
 	^ self
+!
+
+" Remove current node. "
+removeSelf
+        self value: nil.
+        self become: self nextLink
+!
+
+" Remove the next node in list "
+removeNext
+	self nextLink value: nil.
+	self nextLink: (self nextLink nextLink).
+!
+
+optimize
+	^false
 ! !
 
 SmallTalkCodeNode subclass: 'SmallTalkCodeOper'
@@ -1450,6 +1505,7 @@ new: aSym
 ! !
 
 ! SmallTalkCodeOper methodsFor: 'testing' !
+
 isSymbolSelf
 	^ value isSymbolSelf
 !
@@ -1526,8 +1582,11 @@ size
 !
 
 printOn: aStream
+	| v |
 	self printLabel: aStream.
 	aStream nextPutAll: (self name).
+	v <- value.
+	v isNil ifTrue: [ v <- 'XXXnilXXX' ].
 	value printOn: aStream.
 ! !
 
@@ -1537,33 +1596,6 @@ value: aValue
 	value notNil ifTrue: [ value release ].
 	value <- aValue.
 	^ self
-! !
-
-SmallTalkCodeOper subclass: 'SmallTalkCodeStore'
-       instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: nil !
-
-! SmallTalkCodeStore methodsFor: 'testing'!
-
-isCodeStore
-	^ true
-! !
-
-! SmallTalkCodeStore methodsFor: 'accessing' !
-
-name
-	^ 'store '
-!
-
-stack: max
-	^ self nextLink stack: max
-! !
-
-! SmallTalkCodeStore methodsFor: 'compiling' !
-
-" Compile a node into binary from "
-generate
-	^ value genStore.
 ! !
 
 SmallTalkCodeOper subclass: 'SmallTalkCodePush'
@@ -1595,11 +1627,144 @@ stack: max
 ! !
 
 ! SmallTalkCodePush methodsFor: 'compiling' !
-	
+
+advance
+   " Check if it could be a zero or a one. "
+    self isSymbolLiteral ifTrue: [
+	value value == 0 or: [ value value == 1 ]
+		    ifTrue: [ value release ]
+    ].
+!
+
+optimize
+   | nxt |
+   " If next node is a begining of a block, just return. "
+   self beginBlock ifFalse: [ ^ false ].
+
+   nxt <- self nextLink.
+   " Remove unneded push/pop pairs "
+   nxt isCodePopStack ifTrue: [
+	nxt removeSelf.
+	self removeSelf.
+	^ true.
+    ].
+
+    " Convert push x/ push x to push x/ dup "
+    self = nxt
+	 ifTrue: [ nxt value: (SmallTalkSymbolStack new).  ^ true ].
+		
+   " Remove dups before returns "
+    self isSymbolStack and: [
+	(nxt isCodeReturn or: [ nxt isCodeBlockReturn])] ifTrue: [
+		self removeSelf.
+		^ true
+    ].
+
+   " Check if we can shorten a return TOS "
+    nxt isCodeReturnStack and: [ self canReturn ] ifTrue: [
+		  nxt value: (self value).
+		  self removeSelf.
+		  ^ true.
+    ].
+
+     " Remove push bool, jcond "
+     nxt isCodeJcond ifTrue: [
+	   self isSymbolTrue ifTrue: [
+		nxt isCodeJTrue ifTrue: [ nxt cond: nil ]
+				     ifFalse: [ self removeNext ].
+		self removeSelf.
+		^ true
+	   ].
+           self isSymbolFalse ifTrue: [
+		nxt isCodeJFalse ifTrue: [ nxt cond: nil ]
+				      ifFalse: [ self removeNext ].
+		self removeSelf.
+	        ^ true
+	   ].
+      ].
+
+      self isSymbolStack and: [ nxt notNil ] ifFalse: [ ^ false ].
+
+      " Convert  Dup, Store, Pop -> Store "
+      nxt isCodeStore and: [ nxt beginBlock and: [
+	 nxt nextLink isCodePopStack ]] ifTrue: [
+		nxt removeNext.
+		self removeSelf.
+		^ true.
+      ].
+
+
+	" Check for: dup       Replace with:    jcond x + 1 if cond1 =~ cond2
+		     jcond1 x		 or:    jcond y     if cond1 = cond2
+		     pop
+		     ----
+		  x: jcond2 y
+	"
+     nxt isCodeJcond and: [ nxt nextLink notNil and: [
+	     nxt nextLink isCodePopStack and: [
+	     nxt value offset isCodeJcond and: [
+	     nxt value offset value notNil ]]]] ifTrue: [
+"		'checking pop/jump' print. "
+		" Remove Dup and Pop "
+		nxt removeNext.
+		" Advance Jump forward one step "
+		nxt cond = (nxt value offset cond)
+		  ifTrue: [ nxt value offset: (nxt value offset) ]
+		  ifFalse: [ nxt value offset: (nxt value offset nextLink) ].
+		self removeSelf.
+		^ true
+     ].
+
+     ^ false
+!
+    		
 " Compile a node into binary from "
 generate
 	^ value genPush.
 ! !
+
+SmallTalkCodeOper subclass: 'SmallTalkCodeStore'
+       instanceVariableNames: ''
+       classVariableNames: '' poolDictionaries: '' category: nil !
+
+! SmallTalkCodeStore methodsFor: 'testing'!
+
+isCodeStore
+	^ true
+! !
+
+! SmallTalkCodeStore methodsFor: 'accessing' !
+
+name
+	^ 'store '
+!
+
+stack: max
+	^ self nextLink stack: max
+! !
+
+! SmallTalkCodeStore methodsFor: 'compiling' !
+
+optimize
+  | temp |
+  " Convert  Store x, Push x -> Dup, Store x "
+   self beginBlock and: [ self nextLink isCodePush and: [
+	        self value = (self nextLink value)]]
+       ifTrue: [
+		temp <- self value.
+	 	self replace: (SmallTalkCodePush new: 
+				(SmallTalkSymbolStack new)).
+		self nextLink replace: (SmallTalkCodeStore new: temp). 
+		^ true
+	].
+   ^ false
+!
+
+" Compile a node into binary from "
+generate
+	^ value genStore.
+! !
+
 
 SmallTalkCodeOper subclass: 'SmallTalkCodeReturn'
        instanceVariableNames: ''
@@ -1627,163 +1792,58 @@ name
 
 ! SmallTalkCodeReturn methodsFor: 'compiling' !
 	
+optimize
+" Remove dead code after jump or return "
+    | changed |
+    changed <- false.
+    [ self beginBlock ] whileTrue: [
+	 self removeNext.
+	 changed <- true. ].
+    ^ changed
+!
+
 " Compile a node into binary from "
 generate
 	^ value genReturn
 ! !
 
-SmallTalkCodeOper subclass: 'SmallTalkCodeBlock'
-       instanceVariableNames: 'argcount'
+SmallTalkCodeNode subclass: 'SmallTalkCodePopStack'
+       instanceVariableNames: ''
        classVariableNames: '' poolDictionaries: '' category: nil !
 
-! SmallTalkCodeBlock class methodsFor: 'creation'!
+! SmallTalkCodePopStack methodsFor: 'testing'!
 
-new: value argcount: count 
-	^ super new; value: value argcount: count 
-! !
-
-! SmallTalkCodeBlock methodsFor: 'testing'!
-
-isCodeBlockCopy
+isCodePopStack
 	^ true
+!
+
+= aNode
+	aNode isNil or: [ aNode isLabel ] ifTrue: [ ^ false ].
+	^ aNode isCodePopStack
 ! !
 
-! SmallTalkCodeBlock methodsFor: 'accessing' !
+! SmallTalkCodePopStack methodsFor: 'accessing' !
 
-argcount
-	^ argcount
+name
+    ^ 'pop'
 !
 
 size
-    | i |
-    i <- value offset offset - (offset + length).
-    (i between: 0 and: 15) ifTrue: [ ^ 3 ].
-    (i between: -127 and: 128) ifTrue: [ ^ 4].
-    ^ 5.
+    ^ 1
 !
 
 stack: max
-	^ (value offset stack: (max + 1)) max: argcount
-!
-
-name
-	^ 'block '
+	^ self nextLink stack: max.
 ! !
 
-! SmallTalkCodeBlock methodsFor: 'modifing' !
-
-value: aValue argcount: aCount
-	self value: aValue.
-	argcount <- aCount.
-	^ self
-!
-
-advance
-	value offset: value offset nextLink.
-!
-
-argcount: aCount
-	^ argcount <- aCount
-! !
-
-! SmallTalkCodeBlock methodsFor: 'compiling' !
+! SmallTalkCodePopStack methodsFor: 'compiling' !
+	
 " Compile a node into binary from "
 generate
-	| array opc operand |
-        operand <- (value offset offset) - (offset + length).
-	( operand between: 0 and: 15) 
-	     ifTrue: [ opc <- 16rA0 bitOr: operand ]
-	     ifFalse: [
-	        (operand between: -127 and: 128)
-		 ifTrue: [ opc <- 16r0A ]
-		 ifFalse: [
-			array <- ByteArray new: 5.
-			array at: 1 put: 16r0F.
-			array at: 2 put: argcount.
-			array at: 3 put: 0.
-			array at: 4 put: operand.
-			array at: 5 put: (operand / 256).
-			^ array
-		 ]].
-	array <- ByteArray new: length.
-	array at: 1 put: 16r0F.
-	array at: 2 put: argcount.
-	array at: 3 put: opc.
-	length == 4 ifTrue: [ array at: 2 put: operand ].
-	^ array
-! !
-
-SmallTalkCodeBlock subclass: 'SmallTalkCodeSend'
-       instanceVariableNames: 'superFlag'
-       classVariableNames: '' poolDictionaries: '' category: nil !
-
-! SmallTalkCodeSend class methodsFor: 'creation'!
-
-new: value argcount: count super: superFlag
-	^ super new; value: value argcount: count super: superFlag
-! !
-
-! SmallTalkCodeSend methodsFor: 'testing'!
-
-isCodeSend
-	^ super == false
-!
-
-isCodeSendSuper
-	^ super == true
-!
-
-isCodeSend: aSymbol
-	| temp |
-	superFlag ifTrue: [ ^ false ].
-	value value == aSymbol ifTrue: [^ true].
-	^ false
-!
-
-isCodeBlockCopy
-	^ false
-! !
-
-! SmallTalkCodeSend methodsFor: 'accessing' !
-
-size
-    ^ value genSize + 1
-!
-
-stack: max
-     | size |
-     size <- max - argcount min: 1.
-     size <- (self nextLink stack: size) + argcount.
-     ^ size max: max.
-!
-
-name
-	^ superFlag ifTrue: [ 'SSend ' ] ifFalse: [ 'Send ' ]
-! !
-
-! SmallTalkCodeSend methodsFor: 'modifing' !
-
-value: aValue argcount: aCount super: ss
-	self value: aValue argcount: aCount.
-	superFlag <- ss.
-	^ self
-!
-
-advance
-    | temp sym |
-    superFlag ifTrue: [ ^ self ].
-    sym <- value value.
-    temp <- Smalltalk at: #SpecialSelectors ifAbsent: [ Array new: 0 ].
-    1 to: temp size do:
-	 [ :sel | (temp at: sel) = sym
-   	       ifTrue: [ self value:
-		 (SmallTalkSymbolSpecial index: (sel - 1)  value: sym)]].
-! !
-
-! SmallTalkCodeSend methodsFor: 'compiling' !
-
-generate
-     ^ value genSend: superFlag argcount: argcount
+	| array |
+	array <- ByteArray new: 1.
+	array at: 1 put: 16rF7.
+	^array
 ! !
 
 SmallTalkCodeOper subclass: 'SmallTalkCodeJump'
@@ -1884,6 +1944,38 @@ advance
 
 ! SmallTalkCodeJump methodsFor: 'generation' !
 
+optimize
+" Remove dead code after jump or return "
+    | changed where |
+    changed <- false.
+
+    where <- self value offset.
+    " Redirect jump to a jump "
+    where isCodeJump ifTrue: [
+	self value: (where value).
+	where <- self value offset.
+	changed <- true.
+    ].
+
+    " Remove dead code after this jump "
+    [ self beginBlock ] whileTrue: [
+	 self removeNext.
+	 changed <- true. ].
+
+   " A Jump to next can be cleaned up "
+    self nextLink == where ifTrue: [
+    " JCond to next is just a pop "
+	 self isCodeJcond ifTrue: [
+	     self replace: (SmallTalkCodePopStack new).
+	] ifFalse: [
+      	     self removeSelf.
+	].
+	^ true.
+     ].
+
+    ^ changed
+!
+
 " Compile a node into binary from "
 generate
 	| array len opc operand place |
@@ -1915,6 +2007,217 @@ generate
 	^ array
 ! !
 
+SmallTalkCodeOper subclass: 'SmallTalkCodeBlock'
+       instanceVariableNames: 'argcount'
+       classVariableNames: '' poolDictionaries: '' category: nil !
+
+! SmallTalkCodeBlock class methodsFor: 'creation'!
+
+new: value argcount: count 
+	^ super new; value: value argcount: count 
+! !
+
+! SmallTalkCodeBlock methodsFor: 'testing'!
+
+isCodeBlockCopy
+	^ true
+! !
+
+! SmallTalkCodeBlock methodsFor: 'accessing' !
+
+argcount
+	^ argcount
+!
+
+size
+    | i |
+    i <- value offset offset - (offset + length).
+    (i between: 0 and: 15) ifTrue: [ ^ 3 ].
+    (i between: -127 and: 128) ifTrue: [ ^ 4].
+    ^ 5.
+!
+
+stack: max
+	^ (value offset stack: (max + 1)) max: argcount
+!
+
+name
+	^ 'block '
+! !
+
+! SmallTalkCodeBlock methodsFor: 'modifing' !
+
+value: aValue argcount: aCount
+	self value: aValue.
+	argcount <- aCount.
+	^ self
+!
+
+advance
+	value offset: value offset nextLink.
+!
+
+argcount: aCount
+	^ argcount <- aCount
+! !
+
+! SmallTalkCodeBlock methodsFor: 'compiling' !
+
+" Optimize block loops, this is done here before any jumps are modified"
+optimize
+	| nxt temp ptr |
+	" Check for: blk 0, x	Replace with:   z: 
+		     {C1}			   {C1}
+		     retblk			   jmp x
+		  x: dup                           ----
+		     send value			   ----
+		     jcond y			x: jcond y
+		     {C2}			   {C2}
+		     jmp x			   jmp z
+		  y: pop			y:
+	"
+		
+	self argcount == 0 ifFalse: [ ^false ].
+"	    'Checking block' print. "
+	" Point nxt to instruction after block. x"
+	nxt <- self value offset.
+	nxt notNil and: [nxt isCodePushStack and: [
+	    (nxt nextLink isCodeSend: #value ) and: [ 
+	     nxt nextLink nextLink isCodeJcond and: [
+	     nxt nextLink nextLink value offset isCodePopStack ]]]]
+		 ifFalse: [ ^ false ].
+
+"		'Optimizing loop' print. "
+	" Point to after blk instruction (z + 1)"
+	temp <- self nextLink.
+
+	" Point all labels that point to Dup to just after block z"
+	ptr <- nxt.
+	[ ptr notNil ] whileTrue: [
+		ptr isSymbolLabel and: [ ptr value offset == nxt ]
+			ifTrue: [ ptr value offset: temp ].
+		ptr <- ptr nextLink.
+	].
+
+	" Convert all ret blk to Jump condition "
+	nxt <- nxt nextLink nextLink.
+	[ temp notNil and: [temp ~= nxt] ] whileTrue: [
+		temp isCodeBlockReturn ifTrue: [
+		    temp replace: (SmallTalkCodeJump new: nxt cond: nil).
+		].
+		temp <- temp nextLink.
+	].
+		
+	" Remove extra instructions "
+	nxt value offset removeSelf.    " last Pop "
+	self removeSelf.		" Blk "
+	^ true
+!
+
+" Compile a node into binary from "
+generate
+	| array opc operand |
+        operand <- (value offset offset) - (offset + length).
+	( operand between: 0 and: 15) 
+	     ifTrue: [ opc <- 16rA0 bitOr: operand ]
+	     ifFalse: [
+	        (operand between: -127 and: 128)
+		 ifTrue: [ opc <- 16r0A ]
+		 ifFalse: [
+			array <- ByteArray new: 5.
+			array at: 1 put: 16r0F.
+			array at: 2 put: argcount.
+			array at: 3 put: 0.
+			array at: 4 put: operand.
+			array at: 5 put: (operand bitShift: -8).
+			^ array
+		 ]].
+	array <- ByteArray new: length.
+	array at: 1 put: 16r0F.
+	array at: 2 put: argcount.
+	array at: 3 put: opc.
+	length == 4 ifTrue: [ array at: 2 put: operand ].
+	^ array
+! !
+
+SmallTalkCodeBlock subclass: 'SmallTalkCodeSend'
+       instanceVariableNames: 'superFlag'
+       classVariableNames: '' poolDictionaries: '' category: nil !
+
+! SmallTalkCodeSend class methodsFor: 'creation'!
+
+new: value argcount: count super: superFlag
+	^ super new; value: value argcount: count super: superFlag
+! !
+
+! SmallTalkCodeSend methodsFor: 'testing'!
+
+isCodeSend
+	^ super == false
+!
+
+isCodeSendSuper
+	^ super == true
+!
+
+isCodeSend: aSymbol
+	| temp |
+	superFlag ifTrue: [ ^ false ].
+	value value == aSymbol ifTrue: [^ true].
+	^ false
+!
+
+isCodeBlockCopy
+	^ false
+! !
+
+! SmallTalkCodeSend methodsFor: 'accessing' !
+
+size
+    ^ value genSize + 1
+!
+
+stack: max
+     | size |
+     size <- max - argcount min: 1.
+     size <- (self nextLink stack: size) + argcount.
+     ^ size max: max.
+!
+
+name
+	^ superFlag ifTrue: [ 'SSend ' ] ifFalse: [ 'Send ' ]
+! !
+
+! SmallTalkCodeSend methodsFor: 'modifing' !
+
+value: aValue argcount: aCount super: ss
+	self value: aValue argcount: aCount.
+	superFlag <- ss.
+	^ self
+! !
+
+! SmallTalkCodeSend methodsFor: 'compiling' !
+
+advance
+    | temp sym |
+    superFlag ifTrue: [ ^ self ].
+    sym <- value value.
+    temp <- Smalltalk at: #SpecialSelectors ifAbsent: [ Array new: 0 ].
+    1 to: temp size do:
+	 [ :sel | (temp at: sel) = sym
+   	       ifTrue: [ self value:
+		 (SmallTalkSymbolSpecial index: (sel - 1)  value: sym)]].
+!
+
+" There is nothing we can optimize "
+optimize
+     ^ false
+!
+
+generate
+     ^ value genSend: superFlag argcount: argcount
+! !
+
 SmallTalkCodeNode subclass: 'SmallTalkCodeBlockReturn'
        instanceVariableNames: ''
        classVariableNames: '' poolDictionaries: '' category: nil !
@@ -1941,6 +2244,16 @@ name
 ! !
 
 ! SmallTalkCodeBlockReturn methodsFor: 'compiling' !
+
+optimize
+" Remove dead code after jump or return "
+    | changed |
+    changed <- false.
+    [ self beginBlock ] whileTrue: [
+	 self removeNext.
+	 changed <- true. ].
+    ^ changed
+!
 	
 " Compile a node into binary from "
 generate
@@ -1950,44 +2263,6 @@ generate
 	^ array 
 ! !
 
-SmallTalkCodeNode subclass: 'SmallTalkCodePopStack'
-       instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: nil !
-
-! SmallTalkCodePopStack methodsFor: 'testing'!
-
-isCodePopStack
-	^ true
-!
-
-= aNode
-	aNode isNil or: [ aNode isLabel ] ifTrue: [ ^ false ].
-	^ aNode isCodePopStack
-! !
-
-! SmallTalkCodePopStack methodsFor: 'accessing' !
-
-name
-    ^ 'pop'
-!
-
-size
-    ^ 1
-!
-
-stack: max
-	^ self nextLink stack: max.
-! !
-
-! SmallTalkCodePopStack methodsFor: 'compiling' !
-	
-" Compile a node into binary from "
-generate
-	| array |
-	array <- ByteArray new: 1.
-	array at: 1 put: 16rF7.
-	^array
-! !
 
 LinkedList subclass: 'SmallTalkCodeTree'
        instanceVariableNames: 'superFlag lits'
@@ -2101,281 +2376,24 @@ setJumpTarget: aLabel advance: amount
 ! !
 
 ! SmallTalkCodeTree methodsFor: 'Compiling' !
-" Remove a code node "
-removeNode: aNode
-	| next |
-	next <- aNode nextLink.
-	self relabel: aNode to: next.
-	aNode value: nil.
-	self remove: aNode ifAbsent: [ nil ].
-	^ next
-!
-
-peephole
-    | i nxt temp temp1 block node changed |
-" Preform optimization pass.
-  1) Convert sends into sendSpecail if we can.
-  2) Remove Dup/Pop pairs when second one is not referenced.
-  3) Remove Push/Popstack pairs.
-  4) Remove unreferenced code after a return.
-  5) Remove unreferenced code after a jump.
-  6) Release literals for push of 0 or 1.
-  7) Convert Dup/Store/Pop into Store.
-  8) Convert push special /return to return special.
- "
-    node <- firstLink.
-    changed <- false.
-    [ node notNil ] whileTrue: [ 
-        nxt <- node nextLink.
-	block <- node beginBlock.
-	node isCodePush ifTrue: [
-	   " Remove unneded push/pop pairs "
-	    node beginBlock and: [ nxt isCodePopStack ] ifTrue: [
-		node <- self removeNode: node.
-		node <- self removeNode: node.
-		nxt <- node nextLink.
-	 	block <- node beginBlock.
-		changed <- true.
-	    ]
-	].
-
-	node isCodePush ifTrue: [
-	    " Convert push x/ push x to push x/ dup "
-	     block and: [ node = nxt ]
-		ifTrue: [ nxt value: (SmallTalkSymbolStack new) ].
-		
-	   " Check if it could be a zero or a one. "
-	    node isSymbolLiteral ifTrue: [
-		node value value == 0 or: [ node value value == 1 ]
-		    ifTrue: [ node value release ]
-	    ].
-		
-	   " Remove dups before returns "
-	    block and: [ node isSymbolStack and: [
-		(nxt isCodeReturn or: [ nxt isCodeBlockReturn])]] ifTrue: [
-		node <- self removeNode: node.
-		nxt <- node nextLink.
-		block <- node beginBlock.
-		changed <- true.
-	    ] ifFalse: [
-
-	   " Check if we can shorten a return TOS "
-	    block and: [ nxt isCodeReturnStack
-		and: [ node canReturn ]] ifTrue: [
-		  nxt value: (node value).
-		  node <- self removeNode: node.
-		  nxt <- node nextLink.
-		  block <- node beginBlock.
-		  changed <- true.
-            ] ifFalse: [
-
-	    " Convert  Dup, Store x, Pop, Push x -> Dup, Store "
-	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
-		nxt beginBlock and: [ nxt nextLink isCodePopStack and: [
-		nxt nextLink beginBlock and: [
-	        nxt nextLink nextLink isCodePush and: [
-	        nxt nextLink value = (nxt nextLink nextLink value)]]]]]]]
-	       ifTrue: [
-		self removeNode: (self removeNode: (nxt nextLink)).
-		changed <- true.
-	    ] ifFalse: [
-
-	    " Convert  Dup, Store x, Ret y -> Store, Ret y "
-	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
-		nxt beginBlock and: [ nxt nextLink isCodeReturn and: [
-	        nxt nextLink isSymbolStack not ]]]]]
-	       ifTrue: [
-		node <- self removeNode: node.
-		changed <- true.
-	    ] ifFalse: [
-
-       	    " Convert  Dup, Store, Pop -> Store "
-	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
-		nxt beginBlock and: [ nxt nextLink isCodePopStack ]]]] ifTrue: [
-		node <- self removeNode: node.
-		self removeNode: (node nextLink).
-		changed <- true.
-	    ] ifFalse: [
-
-	     " Remove push bool, jcond "
-	     "block and: [ nxt isCodeJcond ]"
-	     nxt isCodeJcond
-		ifTrue: [
-		   node isSymbolTrue ifTrue: [
-			nxt isCodeJTrue ifTrue: [ nxt cond: nil ]
-				        ifFalse: [ self removeNode: nxt ].
-			node <- self removeNode: node.
-		        changed <- true.
-		   ] ifFalse: [
-		      node isSymbolFalse ifTrue: [
-			nxt isCodeJFalse ifTrue: [ nxt cond: nil ]
-				        ifFalse: [ self removeNode: nxt ].
-			node <- self removeNode: node.
-	  	        changed <- true.
-		      ]
-		   ].
-	     ]]]]]].
-    	     nxt <- node nextLink.
- 	     block <- node beginBlock.
-
-	].
 
 
-	" Remove dead code after jump or return "
-	node isCodeJump or: [ node isCodeReturn ] ifTrue: [
-	    [ node beginBlock ] whileTrue: [
-		 self removeNode: (node nextLink).
-		 changed <- true. ].
-	    nxt <- node nextLink.
- 	    block <- node beginBlock.
-	].
-	node <- node nextLink.
-    ].
-    ^ changed
-!
-
-" Repoint a label to new node "
-relabel: aNode to: newNode
-    | node |
-    node <- firstLink.
-    [ node notNil ] whileTrue: [
-    	node isSymbolLabel and: [ node value offset == aNode ]
-	 	ifTrue: [ node value offset: newNode ].
-	node <- node nextLink.
-    ].
-!
-
-" Optimize jump instructions. "
-optimizeJump
-    | i nxt temp temp1 changed node |
-
-" Preform optimization pass.
-  1) Jumps to Jumps get repointed to second Jump.
-  2) Condition jumps to conditional jumps get optimized.
-  3) While Blocks get unblocked.
-  4) Jumps to next location get removed. 
- "
-    changed <- false.
-    node <- firstLink.
-"    'Code motion' print."
-    [ node notNil ] whileTrue: [
-        nxt <- node nextLink.
-	node isCodeJump ifTrue: [
-"	    'checking jump' print. "
-	    temp <- node value offset.
-	    " Redirect jump to a jump "
-	    temp isCodeJump ifTrue: [
-		node value: (temp value).
-		changed <- true.
-	    ].
-	    " Remove jump to next "
-	    node nextLink == temp ifTrue: [
-		node <- self removeNode: node.
-		nxt <- node nextLink.
-		changed <- true.
-	    ]
-	].
-
-        node isCodeJcond ifTrue: [
-"	    'checking conditional jump' print. "
-	    temp <- node value offset.
-	    " Redirect jcond to jump "
-	    temp isCodeJump ifTrue: [
-		node value: (temp value).
-		changed <- true.
-	    ].
-	    " JCond to next is just a pop "
-	    node nextLink == temp ifTrue: [
-	 	node replace: (SmallTalkCodePopStack new).
-		changed <- true.
-	    ]
-	].
-	
-	" Check for: dup       Replace with:    jcond x + 1 if cond1 =~ cond2
-		     jcond1 x		 or:    jcond y     if cond1 = cond2
-		     pop
-		     ----
-		  x: jcond2 y
-	"
-	node isCodePushStack and: [ nxt notNil and: [nxt isCodeJcond and: [
-	     nxt nextLink notNil and: [ nxt nextLink isCodePopStack and: [
-	     nxt value offset isCodeJcond and: [
-	     nxt value offset value notNil ]]]]]] ifTrue: [
-"		'checking pop/jump' print. "
-		" Remove Dup and Pop "
-		node <- self removeNode: node.
-		self removeNode: (node nextLink).
-		" Advance Jump forward one step "
-		node cond = (node value offset cond)
-		  ifTrue: [ node value offset: (node value offset) ]
-		  ifFalse: [ node value offset: (node value offset nextLink) ]
-	].
-			
-	" Check for: blk 0, x	Replace with:   z: 
-		     {C1}			   {C1}
-		     retblk			   jmp x
-		  x: dup                           dup
-		     send value			   send value
-		     jcond y			x: jcond y
-		     {C2}			   {C2}
-		     jmp x			   jmp z
-		  y: pop			y:
-	"
-		
-	node isCodeBlockCopy and: [ node argcount == 0 ] ifTrue: [
-"	    'Checking block' print. "
-	    nxt <- node value offset.
-	    nxt notNil and: [nxt isCodePushStack and: [
-		(nxt nextLink isCodeSend: #value ) and: [ 
-	        nxt nextLink nextLink isCodeJcond and: [
-		nxt nextLink nextLink value offset isCodePopStack ]]]] ifTrue:
-	      [
-"		'Optimizing loop' print. "
-		" Point to after blk "
-		temp <- node nextLink.
-
-		" Point all labels that point to Dup to just after block "
-		self relabel: nxt to: temp.
-
-		" Convert all ret blk to Jump after send "
-		nxt <- nxt nextLink nextLink.
-		[ temp notNil and: [temp ~= nxt] ] whileTrue: [
-			temp isCodeBlockReturn ifTrue: [
-			    temp replace:
-					 (SmallTalkCodeJump new: nxt cond: nil).
-			].
-			temp <- temp nextLink.
-		].
-		
-		" Remove extra instructions "
-		self removeNode: ( nxt value offset).
-							" last Pop "
-	"	nxt <- self removeNode: nxt."  		" dup "
-	"	self removeNode: nxt. 	"		" send "
-		node <- self removeNode: node.		" Blk "
-		changed <- true.
-	      ] 
-	     ].
-	    node <- node nextLink.
-	].
-    ^ changed
-!
 
 " Optimize a code block. "
 optimize
-    | temp temp2 |
+    | temp |
     " Fix jump targets to point to next instruction, also set referenced flag. "
    " Adjust jump and Send instructions "
     self do: [ :cur | cur advance ].
-    self peephole.
+   " self do: [ :cur | cur print ]."
+
+    " Continue to optimize blocks until there are no changes. "
     temp <- true.
-    temp2 <- true.
-    [ temp or: [temp2 ] ] whileTrue: [
-       temp <- self peephole.
-       temp2 <- self optimizeJump.
+    [ temp ] whileTrue: [
+       temp <- false.
+    "   self do: [ :cur | cur optimize ifTrue: [ temp <- true] ]."
     "   self do: [ :cur | cur print ]. "
     ].
-    ^ superFlag.
 !
 
 " Sort literals by usage count. "
@@ -2471,10 +2489,8 @@ isGetInst
     cur <- cur nextLink.
     cur isNil ifTrue: [ ^ nil ].
     cur isCodeReturnStack ifFalse: [ ^ nil ].
-    cur <- cur nextLink.
-    cur notNil ifTrue: [ ^ nil ].
     " Build method "
-    ^ CompiledMethod newMethod: 0 header: ((inst * 256) + 16r68000000)
+    ^ CompiledMethod newMethod: 0 header: ((inst * 256) + 16r34000000)
 !
 
 " Check if code could be a set instance variable.
@@ -2507,16 +2523,14 @@ isSetInst
 	       ifFalse: [ ^ nil ] ]
           ifFalse: [ ^ nil ].
     ].
-    cur isCodeReturnStack ifFalse: [ ^ nil ].
-"    cur <- cur nextLink.
-    cur notNil ifTrue: [ ^ nil ]."
+    cur nextLink isCodeReturnStack ifFalse: [ ^ nil ].
     " Build method "
-    ^ CompiledMethod newMethod: 0 header: ((inst * 256) + 16r70000000)
+    ^ CompiledMethod newMethod: 0 header: ((inst * 256) + 16r38000000)
 !
 
 " Convert codetree into a method. "
 makeMethod: aClass argcount: count temps: tempcount for: primitive
-    | bytecodes header eheader method litcount maxstack|
+    | bytecodes header eheader method litcount maxstack |
 
     " Clean up generated code. "
     self optimize.
@@ -2532,11 +2546,11 @@ makeMethod: aClass argcount: count temps: tempcount for: primitive
     maxstack <- firstLink stack: 0.
     primitive > 0 or: [ count > 12 ] ifTrue: [ 
         header <- litcount + 1 + (tempcount bitShift: 8) +
-		   (maxstack bitShift: 16) + 16r78000000.
+		   (maxstack bitShift: 16) + 16r3C000000.
 	eheader <- primitive + (count bitShift: 16).
     ] ifFalse: [
-        header <- litcount + (tempcount bitShift: 8) + (maxstack bitShift: 16) +
-		   (count bitShift: 27).
+        header <- litcount + (tempcount bitShift: 8) + (maxstack bitShift: 16)
+			+ (count bitShift: 26).
 	eheader <- nil.
     ].
 
@@ -2563,22 +2577,32 @@ Object subclass: 'Compiler'
 evaluate: aString
     | comp |
     comp <- self new.
-    (comp compileForExecute: aString) ifFalse: [ ^ comp error ].
     aString print.
-    comp method print.
+    (comp compileForExecute: aString) ifFalse: [ ^ comp error ].
+    "comp method print."
     ^ comp method evaluate.
 !
 
 compile: aString forClass: aClass classified: aCategory
     | comp |
     comp <- self new.
-    (comp compile: aString forClass: aClass) ifFalse: [ ^ comp error ].
+    (comp compile: aString forClass: aClass) ifFalse:
+	 [ ^ self ].
+    comp method print.
     comp method description:
 	    (MethodInfo sourceCode: aString forCategory: aCategory).
-    aClass addSelector: comp select 
-	    withMethod: comp method
-	    classified: aCategory.
+    aClass addSelector: comp select
+           withMethod: comp method
+           classified: aCategory.
     ^ self.
+!
+
+compile: aString forClass: aClass
+    ^ self compile: aString forClass: aClass classified: nil
+!
+
+compile: aString forClass: aClass notify: aBlock
+    ^ self compile: aString forClass: aClass classified: nil notify: aBlock
 !
 
 compile: aString forClass: aClass classified: aCategory notify: aBlock
@@ -2589,40 +2613,20 @@ compile: aString forClass: aClass classified: aCategory notify: aBlock
     comp method description:
 	    (MethodInfo sourceCode: aString forCategory: aCategory).
     aClass addSelector: comp select
-	    withMethod: comp method
-	    classified: aCategory.
-    ^ self.
-!
-
-compile: aString forClass: aClass
-    | comp |
-    comp <- self new.
-    (comp compile: aString forClass: aClass) ifFalse: [ ^ comp error ].
-    comp method description:
-	    (MethodInfo sourceCode: aString).
-    aClass addSelector: comp sel withMethod: comp method.
-    ^ self.
-!
-
-compile: aString forClass: aClass notify: aBlock
-    | comp |
-    comp <- self new.
-    (comp compile: aString forClass: aClass) ifFalse:
-	 [ ^ aBlock value: comp errorstr ].
-    comp method description:
-	    (MethodInfo sourceCode: aString).
-    aClass addSelector: comp sel withMethod: comp method.
+           withMethod: comp method
+           classified: aCategory.
     ^ self.
 ! !
 
 ! Compiler methodsFor: 'initialize' !
+
 init: aString
     code <- SmallTalkCodeTree new.
     token <- SmallTalkToken on: aString.
     syms <- Dictionary new.
     tempcount <- 0.
     argcount <- 0.
-    class <- nil.
+    class <- Object.
     sel <- nil.
     inBlock <- false.
     optimBlk <- false.
@@ -2663,7 +2667,7 @@ errorstr
 " Compile a string for a class. "
 compile: aString forClass: aClass
     | offset |
-    stdout nextPutAll: aString.
+    "stdout nextPutAll: aString."
     self init: aString.
     (class <- aClass) notNil ifTrue: [
          offset <- 0.
@@ -2673,10 +2677,12 @@ compile: aString forClass: aClass
          ]
     ].
     self messagePattern ifFalse: [ ^ false ].
+    sel <- sel asSymbol.
     self doTemps ifFalse: [ ^ false ].
     " Check if primitive method. "
     self parsePrimitive ifFalse: [ ^ false ].
     self doBody ifFalse: [ ^ false ].
+    code genPopTOS.
     " Shove a return of self on end of method. "
     code genPushSelf.
     code genReturnTOS.
@@ -2685,8 +2691,13 @@ compile: aString forClass: aClass
 		   argcount: argcount
 		   temps: tempcount
 	           for: primnum.
-    method print.
+    "method print."
     syms <- code <- nil.
+    stdout nextPutAll: 'Class '.
+    stdout nextPutAll: (aClass name).
+    stdout nextPut: ' '.
+    stdout nextPutAll: sel asString.
+    stdout nl.
     ^ true 
 !
 
@@ -2704,6 +2715,8 @@ compileForExecute: aString
 
 parseError: aMessage
     error <- aMessage. 
+    error printOn: stderr.
+    stderr nl.
     ^ false
 ! !
 
@@ -2711,11 +2724,12 @@ parseError: aMessage
 
 " Add a symbol node "
 addSym: aSym 
-     | offset node sym |
+     | node sym |
      sym <- aSym name asSymbol.
-     syms associationAt: sym ifAbsent: [ syms at: sym put: aSym. ^ aSym ].
-     self parseError: ((aSym name) , ' multiply defined').
-     ^ nil 
+     node <- syms associationAt: sym ifAbsent: [ nil ].
+     node isNil 
+	ifTrue: [ syms at: sym put: aSym. ^ aSym ]
+     	ifFalse: [ self parseError: ((aSym name) , ' multiply defined'). ^ nil].
 !
 
 " Add a new temp symbol table node. "
@@ -2745,7 +2759,7 @@ removeSym: aSym
 
 " Lookup symbol in symbol table. "
 findSymbol
-    | var sym name|
+    | var sym name temp |
     name <- token value asSymbol.
     sym <- syms associationAt: name ifAbsent: [ nil ].
 
@@ -2753,24 +2767,30 @@ findSymbol
 
     " See if it is a class variable "
     var <- nil.
-    class notNil and: [(var <- class classPool) notNil] ifTrue: [
-	var <- var associationAt: name ifAbsent: [nil].
-	var isNil ifTrue: [
-           " See if it is a shared pool "
-	   class allSharedPools do: [ :pool |
-		var <- Smalltalk at: pool ifAbsent: [nil].
-		var notNil ifTrue: [
-		   var <- var associationAt: name ifAbsent: [ nil ].
-		  " If we found it, add it into symbol table "
-		   var notNil ifTrue: [
-			^ syms at: name put: (SmallTalkSymbolVar new: 
-								name asString 
-					offset: (code addLiteral: var)).
-		   ]
-		] 
-	    ]
+    class notNil ifTrue: [
+	temp <- class.
+	[ var isNil and: [ temp notNil ]] whileTrue: [
+	    (var <- temp classPool) notNil ifTrue: [
+	       var <- var associationAt: name ifAbsent: [nil]].
+	    temp <- temp superclass.	"Walk up class chain "
 	]
     ]. 
+
+    " See if it is a pool variable "
+     var isNil ifTrue: [
+        " See if it is a shared pool "
+        class allSharedPools do: [ :pool |
+  	  var <- Smalltalk at: pool ifAbsent: [nil].
+	  var notNil ifTrue: [
+	      var <- var associationAt: name ifAbsent: [ nil ].
+	      " If we found it, add it into symbol table "
+	      var notNil ifTrue: [
+		^ syms at: name put: (SmallTalkSymbolVar new: name asString 
+				offset: (code addLiteral: var)).
+	      ]
+	  ] 
+	]
+    ].
 
     " If not found try Smalltalk dictionary "
     var isNil ifTrue: [
@@ -2797,7 +2817,7 @@ messagePattern
 	   ifTrue: [
 		sel <- token value. 
 		token next isKeyName ifTrue: [ self addArg ]
-	           ifFalse: [ ^ self parseError: 'Binary not followd by name' ]
+	           ifFalse: [ ^ self parseError: 'Binary not followed by name' ]
 	        ]
            ifFalse: [ ^ self parseError: 'Illegal message selector' ]
 	   ]
@@ -2849,8 +2869,11 @@ parsePrimitive
 
 " Parse body of definition. "
 doBody
+    " If we reached end of stream, then just return "
     token isKeyEOS ifTrue: [ ^ true ].
 
+    " If we are at the end of a block already, assume empty block and push
+       a nil term. "
     token isKeyRBrack ifTrue: [
 	code genPushNil.
         inBlock not ifTrue: [ ^ self parseError: 'Mismatched ]' ].
@@ -2860,32 +2883,30 @@ doBody
 	token isKeyReturn ifTrue: [
 		token next.
 		self doExpression ifFalse: [ ^ false ].
+		code genDupTOS.
 	        code genReturnTOS.
 	] ifFalse: [
 		self doExpression ifFalse: [ ^ false ]. 
 	].
 
 	token isKeyEOS ifTrue: [
-"		code genPopTOS.  "
 		^ true
 	] ifFalse: [
 	    token isKeyPeriod ifTrue: [
 		code genPopTOS.
 		" End of Block "
 	        token next isKeyRBrack ifTrue: [
-		    [ code genPushNil ].
+		    code genPushNil.
 		    ^ true
 	        ] ifFalse: [
-  	        " End of method "
+  	        " End of method? "
 	            token isKeyEOS ifTrue: [ ^ true ]
 	        ].
    	    ] ifFalse: [
 		token isKeyRBrack
 		   ifTrue: [
-		       inBlock and: [ optimBlk not ] ifTrue: [ code genDupTOS ].
-		       inBlock ifFalse: [
-			^ self parseError: 'Extra ]' ].
-			 ^ true ]
+		       inBlock ifFalse: [ ^ self parseError: 'Extra ]' ].
+	   	       ^ true ]
 	           ifFalse: [ ^ self parseError: 'Invalid statement ending'.  ]
 	    ]
 	]
@@ -2900,7 +2921,7 @@ doExpression
     token isKeyName ifTrue: [
 	asgname <- self findSymbol.
 	asgname isNil ifTrue: [
-            ^ self parseError: 'Invalid asgname ' , token value.
+            ^ self parseError: ('Invalid asgname ' , token value).
         ].
 	token next isKeyAssign ifTrue: [
 	    asgname canAssign ifFalse: [
@@ -3012,9 +3033,8 @@ doBinaryContinue: superFlag
     [ token isKeySpecial ] whileTrue: [
 	msg <- token value.
 	token next.
-	(s2 <- self doUnaryContinue: self doTerm) isNil ifTrue: [ ^ nil ].
+	(self doUnaryContinue: self doTerm) isNil ifTrue: [ ^ nil ].
         code genSend: msg argcount: 1 super: s.
-	s <- s2.
     ].
     ^ s
 !
@@ -3104,19 +3124,18 @@ optimBlock
 doIfCond: key
     | block cond else adv |
 
-    adv <- 0.
+    adv <- 2.
     key = 'ifTrue:' ifTrue: [ cond <- false. else <- 'ifFalse:' ]
 		    ifFalse: [ cond <- true. else <- 'ifTrue:' ].
     block <- code genJumpCond: cond.    " Jump forward to end of block. "
     self optimBlock ifFalse: [ ^ false ].
 
     token isKeyKeyword and: [ token value = else ] ifTrue: [
-   "     code genDupTOS. "
 	code setJumpTarget: block advance: 2.
 	block <- code genJumpForw.	" Skip around else block "
 	self optimBlock ifFalse: [ ^ false ].	" Do else part "
 	adv <- 1.
-    ] ifFalse: [ code genDupTOS ].
+    ] . 
     code setJumpTarget: block advance: adv.
     ^ true
 
@@ -3130,10 +3149,9 @@ doWhile: aBoolean
     code genSend: 'value' argcount: 0 super: false.
     block <- code genJumpCond: aBoolean.  " Jump forward to end of block. "
     self optimBlock ifFalse: [ ^ false ]." Block body "
-    code genPopTOS.
+    code genPopTOS.			" Remove results of block. "
     code genJump: loop.			" Jump to start of block "
-"    code genPopTOS."			" Remove result of block "
-    code setJumpTarget: block advance: 1.
+    code setJumpTarget: block advance: 2.
     ^ true
 !
 
