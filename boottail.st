@@ -1,9 +1,12 @@
 " Last piece of bootstrap code. "
 
-" $Id: $ "
+" $Id: boottail.st,v 1.1 2001/07/31 14:10:39 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: boottail.st,v $
+ Revision 1.1  2001/07/31 14:10:39  rich
+ Initial revision
+
 
 "
 
@@ -18,6 +21,7 @@
 
 	" next, set up sourceFiles array "
 	n <- initSourceFile at: 1.
+	(File name: (n , 'c')) delete.
 	array <- Array new: 4.
 	array at: 1 put: (FileStream on: n mode: 'r').
 	array at: 2 put: (FileStream on: (n, 'c') mode: 'a').
@@ -34,9 +38,9 @@
 	Smalltalk removeKey: #loading ifAbsent: [nil].
 
 	" Now save an image "
-	stderr nextPutAll: 'Saving image'.
+	stderr nextPutAll: 'Saving system'.
 	stderr nl.
-	(System snapShot: 'smalltalk.sti')
+	(System newSourceFile: 'smalltalk')
 		 ifTrue: [ System quit ]
 		" When we come back after reload, run execute loop. "
 		 ifFalse: [ stdin executeLoop ]
