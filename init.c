@@ -3,6 +3,10 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.8  2001/08/18 16:17:01  rich
+ * Added support for graphics system.
+ * Added support for large integers.
+ *
  * Revision 1.7  2001/08/01 16:42:31  rich
  * Make sure top of message chain has a nil sender.
  *
@@ -36,7 +40,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
+	"$Id: init.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
 
 #endif
 
@@ -458,6 +462,10 @@ load_file(char *str)
     rootObjects[INPUTSEMA] = input_semaphore;
     rootObjects[CONSOLELIST] = console.file_oop;
     init_console(console.file_oop);
+
+   /* Just to be clean we clear out any outstanding events  */
+    Set_integer(tick_semaphore, SEM_SIGNALS, 0);
+    Set_integer(input_semaphore, SEM_SIGNALS, 0);
 
    /* Initialize the display and cursor */
     display_object = NilPtr;
