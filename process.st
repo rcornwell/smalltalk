@@ -1,9 +1,13 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.5 2001/08/01 16:42:31 rich Exp rich $ "
+" $Id: process.st,v 1.6 2001/08/18 16:17:02 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.6  2001/08/18 16:17:02  rich
+ Changed classes and methods to correct categories.
+ Fixed bugs in process management.
+
  Revision 1.5  2001/08/01 16:42:31  rich
  Enabled process scheduling.
  Corrected backtraceString and selector methods.
@@ -135,6 +139,12 @@ wait
     <primitive 72>
     ^self primitiveFailed
 ! !
+
+Object variableSubclass: 'BlockContext'
+     instanceVariableNames: 'caller ip sp home iip unused argcount'
+     classVariableNames: ''
+     poolDictionaries: ''
+     category: 'System-Execution' !
 
 BlockContext comment: 
 'My instances represent Smalltalk blocks, which are portions of executeable
@@ -285,6 +295,12 @@ valueWithArguments: anArray
 	^ self primitiveFailed
 ! !
 
+Object variableSubclass: 'MethodContext'
+     instanceVariableNames: 'sender ip sp method unused receiver argcount'
+     classVariableNames: ''
+     poolDictionaries: ''
+     category: 'System-Execution' !
+
 MethodContext comment: 
 'My instances represent an actively executing method.  They record various
 bits of information about the execution environment, and contain the
@@ -390,6 +406,7 @@ lowIOPriority
 userInterruptPriority
     5
 !
+
 userSchedulingPriority
     4
 !
@@ -573,7 +590,7 @@ untilMilliseconds: millisecondCount
 ! Delay class methodsFor: 'general inquiries'!
 
 millisecondClockValue
-    ^ Time millisecondClockValue self
+    ^ Time millisecondClockValue 
 ! !
 
 
