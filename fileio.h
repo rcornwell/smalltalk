@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Id: fileio.h,v 1.2 2000/02/01 18:09:51 rich Exp rich $
+ * $Id: fileio.h,v 1.3 2001/01/13 15:50:19 rich Exp rich $
  *
  * $Log: fileio.h,v $
+ * Revision 1.3  2001/01/13 15:50:19  rich
+ * Added check_files routine
+ *
  * Revision 1.2  2000/02/01 18:09:51  rich
  * Added fill_buffer and flush_buffer for stdin and stdout support.
  *
@@ -45,9 +48,8 @@ struct file_buffer {
     long                file_id;	/* Os interal identifier */
     long                file_pos;	/* Buffer position */
     int                 file_flags;	/* Flags on file */
-    char               *file_buffer;	/* Internal Buffer */
-    char               *file_offset;	/* Pointer into buffer */
     int                 file_len;	/* Amount of data in buffer */
+    char               *file_buffer;	/* Internal Buffer */
     struct file_buffer *file_next;	/* Next in chain of open files */
 };
 
