@@ -9,8 +9,8 @@ OPTIM=-O -fomit-frame-pointers -finline-functions -fpeephole \
      -funroll-loops -fcse-follow-jumps -fcse-skip-blocks \
      -frerun-cse-after-loop -fexpensive-optimizions -fschedule-insns \
      -fschedule-insns2
-CFLAGS = -g -O2 -Wall -DINLINE_OBJECT_MEM -DINLINE=inline
-LDFLAGS = -g
+CFLAGS = -O2 -Wall -DINLINE_OBJECT_MEM -DINLINE=inline
+LDFLAGS = 
 LIBS=-lm -L/usr/X11/lib -lX11
 
 
@@ -43,7 +43,7 @@ $(PROJ): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) 
 
 clean:
-	rm -f $(OBJS) $(PROJ).sti $(PROJ).st boot.st
+	rm -f $(OBJS) boot.st boot.st source.st
 
 about.o:	about.c smalltalk.h about.h
 $(PROJ).o:	$(PROJ).c $(PROJ).h smalltalk.h  about.h
