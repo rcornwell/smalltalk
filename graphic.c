@@ -1,13 +1,18 @@
 /*
  * Smalltalk graphics: Routines for doing graphics primitive.
  *
- * $Log: $
+ * $Log: graphic.c,v $
+ * Revision 1.1  2001/08/18 16:20:57  rich
+ * Initial revision
+ *
  *
  *
  */
 
 #ifndef lint
-static char        *rcsid = "$Id: $";
+static char        *rcsid =
+
+    "$Id: graphic.c,v 1.1 2001/08/18 16:20:57 rich Exp rich $";
 
 #endif
 
@@ -20,7 +25,7 @@ static char        *rcsid = "$Id: $";
 #include "system.h"
 
 Objptr              display_object = NilPtr;
-Objptr		    cursor_object = NilPtr;
+Objptr              cursor_object = NilPtr;
 Objptr              tick_semaphore = NilPtr;
 Objptr              input_semaphore = NilPtr;
 event_queue         input_queue;
@@ -79,7 +84,8 @@ PostEvent(int type, unsigned long value)
 /*
  * Return the bit at a location in a form.
  */
-Objptr BitAt(Objptr form, Objptr point)
+Objptr
+BitAt(Objptr form, Objptr point)
 {
     Objptr              op;
     unsigned long      *bits;
@@ -114,13 +120,14 @@ Objptr BitAt(Objptr form, Objptr point)
 	return NilPtr;
     /* Grab actual word */
     word = bits[(x / 32) + ((w / 32) * y)];
-    return as_integer_object(1 & (word >> (x & 0x1f)));
+    return as_integer_object(1 & (word >> ( /*32 - */ (x & 0x1f))));
 }
 
 /*
  * Set the bit at a location in a form.
  */
-Objptr BitAtPut(Objptr form, Objptr point, Objptr bitCode)
+Objptr
+BitAtPut(Objptr form, Objptr point, Objptr bitCode)
 {
     Objptr              op;
     unsigned long      *bits;
@@ -133,10 +140,11 @@ Objptr BitAtPut(Objptr form, Objptr point, Objptr bitCode)
     if (class_of(point) != PointClass)
 	return NilPtr;
 
-    if (!is_integer(bitCode))
+    if (is_object(bitCode))
 	return NilPtr;
+
     bit = as_integer(bitCode);
-    if (bit != 0 || bit != 1)
+    if (bit != 0 && bit != 1)
 	return NilPtr;
 
     /* Retrive values */
@@ -162,7 +170,7 @@ Objptr BitAtPut(Objptr form, Objptr point, Objptr bitCode)
 	return NilPtr;
     /* Grab actual word */
     bits = &bits[(x / 32) + ((w / 32) * y)];
-    mask = 1 << (x & 0x1f);
+    mask = 1 << ( /*32 - */ (x & 0x1f));
     *bits &= ~mask;		/* Clear bit */
     if (bit)
 	*bits |= mask;		/* Set it if need be */
@@ -203,9 +211,9 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 
 	/* Extract sizes */
 	IntValue(blitOp, DEST_X, blit_data->dx);
-        IntValue(blitOp, DEST_Y, blit_data->dy);
-        IntValue(blitOp, DEST_WIDTH, blit_data->w);
-        IntValue(blitOp, DEST_HEIGHT, blit_data->h);
+	IntValue(blitOp, DEST_Y, blit_data->dy);
+	IntValue(blitOp, DEST_WIDTH, blit_data->w);
+	IntValue(blitOp, DEST_HEIGHT, blit_data->h);
     } else {
 	return FALSE;		/* Can't copy if no destination */
     }
@@ -231,8 +239,8 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 	if (!is_integer(op))
 	    return FALSE;
 	blit_data->sh = as_integer(op);
-        IntValue(blitOp, SRC_X, blit_data->sx);
-        IntValue(blitOp, SRC_Y, blit_data->sy);
+	IntValue(blitOp, SRC_X, blit_data->sx);
+	IntValue(blitOp, SRC_Y, blit_data->sy);
     } else {
 	blit_data->source_bits = NULL;
 	blit_data->sx = blit_data->dx;
@@ -278,54 +286,6 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 }
 
 /*
- * Adjust blit data for clipping.
- */
-static INLINE void
-clip_data(Copy_bits blit_data)
-{
-    /* Now we have it loaded, compute clip range */
-    if (blit_data->dx < blit_data->cx) {
-	blit_data->sx += blit_data->cx - blit_data->dx;
-	blit_data->w -= blit_data->cx - blit_data->dx;
-	blit_data->dx = blit_data->cx;
-    }
-    if ((blit_data->dx + blit_data->w) > (blit_data->cx + blit_data->cw)) {
-	blit_data->w -= (blit_data->dx + blit_data->w) -
-	    (blit_data->cx + blit_data->cw);
-    }
-
-    /* Now do Y */
-    if (blit_data->dy < blit_data->cy) {
-	blit_data->sy += blit_data->cy - blit_data->dy;
-	blit_data->w -= blit_data->cy - blit_data->dy;
-	blit_data->dy = blit_data->cy;
-    }
-    if ((blit_data->dy + blit_data->h) > (blit_data->cy + blit_data->ch)) {
-	blit_data->h -= (blit_data->dy + blit_data->h) -
-	    (blit_data->cy + blit_data->ch);
-    }
-
-    /* Sanity check things */
-    if (blit_data->sx < 0) {
-	blit_data->dx -= blit_data->sx;
-	blit_data->w += blit_data->sx;
-	blit_data->sx = 0;
-    }
-    if ((blit_data->sx + blit_data->w) > blit_data->sw) {
-	blit_data->w -= blit_data->sx + blit_data->w - blit_data->sw;
-    }
-
-    if (blit_data->sy < 0) {
-	blit_data->dy -= blit_data->sy;
-	blit_data->h += blit_data->sy;
-	blit_data->sy = 0;
-    }
-    if ((blit_data->sy + blit_data->h) > blit_data->sh) {
-	blit_data->h -= blit_data->sy + blit_data->h - blit_data->sh;
-    }
-}
-
-/*
  * Do actual work of copying image.
  */
 static INLINE void
@@ -338,46 +298,91 @@ doblit(Copy_bits blit_data)
     int                 hDir, vDir;
     int                 nWords;
     unsigned long      *source_ptr, *dest_ptr;
-    int                 source_index, source_delta;
-    int                 dest_index, dest_delta;
-    int			dx, dy, sx, sy;
+    int                 source_row, source_index, source_delta;
+    int                 dest_row, dest_index, dest_delta;
+    int                 dx, dy, sx, sy, w, h;
     int                 i;
 
-    /* Compute masks */
-    skew = (blit_data->sx - blit_data->dx) & 0x1f;
-    startBits = 32 - (blit_data->dx & 0x1f);
-    mask1 = low_mask[startBits];
-    endBits = 31 - ((blit_data->dx + blit_data->w - 1) & 0x1f);
-    mask2 = ~low_mask[endBits];
-    skewMask = (skew == 0) ? 0 : (low_mask[32 - skew]);
-
-    /* Merge masks if needed */
-    if (blit_data->w < startBits) {
-	mask1 = mask1 & mask2;
-	mask2 = 0;
-	nWords = 1;
-    } else {
-	nWords = (blit_data->w - startBits - 1) / 32 + 2;
-    }
-
-    /* Check for overlap */
-    hDir = 1;
-    vDir = 1;
+    /* load values so we can play with them */
     dx = blit_data->dx;
     dy = blit_data->dy;
     sx = blit_data->sx;
     sy = blit_data->sy;
+    w = blit_data->w;
+    h = blit_data->h;
+
+    /* Now we have it loaded, do clipping range */
+    if (dx < blit_data->cx) {
+	sx += blit_data->cx - dx;
+	w -= blit_data->cx - dx;
+	dx = blit_data->cx;
+    }
+    if ((dx + w) > (blit_data->cx + blit_data->cw)) {
+	w -= (dx + w) - (blit_data->cx + blit_data->cw);
+    }
+
+    /* Now do Y */
+    if (dy < blit_data->cy) {
+	sy += blit_data->cy - dy;
+	w -= blit_data->cy - dy;
+	dy = blit_data->cy;
+    }
+    if ((dy + h) > (blit_data->cy + blit_data->ch)) {
+	h -= (dy + h) - (blit_data->cy + blit_data->ch);
+    }
+
+    /* Sanity check things */
+    if (sx < 0) {
+	dx -= sx;
+	w += sx;
+	sx = 0;
+    }
+    if ((sx + w) > blit_data->sw) {
+	w -= sx + w - blit_data->sw;
+    }
+
+    if (sy < 0) {
+	dy -= sy;
+	h += sy;
+	sy = 0;
+    }
+    if ((sy + h) > blit_data->sh) {
+	h -= sy + h - blit_data->sh;
+    }
+
+    if (w <= 0 || h <= 0)
+	return;
+
+    /* Compute masks */
+    skew = (dx - sx) & 0x1f;
+    startBits = dx & 0x1f;
+    mask1 = ~low_mask[startBits];
+    endBits = (dx + w) & 0x1f;
+    mask2 = low_mask[(endBits == 0) ? 32 : endBits];
+    skewMask = low_mask[skew] /*(skew == 0) ? 0 : ~low_mask[skew + 1] */ ;
+
+    /* Merge masks if needed */
+    nWords = ((w - 1 + dx) / 32) - (dx / 32);
+    if (nWords == 0) {
+	mask1 = mask1 & mask2;
+	mask2 = 0;
+    }
+    /* Interloop */
+
+    /* Check for overlap */
+    hDir = 1;
+    vDir = 1;
     if (blit_data->source_bits == blit_data->dest_bits) {
 	if (dy > sy) {
 	    vDir = -1;
-	    sy += blit_data->h - 1;
-	    dy += blit_data->h - 1;
+	    sy += h - 1;
+	    dy += h - 1;
 	} else if (dx > sx) {
 	    unsigned long       t;
 
 	    hDir = -1;
-	    sx += blit_data->w - 1;
-	    dx += blit_data->w - 1;
+	    sx += w - 1;
+	    dx += w - 1;
 	    skewMask = ~skewMask;
 	    t = mask1;
 	    mask1 = mask2;
@@ -386,7 +391,7 @@ doblit(Copy_bits blit_data)
     }
 
     /* Calculate offsets */
-    if (blit_data->source_bits != NULL && skew != 0 && skew < -(sx & 0x1f))
+    if (blit_data->source_bits != NULL && skew != 0 && skew <= (sx & 0x1f))
 	preload = 1;
     else
 	preload = 0;
@@ -395,22 +400,22 @@ doblit(Copy_bits blit_data)
 	preload = !preload;
 
     /* Calculate starting offsets and increments */
-    source_index = sy * (((blit_data->sw - 1) / 32) + 1) + (sx / 32);
+    source_row = (blit_data->sw + 30 /* - 1 + 31 */ ) / 32;
+    source_index = (sy * source_row) + (sx / 32);
+    source_delta = (vDir * source_row) - ((nWords + preload + 1) * hDir);
     if (blit_data->source_bits != NULL)
 	source_ptr = &blit_data->source_bits[source_index];
     else
 	source_ptr = NULL;
-    dest_index = dy * (((blit_data->dw - 1) / 32) + 1) + (dx / 32);
+    dest_row = (blit_data->dw + 30 /* - 1 + 31 */ ) / 32;
+    dest_index = (dy * dest_row) + (dx / 32);
     dest_ptr = &blit_data->dest_bits[dest_index];
-    source_delta = vDir * (((blit_data->sw - 1) / 32) + 1) -
-	(nWords + preload) * hDir;
-    dest_delta = vDir * (((blit_data->dw - 1) / 32) + 1) - (nWords * hDir);
+    dest_delta = (vDir * dest_row) - ((nWords + 1) * hDir);
 
     /* Interloop */
-    for (i = 0; i < blit_data->h; i++) {	/* Vertical loop */
+    for (i = 0; i < h; i++) {	/* Vertical loop */
 	unsigned long       halftone;
 	unsigned long       prevword;
-	unsigned long       skewWord;
 	unsigned long       mergeMask;
 	int                 word;
 
@@ -420,7 +425,7 @@ doblit(Copy_bits blit_data)
 	} else {
 	    halftone = 0xffffffff;
 	}
-	skewWord = halftone;
+
 	if (preload) {
 	    prevword = *source_ptr;
 	    source_ptr += hDir;
@@ -428,7 +433,7 @@ doblit(Copy_bits blit_data)
 	    prevword = 0;
 	}
 	mergeMask = mask1;
-	for (word = 0; word < nWords; word++) {	/* Horizontal loop */
+	for (word = nWords; word >= 0; word--) {	/* Horizontal loop */
 	    unsigned long       skewWord;
 	    unsigned long       mergeWord;
 	    unsigned long       dest;
@@ -437,10 +442,8 @@ doblit(Copy_bits blit_data)
 		unsigned long       thisword;
 
 		thisword = *source_ptr;
-		skewWord = (prevword & skewMask) |
-		    (thisword & (~skewMask));
+		skewWord = (thisword << skew) | (prevword >> (32 - skew));
 		prevword = thisword;
-		skewWord = (skewWord << skew) | (skewWord >> (32 - skew));
 		skewWord &= halftone;
 		source_ptr += hDir;
 	    } else
@@ -499,13 +502,12 @@ doblit(Copy_bits blit_data)
 	    }
 	    *dest_ptr = (mergeWord & mergeMask) | ((~mergeMask) & dest);
 	    dest_ptr += hDir;
-	    mergeMask = (word == nWords) ? mask2 : 0xffffffff;
+	    mergeMask = (word == 1) ? mask2 : 0xffffffff;
 	}
 	if (source_ptr != NULL)
 	    source_ptr += source_delta;
 	dest_ptr += dest_delta;
     }
-
 }
 
 /*
@@ -519,12 +521,6 @@ copybits(Objptr blitOp)
     if (!load_blit(blitOp, &blit_data))
 	return FALSE;
 
-    clip_data(&blit_data);
-
-    /* Check for null copy */
-    if (blit_data.w <= 0 || blit_data.h <= 0)
-	return TRUE;
-
     doblit(&blit_data);
 
     /* If display, update changed bits */
@@ -536,7 +532,8 @@ copybits(Objptr blitOp)
 /*
  * Primitive to scan a character array and display it.
  */
-Objptr character_scanword(Objptr op, Objptr arg)
+Objptr
+character_scanword(Objptr op, Objptr arg)
 {
     Objptr              text;
     Objptr              except;
@@ -681,8 +678,13 @@ drawLoop(Objptr blitOp, int x, int y)
 {
     int                 dx, px;
     int                 dy, py;
+    int                 i, p;
+    int                 minx, miny;
+    int                 maxx, maxy;
     copy_bits           blit_data;
-    copy_bits           inst_data;
+
+    if (!load_blit(blitOp, &blit_data))
+	return FALSE;
 
     if (x < 0) {
 	dx = -1;
@@ -706,73 +708,76 @@ drawLoop(Objptr blitOp, int x, int y)
 	py = 0;
     }
 
-    if (!load_blit(blitOp, &blit_data))
-	return FALSE;
-
-    inst_data = blit_data;
-    /* Do initial copy */
-    clip_data(&inst_data);
+    /* Set initial area */
+    minx = blit_data.dx;
+    miny = blit_data.dy;
+    maxx = blit_data.dx + blit_data.w;
+    maxy = blit_data.dy + blit_data.h;
 
     /* Check for null copy */
-    if (inst_data.w > 0 && inst_data.h > 0) {
-	doblit(&inst_data);
+    doblit(&blit_data);
 
-	/* If display, update changed bits */
-	if (inst_data.display)
-	    UpdateDisplay(&inst_data);
-    }
-
-    if (py > px) {
-	int                 p = py / 2;
-	int                 i;
-
+    if (dx == 0) {
+	/* Vertical line */
 	for (i = 1; i < py; i++) {
+	    blit_data.dy += dy;
+	    doblit(&blit_data);
+	}
+    } else if (dy == 0) {
+	/* Horizontal line */
+	for (i = 1; i < px; i++) {
 	    blit_data.dx += dx;
-	    p -= px;
-	    if (p < 0) {
-		blit_data.dy += dy;
-		p += py;
+	    doblit(&blit_data);
+	}
+    } else if (py > px) {
+	/* More horizontal */
+	p = 2 * px - py;
+	for (i = 1; i < py; i++) {
+	    if (p > 0) {
+		blit_data.dx += dx;
+		p += (2 * px) - (2 * py);
+	    } else {
+		p += 2 * px;
 	    }
-	    inst_data = blit_data;
-	    clip_data(&inst_data);
-
-	    /* Check for null copy */
-	    if (inst_data.w > 0 && inst_data.h > 0) {
-		doblit(&inst_data);
-
-		/* If display, update changed bits */
-		if (inst_data.display)
-		    UpdateDisplay(&inst_data);
-	    }
-
+	    blit_data.dy += dy;
+	    doblit(&blit_data);
 	}
     } else {
-	int                 p = px / 2;
-	int                 i;
-
+	/* More vertical */
+	p = 2 * py - px;
 	for (i = 1; i < px; i++) {
-	    blit_data.dy += dy;
-	    p -= py;
-	    if (p < 0) {
-		blit_data.dx += dx;
-		p += p;
+	    if (p > 0) {
+		blit_data.dy += dy;
+		p += (2 * py) - (2 * px);
+	    } else {
+		p += 2 * py;
 	    }
-	    inst_data = blit_data;
-	    clip_data(&inst_data);
-
-	    /* Check for null copy */
-	    if (inst_data.w > 0 && inst_data.h > 0) {
-		doblit(&inst_data);
-
-		/* If display, update changed bits */
-		if (inst_data.display)
-		    UpdateDisplay(&inst_data);
-	    }
-
+	    blit_data.dx += dx;
+	    doblit(&blit_data);
 	}
     }
+
     /* Set source BitBlit to current location */
     Set_integer(blitOp, DEST_X, blit_data.dx);
     Set_integer(blitOp, DEST_Y, blit_data.dy);
+
+    /* Update the display if we need too */
+    if (blit_data.display) {
+	/* Set initial area */
+	if (blit_data.dx < minx)
+	    minx = blit_data.dx;
+	if (blit_data.dy < miny)
+	    miny = blit_data.dy;
+	if ((blit_data.dx + blit_data.w) > maxx)
+	    maxx = blit_data.dx + blit_data.w;
+	if ((blit_data.dy + blit_data.h) > maxy)
+	    maxy = blit_data.dy + blit_data.h;
+	blit_data.dx = minx;
+	blit_data.dy = miny;
+	blit_data.w = maxx - minx;
+	blit_data.h = maxy - miny;
+	UpdateDisplay(&blit_data);
+    }
+
     return TRUE;
 }
