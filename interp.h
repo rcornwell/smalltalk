@@ -2,9 +2,14 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.5 2001/07/31 14:09:48 rich Exp rich $
+ * $Id: interp.h,v 1.6 2001/08/01 16:42:31 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.6  2001/08/01 16:42:31  rich
+ * Added Pshint instruction.
+ * Moved sendsuper to group 2.
+ * Added psh context instruction.
+ *
  * Revision 1.5  2001/07/31 14:09:48  rich
  * Reorganized instructions.
  *
@@ -68,6 +73,13 @@ typedef struct _method_Cache {
     Objptr              header;
 } method_Cache     , *Method_Cache;
 
+typedef struct _queue {
+    Objptr		data[256];
+    Objptr		*rdptr;
+    Objptr		*wrptr;
+    Objptr		*top;
+} event_queue	   , *Event_queue;
+
 #define Push(obj) { if (stack_pointer == BLOCK_STACK)  {	  \
 			int tstack = stack_pointer;		  \
 			SendError(InterpStackFault, &tstack);     \
@@ -102,15 +114,14 @@ extern int          newContextFlag;
 
 extern int          newProcessWaiting;
 extern Objptr       newProcess;
-extern Objptr       semaphoreList[100];
-extern int          semaphoreIndex;
+extern event_queue  asyncsigs;
 
 #define isEmptyList(aList) (get_pointer(aList, LINK_FIRST) == NilPtr)
 
 #define asynchronusSignal(aSemaphore) \
-	 semaphoreList[++semaphoreIndex] = (aSemaphore)
+	 add_event(&asyncsigs, aSemaphore)
 
-#define schedulerPointer get_pointer(SchedulerAssociationPointer, DICT_VALUES)
+#define schedulerPointer SchedulerAssociationPointer
 
 #define activeProcess (newProcessWaiting? newProcess: \
 		 get_pointer(schedulerPointer, SCHED_INDEX))
@@ -120,19 +131,30 @@ extern int          semaphoreIndex;
 			    as_integer(get_pointer(aProcess, PROC_PRIO))-1), \
 			    aProcess)
 
+#define transferTo(aProcess) \
+	newProcess = (aProcess); \
+	rootObjects[NEWPROC] = newProcess; \
+	newProcessWaiting = 1;  
+
 #define suspendActive transferTo(wakeHighestPriority())
+
+#define is_empty(queue) (queue)->rdptr == (queue)->wrptr
 
 void		    SendToClass(Objptr, int *, int, Objptr);
 void		    dump_stack(Objptr);
 void                interp();
 void                synchronusSignal(Objptr);
-void                transferTo(Objptr);
 void                checkProcessSwitch();
 Objptr              removeFirstLinkOf(Objptr);
 void                addLinkLast(Objptr, Objptr);
 Objptr              wakeHighestPriority();
 void                resume(Objptr);
 void                wait(Objptr);
+void                signal_console(Objptr);
+void                wait_console(Objptr);
 void		    SendError(Objptr, int *);
 void		    flushMethod(Objptr);
 void		    flushCache(Objptr);
+void		    init_event(Event_queue);
+void		    add_event(Event_queue, Objptr);
+Objptr		    nxt_event(Event_queue);
