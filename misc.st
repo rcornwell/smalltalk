@@ -1,9 +1,12 @@
 " Methods for Class misc extra classes"
 
-" $Id: misc.st,v 1.3 2001/01/07 15:47:21 rich Exp rich $ "
+" $Id: misc.st,v 1.4 2001/07/31 14:09:48 rich Exp rich $ "
 
 "
  $Log: misc.st,v $
+ Revision 1.4  2001/07/31 14:09:48  rich
+ Code cleanup
+
  Revision 1.3  2001/01/07 15:47:21  rich
  Code cleanup
 
@@ -19,7 +22,7 @@ Stream subclass: 'Random'
        instanceVariableNames: 'seed'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil
+       category: 'Streaming'
 !
 
 Random comment: 
