@@ -2,9 +2,13 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.6 2001/08/01 16:42:31 rich Exp rich $
+ * $Id: interp.h,v 1.7 2001/08/18 16:17:01 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.7  2001/08/18 16:17:01  rich
+ * Fixed bugs in process management functions.
+ * Added queue functions to improve communication from system to image.
+ *
  * Revision 1.6  2001/08/01 16:42:31  rich
  * Added Pshint instruction.
  * Moved sendsuper to group 2.
@@ -74,7 +78,7 @@ typedef struct _method_Cache {
 } method_Cache     , *Method_Cache;
 
 typedef struct _queue {
-    Objptr		data[256];
+    Objptr		data[1024];
     Objptr		*rdptr;
     Objptr		*wrptr;
     Objptr		*top;
