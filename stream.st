@@ -1,9 +1,12 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: $ "
+" $Id: stream.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: stream.st,v $
+ Revision 1.1  1999/09/02 15:57:59  rich
+ Initial revision
+
 "
 
 Object subclass: 'Stream' instanceVariableNames: 'contents'
@@ -68,6 +71,7 @@ print: anObject
 store: anObject
     anObject storeOn: self
 ! !
+
 
 
 Stream subclass: 'PositionableStream'
@@ -139,6 +143,7 @@ reverseContents
 !PositionableStream methodsFor: 'testing'!
 
 atEnd
+    <primitive 52>
     ^position > endPtr
 !
 
@@ -199,6 +204,7 @@ PositionableStream subclass: 'ReadStream' instanceVariableNames: ''
 
 next
     | element |
+    <primitive 50>
     self atEnd ifTrue: [ ^self error: 'end of stream reached' ].
     element <- contents at: position.
     position <- position + 1.
@@ -243,6 +249,7 @@ next
 !WriteStream methodsFor: 'accessing-writing'!
 
 nextPut: anObject
+    <primitive 51>
     position > maxSize ifTrue: [ self growCollection ].
     contents at: position put: anObject.
     position > endPtr ifTrue: [ endPtr <- position ].
@@ -330,6 +337,7 @@ on: aCollection
 
 next
     | element |
+    <primitive 50> 
     self atEnd ifTrue: [ ^self error: 'end of stream reached' ].
     element <- contents at: position.
     position <- position + 1.
@@ -345,6 +353,82 @@ useWholeStream
     endPtr <- contents size
 ! !
 
+ReadWriteStream subclass: 'CharStream' 
+       instanceVariableNames: 'stream mode'
+       classVariableNames: '' poolDictionaries: '' category: nil
+!
+
+!CharStream class methodsFor: 'creation'!
+
+on: aStream
+    ^ super new stream: aStream
+! !
+
+!CharStream methodsFor: 'accessing-writing'!
+
+nextPut: anObject
+    contents isNil ifTrue: [ contents <- anObject asString ]
+	 	 ifFalse: [ contents <- contents , (anObject asString) ].
+    mode == 1 or: [ Character nl == anObject ]
+	 ifTrue: [ self flush: stream buffer: contents. contents <- nil ].
+    ^ anObject
+! !
+
+!CharStream methodsFor: 'misc'!
+
+setBuffered
+	mode <- 0.
+!
+
+setUnbuffered
+	mode <- 1.
+! !
+
+!CharStream methodsFor: 'testing'!
+
+atEnd
+     position > endPtr ifTrue: [
+	 contents <- self fill: stream mode: mode.
+	 position <- 1.
+	 endPtr <- contents size. ].
+    ^ false
+!
+
+isEmpty
+    ^false
+! !
+
+
+!CharStream methodsFor: 'private'!
+
+fill: aStream mode: aMode
+	<primitive 101>
+	^ self primitiveFailed
+!
+
+flush: aStream buffer: aBuffer
+	<primitive 102>
+	^ self primitiveFailed
+!
+
+stream: aInteger
+	stream <- aInteger.
+	mode <- 0.
+	position <- 1.
+	endPtr <- 0.
+! !
+
+!CharStream class methodsFor: 'initialize'!
+
+initialize
+    " Define built in streams "
+       Smalltalk at: #stdin put: (CharStream on: 0).
+       Smalltalk at: #stdout put: (CharStream on: 1).
+       Smalltalk at: #stderr put: (CharStream on: 2; setUnbuffered).
+! !
+
+CharStream initialize !
+
 ReadWriteStream subclass: 'FileStream'
                 instanceVariableNames: 'file buffer'
                 classVariableNames: '' poolDictionaries: '' category: nil!
@@ -352,7 +436,7 @@ ReadWriteStream subclass: 'FileStream'
 !FileStream class methodsFor: 'basic'!
 
 open: fileName mode: fileMode
-    ^self open: fileName mode: fileMode 
+    ^self new open: fileName mode: fileMode 
           ifFail: [ ^self error: 'Failed to open ''', fileName, '''' ]
 !
 
@@ -367,11 +451,25 @@ fileIn: aFileName
     fileStream close.
 ! !
 
-!FileStream methodsFor: 'basic'!
+!FileStream methodsFor: 'basic' !
 
 open: fileName mode: fileMode ifFail: aBlock
     file <- File open: fileName mode: fileMode ifFail: aBlock.
-    buffer <- nil
+    buffer <- nil.
+    position <- file position.
+!
+
+openOnFile: aFile
+    file <- aFile.
+    buffer <- nil.
+    position <- file position.
+!
+
+copy
+    | newStream |
+    newStream <- FileStream new.
+    newStream openOnFile: file.
+    ^ newStream
 !
 
 close
@@ -381,28 +479,35 @@ close
 
 next
     | ch |
-    buffer isNil ifTrue: [ ^file next ]
-	         ifFalse: [ ch <- buffer. buffer <- nil. ^ ch ]
+    buffer isNil ifTrue: [
+	 file position: position.
+	 file atEnd ifTrue: [ ^ 0 asCharacter ].
+	 position <- position + 1.
+	 ^ file next.  ]
+     ifFalse: [ ch <- buffer. position <- position + 1. buffer <- nil. ^ ch ]
 !
 
 nextPut: aChar
-    file nextPut: aChar
+    file position: position.
+    file nextPut: aChar.
+    position <- position + 1.
 !
 
 peek
     buffer
-        isNil ifTrue: [ buffer <- self next ].
+        isNil ifTrue: [ buffer <- self next. position <- position - 1 ].
     ^buffer
 !
 
-position: position
+position: aInteger
     buffer <- nil.
-    file position: position
+    position <- aInteger.
+    ^ aInteger
 ! 
 
 position
-    buffer isNil ifTrue: [ ^file position ]
-	         ifFalse: [ ^(file position) - 1]
+    buffer isNil ifTrue: [ ^position ]
+	         ifFalse: [ ^position - 1]
 !
 
 contents
@@ -422,7 +527,7 @@ reset
 !
 
 setToEnd
-    self position: self size
+    ^ self position: self size
 !
 
 skip: anInteger
@@ -445,4 +550,45 @@ atEnd
     ^file atEnd
 
 ! !
+
+!FileStream class methodsFor: 'Initialize'!
+
+initialize
+	| array |
+	array <- Array new: 4.
+	array at: 1 put: (FileStream
+		 open: (initSourceFile at: 1) mode: 'r').
+	array at: 2 put: (FileStream open: 'smalltalk.stc' mode: 'a').
+	Smalltalk at: #sourceFiles put: array.
+! !
+
+FileStream initialize !
+
+!Stream methodsFor: 'reading chunks' !
+
+nextChunk
+    " Return the next chunk off the stream. "
+    | chunk char |
+    chunk <- WriteStream on: (String new: 0).
+    [ self atEnd ] whileFalse: [
+	char <- self next.
+	char == $!! and: [ self next ~= $!! ] ifTrue: [ ^ chunk contents ].
+	chunk nextPut: char.
+    ].
+! !
+
+!Stream methodsFor: 'writing chunks' !
+
+nextChunkPut: aString
+     " Put a string onto a stream as a chunk. "
+     | char position |
+     self space.
+     1 to: aString size do: [ :i |
+	char <- aString at: i.
+	char == $!! ifTrue: [ self nextPut: char ].
+	self nextPut: char.
+     ].
+     self nextPut: $!!.
+! !
+
 
