@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.2 2000/01/03 16:23:22 rich Exp rich $
+ * $Id: object.h,v 1.3 2000/02/01 18:09:58 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.3  2000/02/01 18:09:58  rich
+ * Increased size of root objects.
+ *
  * Revision 1.2  2000/01/03 16:23:22  rich
  * Moved object pointer out to a new structure to reduce access cost.
  *
@@ -165,7 +168,7 @@ void		    reclaimSpace();
 #define set_word(op, offset, value) \
 			(((int *) get_object_base(op))[offset] = (value))
 
-#define get_byte(op, offset) (((char *) get_object_base(op))[offset])
+#define get_byte(op, offset) (0xff&(((char *) get_object_base(op))[offset]))
 
 #define set_byte(op, offset, value) \
 	    (((char *) get_object_base(op))[offset] = (value))

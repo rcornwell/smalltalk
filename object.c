@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.4  2000/03/08 01:36:19  rich
+ * Dump stack on Set out of bounds error.
+ *
  * Revision 1.3  2000/02/01 18:09:57  rich
  * Increased size of root objects.
  * reclaimSpace now global since it should be called after image load.
@@ -18,7 +21,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.3 2000/02/01 18:09:57 rich Exp rich $";
+	"$Id: object.c,v 1.4 2000/03/08 01:36:19 rich Exp rich $";
 
 #endif
 
@@ -412,7 +415,7 @@ set_word(Objptr op, int offset, int value)
 INLINE int
 get_byte(Objptr op, int offset)
 {
-    return ((char *) get_object_base(op))[offset];
+    return 0xff & (((char *) get_object_base(op))[offset]);
 }
 
 INLINE int
