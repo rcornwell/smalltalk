@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Windows 32 interface.
  *
  * $Log: win32.c,v $
+ * Revision 1.2  2001/09/17 20:19:55  rich
+ * Got display and cursor support working.
+ *
  * Revision 1.1  2001/08/18 16:22:56  rich
  * Initial revision
  *
@@ -9,7 +12,7 @@
  */
 
 #ifndef lint
-static char        *rcsid = "$Id: win32.c,v 1.1 2001/08/18 16:22:56 rich Exp rich $";
+static char        *rcsid = "$Id: win32.c,v 1.2 2001/09/17 20:19:55 rich Exp rich $";
 #endif
 
 #ifdef WIN32
@@ -184,6 +187,7 @@ BeCursor(Objptr op)
     return op;
 }
 
+
 /* Become display object */
 Objptr
 BeDisplay(Objptr op)
@@ -195,6 +199,8 @@ BeDisplay(Objptr op)
     if (hwnd == NULL) {
 	WNDCLASSEX          wndclass;
 	HINSTANCE           hInst;
+	Objptr		    temp;
+	int		    crow, ccol;
 
 	/* Initialize the input event queue */
 	init_event(&input_queue);
@@ -218,8 +224,15 @@ BeDisplay(Objptr op)
 	/* Create Window */
 	RegisterClassEx(&wndclass);
 
+	/* Grab current old size of window */
+        temp = get_pointer(display_object, FORM_HEIGHT);
+	crow = (is_integer(temp)) ? as_integer(temp) : 512;
+
+	temp = get_pointer(display_object, FORM_WIDTH);
+	ccol = (is_integer(temp)) ? as_integer(temp) : 512;
+
 	hwnd = CreateWindow(szAppName, "Smalltalk", WS_OVERLAPPEDWINDOW,
-			    CW_USEDEFAULT, CW_USEDEFAULT, 512, 512,
+			    CW_USEDEFAULT, CW_USEDEFAULT, ccol, crow,
 			    NULL, NULL, hInst, (PSTR) NULL);
 
 	/* Initialize rest */
@@ -447,15 +460,11 @@ WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 	    int                 crow, ccol;
 	    int                 roundcol;
 	    unsigned long	*temp;
-	    char		buffer[1024];
 
 	    crow = get_integer(display_object, FORM_HEIGHT);
 	    ccol = get_integer(display_object, FORM_WIDTH);
 	    if (crow == row && ccol == col && dispmap != NULL)
 		return 0;
-
-	wsprintf(buffer, "Size %d, %d\n", col, row);
-	dump_string(buffer);
 
 	    roundcol = (col + 31) & ~0x1f;
 	    if (dispmap != NULL)
@@ -794,6 +803,11 @@ file_rename(Objptr op, Objptr newop)
     return res;
 }
 
+void
+file_cwd(char *name)
+{
+    SetCurrentDirectory(name);
+}
  
 void 
 error(char *str)
@@ -814,7 +828,7 @@ errorStr(char *str, char *argument)
 {
     char	buffer[1024];
     wsprintf(buffer, str, argument);
-    error(buffer);
+    dump_string(buffer);
 }
 
 
@@ -822,6 +836,16 @@ void
 dump_string(char *str)
 {
     DWORD		did;
+
+    if (needconsole) {
+	if (AllocConsole() == 0)
+	   return;
+	/* Set console to igrnore mouse/ window events */
+    	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE),
+			ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT 
+		        | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT );
+	needconsole = 0;
+    }
 
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), str, strlen(str), &did, 0);
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\r\n", 2, &did, 0);

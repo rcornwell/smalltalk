@@ -2,6 +2,10 @@
  * Smalltalk interpreter: X Windows interface.
  *
  * $Log: xwin.c,v $
+ * Revision 1.3  2002/01/29 16:40:38  rich
+ * Fixed bugs in saving images under unix.
+ *   By makeing timer events post only when system requests them.
+ *
  * Revision 1.2  2001/08/29 20:16:35  rich
  * Added graphics support.
  * Added timer support.
@@ -16,7 +20,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: xwin.c,v 1.2 2001/08/29 20:16:35 rich Exp rich $";
+    "$Id: xwin.c,v 1.3 2002/01/29 16:40:38 rich Exp rich $";
 #endif
 
 #ifndef WIN32
@@ -271,6 +275,7 @@ BeDisplay(Objptr op)
 	int                 event_mask;
 	char               *prog = "smalltalk";
 	sigset_t            hold, old;
+	Objptr		    temp;
 
 	/* Prevent signals while processing events */
 	sigemptyset(&hold);
@@ -283,6 +288,7 @@ BeDisplay(Objptr op)
 	screen = DefaultScreen(display);
 	root = DefaultRootWindow(display);
 
+	/* Set up hints */
 	sizehints.x = 0;
 	sizehints.y = 0;
 	sizehints.width = 512;
@@ -306,6 +312,13 @@ BeDisplay(Objptr op)
 	    if (mask & HeightValue)
 		sizehints.height = height;
 	}
+
+	temp = get_pointer(display_object, FORM_WIDTH);
+	if (is_integer(temp))
+	    sizehints.width = as_integer(temp);
+        temp = get_pointer(display_object, FORM_HEIGHT);
+	if (is_integer(temp))
+	    sizehints.height = as_integer(temp);
 
 	fg = WhitePixel(display, screen);
 	bg = BlackPixel(display, screen);
@@ -769,6 +782,12 @@ file_rename(Objptr op, Objptr newop)
     free(name);
     sigprocmask(SIG_UNBLOCK, &hold, &old);
     return res;
+}
+
+void
+file_cwd(char *name)
+{
+    chdir(name);
 }
 
 void
