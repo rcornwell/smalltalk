@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.4  2000/08/19 19:46:50  rich
+ * Fixed optimizer bug resulting in not all code being emited.
+ * Always relabel nodes after jump optimization.
+ *
  * Revision 1.3  2000/02/02 16:48:58  rich
  * Changed include order.
  *
@@ -20,7 +24,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.3 2000/02/02 16:48:58 rich Exp rich $";
+	"$Id: code.c,v 1.4 2000/08/19 19:46:50 rich Exp rich $";
 
 #endif
 
@@ -912,8 +916,7 @@ genblock(Codestate cstate)
 	    }
 	    break;
 	case SendSpec:
-	    opcode = SNDSPC1;
-	    opcode += cur->u.operand;
+	    opcode = SNDSPC1 + cur->u.operand;
 	    operand = cur->argcount;
 	    len = 2;
 	    break;
