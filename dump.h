@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Object Dumper.
  *
- * $Id: dump.h,v 1.2 2000/02/01 18:09:50 rich Exp rich $
+ * $Id: dump.h,v 1.3 2000/03/05 17:25:31 rich Exp rich $
  *
  * $Log: dump.h,v $
+ * Revision 1.3  2000/03/05 17:25:31  rich
+ * Exported dump_class_name
+ *
  * Revision 1.2  2000/02/01 18:09:50  rich
  * Error tracing is now controlled via flags.
  *
@@ -14,9 +17,9 @@
  */
 
 #undef TRACE_INST
+#undef TRACE_SEND
 #undef SHOW_EXEC
 #undef SHOW_METHODS
-#undef TRACE_SEND
 #undef SHOW_SOURCE
 #undef DUMP_OBJMEM
 #undef DUMP_CODETREE
