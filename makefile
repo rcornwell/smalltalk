@@ -5,12 +5,12 @@
 
 O=obj
 PROJ = smalltalk
-SDK=//e/sdk
+SDK=//d/sdk
 INCLUDE=$(SDK)/include
 CC = gcc 
-RC = windres -I rc -O coff --include-dir $(INCLUDE)
+RC = windres -I rc -O coff -DWIN32 -DINLINE_OBJECT_MEM #--include-dir $(INCLUDE)
 HC = $(SDK)/bin/hcw
-CFLAGS = -g -Wall -O2 -I$(INCLUDE) -DINLINE_OBJECT_MEM
+CFLAGS = -g -Wall -O2 -DWIN32 -DINLINE_OBJECT_MEM #-I$(INCLUDE) 
 LDFLAGS = -g -mwindows -mno-cygwin
 LIBS=-lversion
 
@@ -22,13 +22,18 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 	     primitive.$(O) fileio.$(O) init.$(O) dump.$(O) lex.$(O) \
 	     code.$(O) symbols.$(O) parse.$(O) smallobjs.$(O) $(PROJ).res
 
-SMALLSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
+BOOTSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
+	   behavior.st object.st
+SMALLSRC = stream.st collection.st magnitude.st misc.st compile.st \
 	   behavior.st object.st
 
 all:	$(PROJ).sti 
 
 $(PROJ).sti: $(PROJ).exe $(PROJ).st
-	./$(PROJ).exe $(PROJ).st
+	./$(PROJ).exe boot.st
+
+boot.st: $(BOOTSRC)
+	cat $(BOOTSRC) > boot.st
 
 $(PROJ).st: $(SMALLSRC)
 	cat $(SMALLSRC) > $(PROJ).st
@@ -49,17 +54,17 @@ clean:
 .c.$(O):
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-about.$(O):	about.c about.h
-code.$(O):	code.c object.h smallobjs.h interp.h lex.h symbols.h code.h fileio.h dump.h
-dump.$(O):	dump.c object.h smallobjs.h fileio.h interp.h lex.h symbols.h code.h dump.h
-fileio.$(O):	fileio.c object.h smallobjs.h fileio.h
-image.$(O):	image.c object.h smallobjs.h image.h interp.h fileio.h
-init.$(O):	init.c smalltalk.h object.h smallobjs.h interp.h primitive.h fileio.h lex.h dump.h symbols.h parse.h image.h
-interp.$(O):	interp.c object.h smallobjs.h interp.h primitive.h dump.h fileio.h
-lex.$(O):	lex.c object.h smallobjs.h lex.h fileio.h dump.h
-object.$(O):	object.c object.h smallobjs.h dump.h fileio.h
-parse.$(O):	parse.c object.h smallobjs.h fileio.h lex.h symbols.h code.h parse.h dump.h
-primitive.$(O):	primitive.c image.h object.h smallobjs.h interp.h primitive.h fileio.h dump.h
-smallobjs.$(O):	smallobjs.c object.h smallobjs.h interp.h fileio.h dump.h
+about.$(O):	about.c smalltalk.h about.h
+code.$(O):	code.c smalltalk.h object.h smallobjs.h interp.h lex.h symbols.h code.h fileio.h dump.h
+dump.$(O):	dump.c smalltalk.h object.h smallobjs.h fileio.h interp.h lex.h symbols.h code.h dump.h
+fileio.$(O):	fileio.c smalltalk.h object.h smallobjs.h fileio.h
+image.$(O):	image.c smalltalk.h object.h smallobjs.h image.h interp.h fileio.h
+init.$(O):	init.c smalltalk.h smalltalk.h object.h smallobjs.h interp.h primitive.h fileio.h lex.h dump.h symbols.h parse.h image.h
+interp.$(O):	interp.c smalltalk.h object.h smallobjs.h interp.h primitive.h dump.h fileio.h
+lex.$(O):	lex.c smalltalk.h object.h smallobjs.h lex.h fileio.h dump.h
+object.$(O):	object.c smalltalk.h object.h smallobjs.h dump.h fileio.h interp.h
+parse.$(O):	parse.c smalltalk.h object.h smallobjs.h fileio.h lex.h symbols.h code.h parse.h dump.h
+primitive.$(O):	primitive.c smalltalk.h image.h object.h smallobjs.h interp.h primitive.h fileio.h dump.h
+smallobjs.$(O):	smallobjs.c smalltalk.h object.h smallobjs.h interp.h fileio.h dump.h
 smalltalk.$(O):	smalltalk.c smalltalk.h about.h object.h interp.h fileio.h dump.h
-symbols.$(O):	symbols.c object.h smallobjs.h lex.h symbols.h
+symbols.$(O):	symbols.c smalltalk.h object.h smallobjs.h lex.h symbols.h
