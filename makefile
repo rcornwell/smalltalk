@@ -37,7 +37,7 @@ $(PROJ).sti: $(PROJ).exe source.st boot.st
 boot.st: $(BOOTSRC)
 	cat $(BOOTSRC) > boot.st
 
-sourse.st: $(SMALLSRC)
+source.st: $(SMALLSRC)
 	cat $(SMALLSRC) > source.st
 
 $(PROJ).exe: $(OBJS)
