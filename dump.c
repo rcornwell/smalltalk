@@ -3,6 +3,11 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.7  2001/08/01 16:42:31  rich
+ * Added Pshint instruction.
+ * Moved sendsuper to group 2.
+ * Added psh context instruction.
+ *
  * Revision 1.6  2001/07/31 14:09:48  rich
  * Fixed to compile under new cygwin.
  *
@@ -30,7 +35,7 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
+"$Id: dump.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
 
 #endif
 
@@ -38,7 +43,7 @@ static char        *rcsid =
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
-#include "fileio.h"
+#include "system.h"
 #include "interp.h"
 #include "lex.h"
 #include "symbols.h"
