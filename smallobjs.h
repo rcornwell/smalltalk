@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: smallobjs.h,v 1.2 2000/02/01 18:10:03 rich Exp rich $
+ * $Id: smallobjs.h,v 1.3 2000/02/02 00:33:34 rich Exp rich $
  *
  * $Log: smallobjs.h,v $
+ * Revision 1.3  2000/02/02 00:33:34  rich
+ * Moved assit functions from primitive.c to here.
+ *
  * Revision 1.2  2000/02/01 18:10:03  rich
  * Added stack checking.
  * Added method categories dictionary to Class.
@@ -97,21 +100,21 @@
 #define METH_LITSTART		2
 #define METH_NUMLITS		0x000001FE
 #define METH_NUMTEMPS		0x0001FE00
-#define METH_STACKSIZE		0x0FFE0000
-#define METH_FLAG		0xF0000000
-#define METH_RETURN		0xD0000000
-#define METH_SETINST		0xE0000000
-#define METH_EXTEND		0xF0000000
+#define METH_STACKSIZE		0x07FE0000
+#define METH_FLAG		0x78000000
+#define METH_RETURN		0x68000000
+#define METH_SETINST		0x70000000
+#define METH_EXTEND		0x78000000
 #define EMETH_PRIM		0x000003FE
-#define EMETH_ARGS		0x00FF0000
+#define EMETH_ARGS		0x01FE0000
 
 /* Accessing method header */
 #define LiteralsOf(hdr)		(((hdr) & METH_NUMLITS)>>1)
 #define TempsOf(hdr)		(((hdr) & METH_NUMTEMPS)>>9)
 #define StackOf(hdr)		(((hdr) & METH_STACKSIZE)>>17)
 #define FlagOf(hdr)		((hdr) & METH_FLAG)
-#define ArgsOf(hdr)		(((hdr) & METH_FLAG)>>28)
-#define EArgsOf(ehdr)		(((ehdr) & EMETH_ARGS)>>16)
+#define ArgsOf(hdr)		(((hdr) & METH_FLAG)>>27)
+#define EArgsOf(ehdr)		(((ehdr) & EMETH_ARGS)>>17)
 #define PrimitiveOf(ehdr)	(((ehdr) & EMETH_PRIM)>>1)
 
 /* Class MethodInfoClass */
