@@ -2,6 +2,11 @@
  * Smalltalk interpreter: File IO routines.
  *
  * $Log: fileio.c,v $
+ * Revision 1.2  2000/02/01 18:09:50  rich
+ * error now exits on windows.
+ * Added fill_buffer and flush_buffer for stdin and stdout support.
+ * Fixed bugs in buffering.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +15,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: fileio.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: fileio.c,v 1.2 2000/02/01 18:09:50 rich Exp rich $";
 
 #endif
 
@@ -36,7 +41,6 @@ static char        *rcsid =
 #include "object.h"
 #include "smallobjs.h"
 #include "fileio.h"
-#include "primitive.h"
 
 struct file_buffer *files = NULL;
 

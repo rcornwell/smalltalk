@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Main routine.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.2  2000/02/01 18:10:03  rich
+ * Fixed image load code.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +13,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: smalltalk.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: smalltalk.c,v 1.2 2000/02/01 18:10:03 rich Exp rich $";
 #endif
 
 #ifdef _WIN32
@@ -27,7 +30,6 @@ static char        *rcsid =
 #include "about.h"
 #include "object.h"
 #include "interp.h"
-#include "primitive.h"
 #include "fileio.h"
 #include "dump.h"
 
