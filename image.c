@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Image reader/writer.
  *
  * $Log: image.c,v $
+ * Revision 1.2  2000/02/01 18:09:51  rich
+ * Support for files in image file.
+ * Fix bug in image loading.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,14 +14,11 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: image.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: image.c,v 1.2 2000/02/01 18:09:51 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#include <stdio.h>
-#include <unistd.h>
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "image.h"
