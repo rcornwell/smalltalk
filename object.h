@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.4 2000/08/19 17:40:30 rich Exp rich $
+ * $Id: object.h,v 1.5 2001/07/31 14:09:48 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.5  2001/07/31 14:09:48  rich
+ * Converted object_incr_ref and object_decr_ref to macros.
+ *
  * Revision 1.4  2000/08/19 17:40:30  rich
  * Make sure bytes are returned unsigned.
  *
@@ -30,28 +33,33 @@
 #endif
 
 /* Root object indexies */
-#define	CURCONT		0
-#define NEWPROC		1
-#define SMALLTLK	2
-#define SYMTAB		3
-#define CHARTAB		4
+#define	CURCONT		0	/* Current context */
+#define NEWPROC		1	/* New process */
+#define SMALLTLK	2	/* Smalltalk dictionary */
+#define SYMTAB		3	/* Symbol table */
+#define CHARTAB		4	/* Character table */
 #define OBJECT		5
-#define SPECSEL		6
-#define TRUEOBJ		7
-#define FALSEOBJ	8
-#define SELECT0		9
+#define SPECSEL		6	/* Specail selectors table */
+#define TRUEOBJ		7	/* True */
+#define FALSEOBJ	8	/* False */
+#define SELECT0		9	/* Common errors message methods */
 #define SELECT1		10
 #define SELECT2		11
 #define SELECT3		12
 #define SELECT4		13
-#define TEMP0		14
+#define TEMP0		14	/* Temporaries used by compiler */
 #define TEMP1		15
 #define TEMP2		16
 #define TEMP3		17
-#define METHFOR0	18
+#define METHFOR0	18	/* Temporaries used during base loading */
 #define METHFOR1	19
 #define ERRORSEL	20
-#define ROOTSIZE	21
+#define TICKSEMA	21	/* Semaphore to send timer ticks too */
+#define DISPOBJ		22	/* Display object */
+#define INPUTSEMA	23	/* Semaphore to signal when input is ready */
+#define CURSOBJ		24	/* Current cursor object */
+#define CONSOLELIST	25	/* Suspended console linked list */
+#define ROOTSIZE	26
 
 typedef unsigned int Objptr;
 
