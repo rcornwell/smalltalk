@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: primitive.h,v 1.4 2000/08/20 00:10:12 rich Exp rich $
+ * $Id: primitive.h,v 1.5 2001/01/17 01:40:54 rich Exp rich $
  *
  * $Log: primitive.h,v $
+ * Revision 1.5  2001/01/17 01:40:54  rich
+ * Added primitives to flush method cache.
+ *
  * Revision 1.4  2000/08/20 00:10:12  rich
  * Added primitive to return number of bytecodes in method.
  *
@@ -66,6 +69,24 @@
 #define	primitiveFloatASin		 42
 #define	primitiveFloatACos		 43
 #define	primitiveFloatATan		 44
+#define	primitiveLargeIntAdd		111
+#define	primitiveLargeIntSub		112
+#define	primitiveLargeIntMult		113
+#define	primitiveLargeIntDivide		114
+#define	primitiveLargeIntMod		115
+#define	primitiveLargeIntDiv		116
+#define	primitiveLargeIntBitAnd		117
+#define	primitiveLargeIntBitOr		118
+#define	primitiveLargeIntBitXor		119
+#define	primitiveLargeIntBitShift	120
+#define	primitiveLargeIntEqual		121
+#define	primitiveLargeIntNotEqual	122
+#define	primitiveLargeIntLess		123
+#define	primitiveLargeIntGreater	124
+#define	primitiveLargeIntLessEqual	125
+#define	primitiveLargeIntGreaterEqual	126
+#define	primitiveLargeIntNegated	137
+#define primitiveAsLargeInt		127
 #define	primitiveAt			 45
 #define	primitivePutAt			 46
 #define	primitiveSize			 47
@@ -107,18 +128,21 @@
 #define	primitiveFileTell		 83
 #define	primitiveFileNext		 84
 #define	primitiveFileNextPut		 85
-#define	primitiveFileGet		 86
-#define	primitiveFilePut		 87
+#define	primitiveFileNextAll		 86
+#define	primitiveFileNextPutAll		 87
 #define	primitiveFileSize		 88
 #define	primitiveFileAtEnd		 89
 #define	primitiveFileDir		 90
+#define primitiveFileisDirectory	108
+#define primitiveFileRename		109
+#define primitiveFileDelete		110
 #define primitiveInternString		 91
 #define primitiveClassComment		 92
 #define primitiveMethodsFor		 93
 #define primitiveError		 	 94
 #define primitiveDumpObject		 95
-#define primitiveTimeWordsInto		 96
-#define primitiveTickWordsInto		 97
+#define primitiveSecondClock		 96
+#define primitiveMillisecondClock	 97
 #define primitiveSignalAtTick		 98
 #define primitiveStackTrace		 99
 #define primitiveEvaluate		100
@@ -129,7 +153,16 @@
 #define primitiveByteCodes		105
 #define primitiveFlushCacheSelect	106
 #define primitiveFlushCache		107
- 
+#define primitiveInputSemaphore		128
+#define primitiveInputWord		129
+#define primitiveBeDisplay		130
+#define primitiveBeCursor		131
+#define primitiveCopyBits		134
+#define primitiveScanCharacter		135
+#define primitiveDrawLoop		136
+#define primitiveBitAt			138
+#define primitiveBitAtPut		139
+#define primitiveIdleWait		140
 
 int                 arrayAt(Objptr, int, Objptr *);
 int                 arrayPutAt(Objptr, int, Objptr);
