@@ -1,10 +1,15 @@
 
 " Methods for Class graphics subclasses"
 
-" $Id: graphic.st,v 1.4 2002/01/16 19:11:51 rich Exp rich $ "
+" $Id: graphic.st,v 1.5 2002/01/29 16:40:38 rich Exp rich $ "
 
 "
  $Log: graphic.st,v $
+ Revision 1.5  2002/01/29 16:40:38  rich
+ Added point transformation methods.
+ Removed fromString and displayString methods in Form.
+ Fixed bugs in waiting on mouse events.
+
  Revision 1.4  2002/01/16 19:11:51  rich
  Fixed typo in clipExtent.
  Removed keyboardPeek method.
@@ -813,6 +818,7 @@ destY
 
 destPoint
     ^ destX @ destY
+!
 
 width
     ^ width
@@ -1522,7 +1528,7 @@ initialize
     InSemaphore <- Semaphore new.
     self setSemaphore: InSemaphore.
     self initKeyboardQueue.
-    self startSensorLoop.
+    "self startSensorLoop."
     Smalltalk at: #Sensor put: self.
 ! !
 
@@ -1591,39 +1597,44 @@ currentCursor: aCursor
 
 waitKey
     [ self keyboardPressed ] whileFalse: [
-        waitSemaphore <- Semaphore new.
+		self processEvent.
+"        waitSemaphore <- Semaphore new.
         waitEvent <- 1.
-        waitSemaphore wait
+        waitSemaphore wait"
     ]
 !
 
 waitEvent
-    waitSemaphore <- Semaphore new.
+		self processEvent.
+"    waitSemaphore <- Semaphore new.
     waitEvent <- 7.
-    waitSemaphore wait
+    waitSemaphore wait"
 !
 
 waitMouse
-    waitSemaphore <- Semaphore new.
+	[ self processEvent == 4 ] whileFalse: [ ].
+"    waitSemaphore <- Semaphore new.
     waitEvent <- 6.
-    waitSemaphore wait
+    waitSemaphore wait"
 !
 
 waitButton
     [ self noButtonPressed ]
           whileTrue: [
-             waitSemaphore <- Semaphore new.
+		self processEvent.
+"             waitSemaphore <- Semaphore new.
              waitEvent <- 2.
-             waitSemaphore wait
+             waitSemaphore wait"
 	 ]
 !
 
 waitNoButton
     [ self anyButtonPressed ]
           whileTrue: [
-             waitSemaphore <- Semaphore new.
+		self processEvent.
+"             waitSemaphore <- Semaphore new.
              waitEvent <- 2.
-             waitSemaphore wait
+             waitSemaphore wait"
 	 ]
 !
 
@@ -1656,9 +1667,9 @@ signalEvent: aNumber
 		  waitEvent <- 0 ]
 !
 
-startSensorLoop
+processEvent
     | event value x y |
-    [ [ true ] whileTrue: [
+ "   [ [ true ] whileTrue: ["
 	InSemaphore wait.
 	event <- self getInput.
 	event isNil ifTrue: [ event <- 0 ].
@@ -1666,14 +1677,16 @@ startSensorLoop
 	event <- event bitAnd: 16rF.
 
 	event == 1 ifTrue: [ "Char event"
-		keyboardQueue nextPut: value.
-		self signalEvent: 1.
+		keyboardQueue nextPut: (value bitAnd: 16rFF).
+"		self signalEvent: 1."
+		^ 1
 	].
 	event == 2 ifTrue: [ "Mouse Pointer event" 
 		x <- value bitAnd: 16rFFF.
 		y <- (value bitShift: -12) bitAnd: 16rFFF.
 		mousePoint <- x@y.
-		self signalEvent: 4.
+"		self signalEvent: 4."
+		^ 4
 	].
 	event == 3 ifTrue: [ "Mouse Button event"
 		((value bitAnd: 1) == 1) ifTrue: [ button1Pressed <- true ]
@@ -1682,12 +1695,13 @@ startSensorLoop
 				        ifFalse: [ button2Pressed <- false ].
 		((value bitAnd: 4) == 4) ifTrue: [ button3Pressed <- true ]
 				        ifFalse: [ button3Pressed <- false ].
-		self signalEvent: 2.
+"		self signalEvent: 2. "
+		^ 2
         ].
 	event == 4 ifTrue: [ "Resize event"
 		self resize.
 	]
-     ]] forkAt: Processor lowIOPriority.
+" ]] forkAt: Processor lowIOPriority."
 !
 
 initKeyboardQueue
