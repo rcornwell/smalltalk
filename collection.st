@@ -1,9 +1,13 @@
 
 
-" $Id: collection.st,v 1.2 2000/02/01 18:09:47 rich Exp rich $ "
+" $Id: collection.st,v 1.3 2000/08/26 20:23:50 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.3  2000/08/26 20:23:50  rich
+ Fixed some typos.
+ Work around cascade problem.
+
  Revision 1.2  2000/02/01 18:09:47  rich
  Fixed a few misc errors.
 
@@ -77,6 +81,7 @@ remove: oldObject
          ifAbsent: [ ^self error: 'Failed to remove object' ].
     ^oldObject
 !
+
 removeAll: aCollection
     aCollection do: [ :element | self remove: element ].
     ^aCollection
@@ -546,6 +551,7 @@ printOn: aStream
     aStream nextPut: $,.
     step printOn: aStream
 ! !
+
 !Interval methodsFor: 'storing'!
 
 storeOn: aStream
@@ -844,6 +850,7 @@ new
 ! !
 
 !OrderedCollection methodsFor: 'accessing'!
+
 at: index
     | location |
     location <- index + firstIndex - 1.
@@ -948,6 +955,7 @@ addLast: newObject
 ! !
 
 !OrderedCollection methodsFor: 'removing'!
+
 removeFirst
     lastIndex < firstIndex
         ifTrue: 
@@ -1097,6 +1105,7 @@ add: anObject
 ! !
 
 !SortedCollection methodsFor: 'instance protocol'!
+
 sortBlock
     ^sortBlock
 !
@@ -1118,6 +1127,7 @@ copyEmpty
 
 
 !SortedCollection methodsFor: 'private methods'!
+
 setSortBlock: aSortBlock
     sortBlock <- aSortBlock
 !
@@ -1404,7 +1414,12 @@ storeOn: aStream
         nextPutAll: (self asString)
 ! !
 
+!Symbol methodsFor: 'primitives'!
 
+flushCache
+     " Flush the method cache of this selector. "
+     <primitive 106>
+! !
 
 
 Collection subclass: 'Bag' instanceVariableNames: 'contents'
@@ -1560,7 +1575,7 @@ add: newObject
 
 remove: anObject 
 	| index |
-	index <- self findIndexOrNil: anObject ifFull: [ ^ nil ].
+	index <- self findIndexOrNil: anObject ifFull: [ nil ].
 	index notNil ifTrue: [ 
 		tally <- tally - 1 .
 		self rehashAfterIndex: index
@@ -1570,7 +1585,7 @@ remove: anObject
 
 remove: anObject ifAbsent: aBlock
 	| index |
-	index <- self findIndexOrNil: anObject ifFull: [ ^ nil ].
+	index <- self findIndexOrNil: anObject ifFull: [ nil ].
 	index isNil ifTrue: [ ^ aBlock value ].
 	tally <- tally - 1 .
 	self rehashAfterIndex: index.
@@ -1756,6 +1771,7 @@ keys
     self keysDo: [ :aKey | aSet add: aKey ].
     ^aSet
 !
+
 values
     | aBag |
     aBag <- Bag new.
@@ -1819,6 +1835,7 @@ remove: anObject ifAbsent: aBlock
 ! !
 
 !Dictionary methodsFor: 'enumerating'!
+
 associationsDo: aBlock
     super do: [ :assoc | aBlock value: assoc ]
 !
@@ -1856,6 +1873,7 @@ reject: aBlock
 inject: value into: aBlock
     self shouldNotImplement
 ! !
+
 !Dictionary methodsFor: 'misc math methods'!
 
 = aDictionary
@@ -1876,7 +1894,6 @@ hash
         [ :assoc | hashValue <- hashValue + assoc hash ].
     ^hashValue
 ! !
-
 
 !Dictionary methodsFor: 'printing'!
 
@@ -2030,7 +2047,6 @@ includesKey: key
     ^(self basicAt: (self findKeyIndex: key)) notNil
 ! !
 
-
 !IdentityDictionary methodsFor: 'removing'!
 
 removeKey: key ifAbsent: aBlock
@@ -2043,6 +2059,7 @@ removeKey: key ifAbsent: aBlock
     self rehashObjectsAfter: index.
     ^ value
 ! !
+
 !IdentityDictionary methodsFor: 'enumerating'!
 
 associationsDo: aBlock
@@ -2145,8 +2162,8 @@ rehashObjectsAfter: anIndex
     | i size count key index |
     index <- anIndex.
     i <- index.
-    size <- self basicSize.
-    count <- size.
+    size <- self basicSize - 1.
+    count <- size + 1.
     [ count > 0 ]
         whileTrue:
             [ i <- i \\ size + 1.
