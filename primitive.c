@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.3  2000/03/02 00:30:52  rich
+ * Moved functions to manipulate smalltalk system to smallobjs.c
+ * Localize stack_pointer in primitive(), improved preformace.
+ *
  * Revision 1.2  2000/02/01 18:10:00  rich
  * Added code to display stack trace on error.
  * Added support for CompiledMethod class.
@@ -17,7 +21,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.2 2000/02/01 18:10:00 rich Exp rich $";
+	"$Id: primitive.c,v 1.3 2000/03/02 00:30:52 rich Exp rich $";
 
 #endif
 
@@ -604,6 +608,14 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	    set_pointer(res, METH_HEADER, otemp);
 	    success = TRUE;
 	}
+	break;
+
+    case primitiveByteCodes:
+	temp = length_of(reciever);
+	otemp = get_pointer(reciever, METH_HEADER);
+	temp -= LiteralsOf(otemp) + 1;
+	temp *= sizeof(Objptr);
+	ReturnInteger(temp);
 	break;
 
     case primitiveValue:
