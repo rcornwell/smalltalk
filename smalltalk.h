@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Global Definitions.
  *
- * $Id: $
+ * $Id: smalltalk.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: smalltalk.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -30,7 +33,8 @@
 
 #ifndef RC_INVOKED
 
-void                smallinit();
+void                smallinit(int);
+void		    load_file(char *);
 void                parsefile(char *);
 
 #endif

@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Main routine.
  *
- * $Log: $
+ * $Log: smalltalk.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: smalltalk.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 #endif
 
 #ifdef _WIN32
@@ -27,7 +30,6 @@ static char        *rcsid =
 #include "primitive.h"
 #include "fileio.h"
 #include "dump.h"
-#include "image.h"
 
 char               *imagename = NULL;
 char               *loadfile = NULL;
@@ -112,16 +114,14 @@ WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 
        /* If there is a image file, load it */
 	if (imagename != NULL)
-	    load_image(imagename);
+	    load_file(imagename);
 	else {
 	   /* Build new system */
-	    new_objectable(defotsize);
-	    smallinit();
+	    smallinit(defotsize);
 	   /* Compile into system */
 	    if (loadfile != NULL)
 		parsefile(loadfile);
 	}
-        dump_objects();
 
 	return 0;
 
@@ -136,6 +136,7 @@ WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 #endif
 
     case WM_DESTROY:
+    	close_files();
 	PostQuitMessage(0);
 	return 0;
 
@@ -323,16 +324,16 @@ main(int argc, char *argv[])
     }
 
    /* If there is a image file, load it */
-    if (imagename != NULL)
-	load_image(imagename);
-    else {
+    if (imagename != NULL) {
+	load_file(imagename);
+    } else {
        /* Build new system */
-	new_objectable(defotsize);
-        smallinit();
+        smallinit(defotsize);
        /* Compile into system */
 	if (loadfile != NULL)
 	    parsefile(loadfile);
     }
+    close_files();
     return 0;
 
   error:
