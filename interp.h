@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: interp.h,v 1.3 2000/02/23 00:14:39 rich Exp rich $
+ * $Id: interp.h,v 1.4 2001/01/17 01:46:03 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.4  2001/01/17 01:46:03  rich
+ * Added routine to send error message.
+ *
  * Revision 1.3  2000/02/23 00:14:39  rich
  * Moved Dump_stack here.
  *
@@ -19,13 +22,13 @@
 
 /* Byte codes are as follows */
 #define LONGOP			0x00
-#define PSHARG			0x10
-#define PSHLIT			0x20
-#define PSHINST			0x30
-#define PSHTMP			0x40
-#define STRINST			0x50
-#define STRTMP			0x60
-#define RETTMP			0x70
+#define PSHTMP			0x10
+#define RETTMP			0x20
+#define STRTMP			0x30
+#define PSHARG			0x40
+#define PSHLIT			0x50
+#define PSHINST			0x60
+#define STRINST			0x70
 #define JMPT			0x80
 #define JMPF			0x90
 #define JMP			0xA0
@@ -43,17 +46,17 @@
 #define RETTRUE			0xF2
 #define RETFALS			0xF3
 #define RETNIL			0xF4
-#define DUPTOS			0xF6
 #define RETBLK			0xF5
-#define POPSTK			0xF7
-#define PSHVAR			0xF8
-#define STRVAR			0xF9
-#define PSHSELF			0xFA
-#define PSHNIL			0xFB
-#define PSHTRUE			0xFC
-#define PSHFALS			0xFD
-#define PSHONE			0xFE
-#define PSHZERO			0xFF
+#define POPSTK			0xF6
+#define PSHVAR			0xF7
+#define PSHSELF			0xF8
+#define DUPTOS			0xF9
+#define PSHTRUE			0xFA
+#define PSHFALS			0xFB
+#define PSHNIL			0xFC
+#define PSHONE			0xFD
+#define PSHZERO			0xFE
+#define STRVAR			0xFF
 
 typedef struct _method_Cache {
     Objptr              select;
@@ -128,4 +131,5 @@ Objptr              wakeHighestPriority();
 void                resume(Objptr);
 void                wait(Objptr);
 void		    SendError(Objptr, int *);
+void		    flushMethod(Objptr);
 void		    flushCache(Objptr);
