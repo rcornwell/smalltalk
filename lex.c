@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Lexiconal Scanner.
  *
  * $Log: lex.c,v $
+ * Revision 1.4  2001/07/31 14:09:48  rich
+ * Fixed to compile with new cygwin.
+ *
  * Revision 1.3  2000/02/02 16:06:22  rich
  * Don't need to include primitives any more
  *
@@ -21,7 +24,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: lex.c,v 1.3 2000/02/02 16:06:22 rich Exp rich $";
+	"$Id: lex.c,v 1.4 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -31,8 +34,8 @@ static char        *rcsid =
 #include "object.h"
 #include "smallobjs.h"
 #include "lex.h"
-#include "fileio.h"
 #include "dump.h"
+#include "system.h"
 
 #define ALLOCSIZE	16
 

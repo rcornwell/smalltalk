@@ -2,6 +2,11 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: code.c,v $
+ * Revision 1.7  2001/08/01 16:42:31  rich
+ * Added Pshint instruction.
+ * Moved sendsuper to group 2.
+ * Added psh context instruction.
+ *
  * Revision 1.6  2001/07/31 14:09:47  rich
  * Made to compile with new cygwin.
  *
@@ -30,7 +35,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: code.c,v 1.6 2001/07/31 14:09:47 rich Exp rich $";
+	"$Id: code.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
 
 #endif
 
@@ -40,8 +45,8 @@ static char        *rcsid =
 #include "interp.h"
 #include "symbols.h"
 #include "code.h"
-#include "fileio.h"
 #include "dump.h"
+#include "system.h"
 
 Codenode            code = NULL;
 Codenode            lastcode = NULL;
