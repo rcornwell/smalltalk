@@ -1,9 +1,13 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.2 2000/02/01 18:09:45 rich Exp rich $ "
+" $Id: behavior.st,v 1.3 2000/02/24 03:10:54 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.3  2000/02/24 03:10:54  rich
+ allInstVarNames now uses WriteStream
+ kindOfSubclass now uses WriteStream
+
  Revision 1.2  2000/02/01 18:09:45  rich
  Completed missing routines.
  Hooks to native compiler.
@@ -21,7 +25,10 @@ Object subclass: 'ClassCategoryReader' instanceVariableNames: 'myClass myCategor
 ! ClassCategoryReader class methodsFor: 'creation' !
 
 for: aClass category: aCategory
-     ^ self new for: aClass category: aCategory
+     | reader |
+     reader <- self new.
+     reader for: aClass category: aCategory.
+     ^ reader
 ! !
 
 ! ClassCategoryReader methodsFor: 'Basic' !
@@ -33,7 +40,7 @@ for: aClass category: aCategory
 
 fileInFrom: aStream
    | aString |
-   [ aStream atEnd or: [(aString <- aStream nextchunk) isEmpty ]] whileFalse:
+   [ aStream atEnd or: [(aString <- aStream nextChunk) isEmpty ]] whileFalse:
 	[ Compiler compile: aString forClass: myClass classified: myCategory ].
 ! !
 
@@ -81,7 +88,7 @@ sourceCode: aString
 	sourceFile <- 2.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		stream <- stream deepcopy.
+		stream <- stream deepCopy.
 		sourcePos <- stream setToEnd.
 		stream nextChunkPut: aString.
 		stream nextChunkPut: ''.
@@ -94,7 +101,7 @@ sourceCode: aString forCategory: aCategory
 	sourceFile <- 2.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		stream <- stream deepcopy.
+		stream <- stream deepCopy.
 		sourcePos <- stream setToEnd.
 		stream nextChunkPut: aString.
 		stream nextChunkPut: ''.
@@ -212,7 +219,8 @@ allSubclasses
 	"Return a set of all subclasses"
 	| subs allsubs |
 	allsubs <- Set new.
-	self subclasses do: [ :subclass | 
+	subclasses isNil ifTrue: [ ^ allsubs ].
+	subclasses do: [ :subclass | 
 		allsubs add: subclass.
 		subclass allSubclasses do: [ :subsubc | allsubs add: subsubc]
 	].
@@ -292,7 +300,6 @@ instanceCount
 !
 
 instVarNames
-	vars isNil ifTrue: [ vars <- Array new: 0 ].
 	^ vars
 !
 
@@ -302,7 +309,7 @@ allInstVarNames
     svars <- superclass allInstVarNames.
     newarray <- WriteStream on: (Array new: 0).
     newarray nextPutAll: svars.
-    newarray nextPutAll: vars.
+    vars isNil ifFalse: [ newarray nextPutAll: vars].
     ^ newarray contents
 !
 
@@ -563,8 +570,8 @@ whichCategoryIncludesSelector: selector
 	| meth info |
 	meth <- self compiledMethodAt: selector.
 	meth isNil ifFalse: [
-	   info <- self description.
-	   info isNil ifFalse: [ ^ info catagory ]
+	   info <- meth description.
+	   info isNil ifFalse: [ ^ info category ]
 	].
 	^ nil
 !
@@ -573,7 +580,7 @@ addSelector: aSelector withMethod: meth classified: aCategory
 	| info set oldcat |
 	self addSelector: aSelector withMethod: meth.
 	aCategory isNil ifFalse: [
-	    info <- self description.
+	    info <- meth description.
 	    info isNil ifFalse: [
 		  info <- MethodInfo new.
 		  meth description: info ].
@@ -595,7 +602,7 @@ copy: aSelector from: aClass
 	| meth info |
 	meth <- aClass compiledMethodAt: aSelector.
 	meth isNil ifFalse: [
-	   info <- self description.
+	   info <- meth description.
 	   info isNil ifFalse: [ info <- info category ].
 	   self addSelector: aSelector withMethod: meth classified: info.
 	].
@@ -605,8 +612,8 @@ copy: aSelector from: aClass classified: categoryName
 	| meth info |
 	meth <- aClass compiledMethodAt: aSelector.
 	meth isNil ifFalse: [
-	   meth <- meth deepcopy.
-	   info <- self description.
+	   meth <- meth deepCopy.
+	   info <- meth description.
 	   info isNil ifTrue: [
 		 info <- MethodInfo new.
 		 meth description: info
