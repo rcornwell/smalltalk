@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Objects known to the interpreter.
  *
- * $Id: $
+ * $Id: smallobjs.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: smallobjs.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -20,52 +23,54 @@
 #define CannotReturnSelector	((Objptr)10)
 #define MustBeBooleanSelector	((Objptr)12)
 #define UnknownClassVar		((Objptr)14)
-#define SpecialSelectors	((Objptr)16)
-#define CharacterTable		((Objptr)18)
-#define SmalltalkPointer	((Objptr)20)
+#define InterpStackFault	((Objptr)16)
+#define SpecialSelectors	((Objptr)18)
+#define CharacterTable		((Objptr)20)
+#define SmalltalkPointer	((Objptr)22)
 
 /* Size of initial array into symbol table */
-#define SymbolTable		((Objptr)22)
+#define SymbolTable		((Objptr)24)
 #define SYMBOL_SIZE		1024
 
 /* Class Behavoir */
-#define BehaviorClass		((Objptr)24)
+#define BehaviorClass		((Objptr)26)
 #define SUPERCLASS		0	/* Superclass of object */
 #define SUBCLASSES		1	/* Subclasses of this object */
 #define METHOD_DICT		2	/* Methods dictionary */
 #define CLASS_FLAGS		3	/* Flags */
 
 /* Class Class */
-#define ClassClass		((Objptr)26)
+#define ClassClass		((Objptr)28)
 #define CLASS_NAME		4	/* Name of class */
 #define CLASS_VARS		5	/* Instance variable list */
 #define CLASS_COMMENT		6	/* Comment string of class */
 #define CLASS_CAT		7	/* Class catagory string */
 #define CLASS_DICT 		8	/* Class variable list */
 #define CLASS_POOL		9	/* Class Pool vairables */
+#define CLASS_METHCAT		10	/* Dictionary of method categories */
 
 /* Flags for class flags field */
 #define CLASS_PTRS		2	/* Object has pointers */
 #define CLASS_BYTE		4	/* Object is byte indexable */
 #define CLASS_INDEX		8	/* Object is indexable */
 
-#define CLASS_SIZE		10	/* Size of Class */
+#define CLASS_SIZE		11	/* Size of Class */
 
 /* Class Metaclass */
-#define MetaClass		((Objptr)28)
-#define META_INSTCLASS		10
+#define MetaClass		((Objptr)30)
+#define META_INSTCLASS		11
 
 /* Simple built in classes */
-#define ObjectClass		((Objptr)30)
-#define UndefinedClass		((Objptr)32)
-#define BooleanClass		((Objptr)34)
-#define TrueClass		((Objptr)36)
-#define FalseClass		((Objptr)38)
-#define SmallIntegerClass	((Objptr)40)
-#define FloatClass		((Objptr)42)
+#define ObjectClass		((Objptr)32)
+#define UndefinedClass		((Objptr)34)
+#define BooleanClass		((Objptr)36)
+#define TrueClass		((Objptr)38)
+#define FalseClass		((Objptr)40)
+#define SmallIntegerClass	((Objptr)42)
+#define FloatClass		((Objptr)44)
 
 /* Class MethodContext */
-#define MethodContextClass	((Objptr)44)
+#define MethodContextClass	((Objptr)46)
 #define BLOCK_SENDER		0	/* Who Sent message */
 #define BLOCK_IP		1	/* Current Instruct pointer */
 #define BLOCK_SP		2	/* Current Stack Pointer */
@@ -75,14 +80,14 @@
 #define BLOCK_ARGCNT		6	/* Number of arguments */
 #define BLOCK_STACK		7	/* Start of stack */
 
-#define BlockContextClass	((Objptr)46)
+#define BlockContextClass	((Objptr)48)
 #define BLOCK_CALLER		0	/* Who called context */
 #define BLOCK_HOME		3	/* Home for block context */
 #define BLOCK_IIP		4	/* Initial Instruction Pointer */
 #define BLOCK_NOTUSED		5	/* Reciever in methodContext */
 
 /* Class CompiledMethod */
-#define CompiledMethodClass	((Objptr)48)
+#define CompiledMethodClass	((Objptr)50)
 #define METH_DESCRIPTION	0
 #define METH_HEADER		1
 #define METH_LITSTART		2
@@ -106,42 +111,42 @@
 #define PrimitiveOf(ehdr)	(((ehdr) & EMETH_PRIM)>>1)
 
 /* Class MethodInfoClass */
-#define MethodInfoClass		((Objptr)50)
+#define MethodInfoClass		((Objptr)52)
 #define METHINFO_SOURCE		0
 #define METHINFO_POS		1
 #define METHINFO_CAT		2
 
 /* Class Point */
-#define PointClass		((Objptr)52)
+#define PointClass		((Objptr)54)
 #define XINDEX			0
 #define YINDEX			1
 
 /* Class Message */
-#define MessageClass		((Objptr)54)
+#define MessageClass		((Objptr)56)
 #define MESSAGE_ARGS		0
 #define MESSAGE_SELECT		1
 #define MESSAGE_SIZE		2
 
 /* Class CharacterValue */
-#define CharacterClass		((Objptr)56)
+#define CharacterClass		((Objptr)58)
 #define CHARVALUE		0
 
 /* Class Link */
-#define LinkClass		((Objptr)58)
+#define LinkClass		((Objptr)60)
 #define LINK_NEXT		0
 
 /* Class SymLink */
-#define SymLinkClass		((Objptr)60)
+#define SymLinkClass		((Objptr)62)
 #define SYM_VALUE		1
 
 /* Array classes */
-#define StringClass		((Objptr)62)
-#define ArrayClass		((Objptr)64)
+#define StringClass		((Objptr)64)
+#define ArrayClass		((Objptr)66)
 
 /* Collection classes */
-#define SSetClass		((Objptr)66)
-#define DictionaryClass		((Objptr)68)
-#define IdentityDictionaryClass	((Objptr)70)
+#define SSetClass		((Objptr)68)
+#define DictionaryClass		((Objptr)70)
+#define IdentityDictionaryClass	((Objptr)72)
 /* Class Dictionary */
 #define DICT_TALLY		0
 #define DICT_VALUES		1
@@ -161,7 +166,7 @@
 
 
 /* Class Association */
-#define AssociationClass	((Objptr)72)
+#define AssociationClass	((Objptr)74)
 #define ASSOC_KEY		0
 #define ASSOC_VALUE		1
 
