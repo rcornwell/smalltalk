@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.5 2001/07/31 14:09:48 rich Exp rich $
+ * $Id: object.h,v 1.6 2001/08/18 16:17:01 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.6  2001/08/18 16:17:01  rich
+ * Added new rootObjects for graphics system.
+ *
  * Revision 1.5  2001/07/31 14:09:48  rich
  * Converted object_incr_ref and object_decr_ref to macros.
  *
@@ -73,19 +76,6 @@ typedef struct _objhdr {
 	struct _objhdr     *next;	/* Next free object in chain */
     } u;
 } objhdr           , *Objhdr;
-
-/*
- * Placed at begining of each region. Used to track free space within
- * the region.
- */
-typedef struct _region {
-    struct _region     *next;			/* Pointer to next region */
-    int                 freespace;		/* Space available */
-    int                 totalspace;		/* Size of region */
-    Objhdr              base;			/* Pointer to first word */
-    Objhdr              limit;			/* Pointer to last word */
-    Objhdr              freeptrs[ALLOCSIZE + 1]; /* Free pointers. */
-} region           , *Region;
 
 typedef struct _otentry {
     unsigned int        refcnt:28;		/* Reference count */
