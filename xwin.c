@@ -2,6 +2,10 @@
  * Smalltalk interpreter: X Windows interface.
  *
  * $Log: xwin.c,v $
+ * Revision 1.4  2002/02/07 04:21:05  rich
+ * Added code to request size of window to be last window size.
+ * Added code to change current working directory.
+ *
  * Revision 1.3  2002/01/29 16:40:38  rich
  * Fixed bugs in saving images under unix.
  *   By makeing timer events post only when system requests them.
@@ -20,7 +24,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: xwin.c,v 1.3 2002/01/29 16:40:38 rich Exp rich $";
+    "$Id: xwin.c,v 1.4 2002/02/07 04:21:05 rich Exp rich $";
 #endif
 
 #ifndef WIN32
@@ -45,6 +49,7 @@ static char        *rcsid =
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/keysym.h>
 
 /* Local stuff */
 #include "smalltalk.h"
@@ -445,15 +450,55 @@ processX()
     sigprocmask(SIG_BLOCK, &hold, &old);
 
     while (XPending(display)) {
+	KeySym	keypress;
+
 	XNextEvent(display, &ev);
 
 	switch (ev.type) {
 	case KeyPress:
+	    PostEvent(EVENT_MOUSEPOS, ((ev.xkey.y & 0xfff) << 12) +
+		      (ev.xkey.x & 0xfff));
 	    i = XLookupString(&ev.xkey, keybuffer,
-			      sizeof(keybuffer), NULL, NULL);
-	    for (j = 0; j < i; j++) {
-		PostEvent(EVENT_CHAR, keybuffer[j]);
+			      sizeof(keybuffer), &keypress, NULL);
+	    if (i == 0) {
+		char c = 0;
+		switch(keypress) {
+		/* Cursor control & motion */
+		case XK_Home:
+			c = 0x80;
+			break;
+ 		case XK_Left:
+			c = 0x81;
+			break;
+ 		case XK_Up:
+			c = 0x82;
+			break;
+ 		case XK_Right:
+			c = 0x83;
+			break;
+ 		case XK_Down:
+			c = 0x84;
+			break;
+ 		case XK_Page_Up:
+			c = 0x85;
+			break;
+ 		case XK_Page_Down:
+			c = 0x86;
+			break;
+ 		case XK_End:
+			c = 0x87;
+			break;
+ 		case XK_Begin:
+			c = 0x88;
+			break;
+		default:
+			break;
+		}
+		if (c != 0) 
+			keybuffer[i++] = c;
 	    }
+	    for (j = 0; j < i; j++) 
+		PostEvent(EVENT_CHAR, keybuffer[j]);
 	    break;
 
 	case ButtonPress:
