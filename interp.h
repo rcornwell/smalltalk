@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Main byte code interpriter.
  *
- * $Id: $
+ * $Id: interp.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: interp.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -53,7 +56,13 @@ typedef struct _method_Cache {
     Objptr              header;
 } method_Cache     , *Method_Cache;
 
-#define Push(obj) Set_object(current_context, --stack_pointer, obj);
+#define Push(obj) { if (stack_pointer == BLOCK_STACK)  {	  \
+			int tstack = stack_pointer;		  \
+			SendMethod(InterpStackFault, &tstack, 0); \
+			stack_pointer = tstack;			  \
+		    } else  					  \
+		        Set_object(current_context, --stack_pointer, obj); \
+		  }
 
 #define TopStack() get_pointer(current_context, stack_pointer)
 
@@ -61,7 +70,13 @@ typedef struct _method_Cache {
 
 #define Literal(off) (((Objptr *)methodPointer)[METH_LITSTART + off])
 
-#define PopStack() Set_object(current_context, stack_pointer++, NilPtr)
+#define PopStack() { if (stack_pointer == stack_top) {	 	  \
+			int tstack = stack_pointer;		  \
+			SendMethod(InterpStackFault, &tstack, 0); \
+			stack_pointer = tstack;			  \
+		      } else  					  \
+			Set_object(current_context, stack_pointer++, NilPtr); \
+		    }
 
 #define SendMethod(selector, stack, args) \
     SendToClass((selector), (stack), (args), \
