@@ -3,6 +3,12 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.6  2001/01/13 15:53:01  rich
+ * Increases growsize to 512.
+ * Commented out some debuging code.
+ * Don't compact a region that is less then 10% free.
+ * Check files after we free objects, to close files that were freed.
+ *
  * Revision 1.5  2000/08/19 17:40:15  rich
  * Make sure bytes are returned unsigned.
  *
@@ -24,29 +30,16 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.5 2000/08/19 17:40:15 rich Exp rich $";
+	"$Id: object.c,v 1.6 2001/01/13 15:53:01 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
-#endif
-
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "dump.h"
 #include "fileio.h"
+#include "interp.h"
 
 int                 growsize = 512;		/* Region grow rate */
 Region              regions = NULL;		/* Memory regions */
@@ -76,6 +69,218 @@ static void         compact_region();
 static INLINE int   last_pointer_of(Objptr);
 static void         mark_all_other_objects(Objptr);
 static INLINE int   decr_ref_count(Objptr);
+
+#ifndef INLINE_OBJECT_MEM
+/*
+ * Testing functions.
+ * Convert to INLINEs after working.
+ */
+
+/* Is op a object */
+INLINE int
+is_object(Objptr op)
+{
+    return (op & 1) == 0;
+}
+
+/* Is op a integer */
+INLINE int
+is_integer(Objptr op)
+{
+    return (op & 1) == 1;
+}
+
+INLINE int
+notFree(Objptr op)
+{
+    return !otable[op / 2].free;
+}
+
+/* Check if object is indexable */
+INLINE int
+is_indexable(Objptr op)
+{
+    return otable[op / 2].indexable;
+}
+
+INLINE int
+is_byte(Objptr op)
+{
+    return otable[op / 2].byte;
+}
+
+INLINE int
+is_word(Objptr op)
+{
+    return !otable[op / 2].ptrs;
+}
+
+/* Convert value to object */
+INLINE              Objptr
+as_object(int value)
+{
+    return (value & (~1));
+}
+
+/* Convert object to integer */
+INLINE int
+as_oop(Objptr op)
+{
+    return op | 1;
+}
+
+/* Conversion Functions. */
+
+/* Get integer value of object */
+INLINE int
+as_integer(int value)
+{
+    return value >> 1;
+}
+
+/* Return integer as a object */
+INLINE              Objptr
+as_integer_object(int value)
+{
+    return (value << 1) | 1;
+}
+
+/* Accessing Functions. */
+
+INLINE              Objhdr
+get_object_pointer(Objptr op)
+{
+    return objmem[op / 2];
+}
+
+INLINE char        *
+get_object_base(Objptr op)
+{
+    return (char *) (get_object_pointer(op) + 1);
+}
+
+INLINE int
+get_object_refcnt(Objptr op)
+{
+    return otable[op / 2].refcnt;
+}
+
+INLINE void
+set_object_refcnt(Objptr op, int cnt)
+{
+    otable[op / 2].refcnt = cnt;
+}
+
+INLINE void
+set_object_pointer(Objptr op, Objhdr addr)
+{
+    objmem[op / 2] = addr;
+}
+
+/* Get value in object */
+INLINE              Objptr
+get_pointer(Objptr op, int offset)
+{
+    return ((Objptr *) get_object_base(op))[offset];
+}
+
+INLINE void
+set_pointer(Objptr op, int offset, int value)
+{
+    ((Objptr *) get_object_base(op))[offset] = value;
+}
+
+/* Return value of object, but convert it to a native integer. */
+INLINE int
+get_integer(Objptr op, int offset)
+{
+    return as_integer(((Objptr *) get_object_base(op))[offset]);
+}
+
+INLINE int
+get_word(Objptr op, int offset)
+{
+    return ((int *) get_object_base(op))[offset];
+}
+
+INLINE int
+set_word(Objptr op, int offset, int value)
+{
+    return ((int *) get_object_base(op))[offset] = value;
+}
+
+INLINE int
+get_byte(Objptr op, int offset)
+{
+    return 0xff & (((char *) get_object_base(op))[offset]);
+}
+
+INLINE int
+set_byte(Objptr op, int offset, char value)
+{
+    return ((char *) get_object_base(op))[offset] = value;
+}
+
+/* Get class of object */
+INLINE              Objptr
+class_of(Objptr op)
+{
+    if (is_object(op) && !notFree(op)) {
+	fprintf(stderr, "Attempt to get class of free object\n");
+    }
+    return is_object(op)? get_object_pointer(op)->u.class :
+				SmallIntegerClass;
+}
+
+/* Size of an object in bytes. */
+INLINE int
+size_of(Objptr op)
+{
+    return get_object_pointer(op)->size;
+}
+
+/*
+ * Return fixed size of object in bytes.
+ */
+
+INLINE int
+fixed_size(Objptr op)
+{
+    Objptr              class = class_of(op);
+    int                 size;
+
+    size = (class == NilPtr) ? 0 : (get_integer(class, CLASS_FLAGS)/ 8);
+    return sizeof(Objptr) * size;
+}
+
+/* Reference Counting. */
+INLINE void
+object_incr_ref(Objptr op)
+{
+    if (is_object(op)) {
+	int                 ncnt;
+
+	if ((ncnt = get_object_refcnt(op)) != MAXREFCNT)
+	    set_object_refcnt(op, ncnt + 1);
+    }
+}
+
+INLINE void
+object_decr_ref(Objptr op)
+{
+    if (is_object(op)) {
+	int                 ncnt;
+
+       /* Don't change objects at max count */
+	if ((ncnt = get_object_refcnt(op)) != MAXREFCNT) {
+	    set_object_refcnt(op, ncnt - 1);
+	   /* If count is zero, remove object */
+	    if (ncnt == 1) 
+		free_all_other_objects(op);
+	}
+    }
+}
+#endif
 
 /* Creation. */
 
@@ -253,12 +458,12 @@ new_objectable(int number)
     }
 
    /* Intialize the null object. */
-    objmem[(int) NilPtr] = &nilhdr;
-    otable[(int) NilPtr].refcnt = MAXREFCNT;
-    otable[(int) NilPtr].free = 0;
-    otable[(int) NilPtr].indexable = 0;
-    otable[(int) NilPtr].byte = 0;
-    otable[(int) NilPtr].ptrs = 0;
+    objmem[((int) NilPtr) / 2] = &nilhdr;
+    otable[((int) NilPtr) / 2].refcnt = MAXREFCNT;
+    otable[((int) NilPtr) / 2].free = 0;
+    otable[((int) NilPtr) / 2].indexable = 0;
+    otable[((int) NilPtr) / 2].byte = 0;
+    otable[((int) NilPtr) / 2].ptrs = 0;
 
     nilhdr.u.class = UndefinedClass;	/* For now */
     nilhdr.size = 0;
@@ -269,225 +474,6 @@ new_objectable(int number)
     new_region(growsize);
     return TRUE;
 }
-
-#ifndef INLINE_OBJECT_MEM
-/*
- * Testing functions.
- * Convert to INLINEs after working.
- */
-
-/* Is op a object */
-INLINE int
-is_object(Objptr op)
-{
-    return (op & 1) == 0;
-}
-
-/* Is op a integer */
-INLINE int
-is_integer(Objptr op)
-{
-    return (op & 1) == 1;
-}
-
-INLINE int
-notFree(Objptr op)
-{
-    return !otable[op / 2].free;
-}
-
-/* Check if object is indexable */
-INLINE int
-is_indexable(Objptr op)
-{
-    return otable[op / 2].indexable;
-}
-
-INLINE int
-is_byte(Objptr op)
-{
-    return otable[op / 2].byte;
-}
-
-INLINE int
-is_word(Objptr op)
-{
-    return !otable[op / 2].ptrs;
-}
-
-/* Convert value to object */
-INLINE              Objptr
-as_object(int value)
-{
-    return (value & (~1));
-}
-
-/* Convert object to integer */
-INLINE int
-as_oop(Objptr op)
-{
-    return op | 1;
-}
-
-/* Conversion Functions. */
-
-/* Get integer value of object */
-INLINE int
-as_integer(int value)
-{
-    return value >> 1;
-}
-
-/* Return integer as a object */
-INLINE              Objptr
-as_integer_object(int value)
-{
-    return (value << 1) + 1;
-}
-
-/* Accessing Functions. */
-
-INLINE              Objhdr
-get_object_pointer(Objptr op)
-{
-    return objmem[op / 2];
-}
-
-INLINE char        *
-get_object_base(Objptr op)
-{
-    return (char *) (get_object_pointer(op) + 1);
-}
-
-INLINE int
-get_object_refcnt(Objptr op)
-{
-    return otable[op / 2].refcnt;
-}
-
-INLINE void
-set_object_refcnt(Objptr op, int cnt)
-{
-    otable[op / 2].refcnt = cnt;
-}
-
-INLINE void
-set_object_pointer(Objptr op, Objhdr addr)
-{
-    objmem[op / 2] = addr;
-}
-
-INLINE void
-set_object_refcnt(Objptr op, int cnt)
-{
-    otable[op / 2].refcnt = cnt;
-}
-
-/* Get value in object */
-INLINE              Objptr
-get_pointer(Objptr op, int offset)
-{
-    return ((Objptr *) get_object_base(op))[offset];
-}
-
-INLINE void
-set_pointer(Objptr op, int offset, int value)
-{
-    ((Objptr *) get_object_base(op))[offset] = value;
-}
-
-/* Return value of object, but convert it to a native integer. */
-INLINE int
-get_integer(Objptr op, int offset)
-{
-    return as_integer(((Objptr *) get_object_base(op))[offset]);
-}
-
-INLINE int
-get_word(Objptr op, int offset)
-{
-    return ((int *) get_object_base(op))[offset];
-}
-
-INLINE int
-set_word(Objptr op, int offset, int value)
-{
-    return ((int *) get_object_base(op))[offset] = value;
-}
-
-INLINE int
-get_byte(Objptr op, int offset)
-{
-    return 0xff & (((char *) get_object_base(op))[offset]);
-}
-
-INLINE int
-set_byte(Objptr op, int offset, char value)
-{
-    return ((char *) get_object_base(op))[offset] = value;
-}
-
-/* Get class of object */
-INLINE              Objptr
-class_of(Objptr op)
-{
-    return is_object(op)? get_object_pointer(op)->u.class :
-				SmallIntegerClass;
-}
-
-/* Size of an object in bytes. */
-INLINE int
-size_of(Objptr op)
-{
-    return get_object_pointer(op)->size;
-}
-
-/*
- * Return fixed size of object in bytes.
- */
-
-INLINE int
-fixed_size(Objptr op)
-{
-    Objptr              class = class_of(op);
-    int                 size;
-
-    size = (class == NilPtr) ? 0 : (get_integer(class, CLASS_FLAGS)/ 16);
-    return sizeof(Objptr) * size;
-}
-
-
-#if 0
-/* Reference Counting. */
-INLINE void
-object_incr_ref(Objptr op)
-{
-    if (is_object(op)) {
-	int                 ncnt = get_object_refcnt(op);
-
-	if (ncnt != MAXREFCNT)
-	    set_object_refcnt(op, ncnt + 1);
-    }
-}
-
-INLINE void
-object_decr_ref(Objptr op)
-{
-    if (is_object(op)) {
-	int                 ncnt = get_object_refcnt(op);
-
-       /* Don't change objects at max count */
-	if (ncnt != MAXREFCNT) {
-	    set_object_refcnt(op, ncnt - 1);
-	   /* If count is zero, remove object */
-	    if (ncnt == 1) {
-		free_all_other_objects(op);
-	    }
-	}
-    }
-}
-#endif
-#endif
 
 /* Assignment */
 void
@@ -752,6 +738,10 @@ free_object_pointer(Objptr op)
    /* Make sure it is a object an not NilObject */
     if (is_object(op) && op != 0 && notFree(op)) {
     	Otentry      optr;
+
+	/* If we are about to free a compiled method, flush it out of cache */
+	if (class_of(op) == CompiledMethodClass)
+	    flushMethod(op);
 
 	op /= 2;
     	optr = &otable[op];			/* Convert to index */
@@ -1219,8 +1209,10 @@ reclaimSpace()
     int                 i, j;
     int                 cnt;
     Objptr		op;
+#ifdef DUMP_OBJMEM
     int			before = 0, after = 0;
     int			total = 0;
+#endif
     Region              best_reg;
 
     if (noreclaim)
@@ -1249,6 +1241,9 @@ reclaimSpace()
 
    /* Check if any of freed objects are a file */
     check_files();
+
+   /* Since we might have freed some things, init the method cache */
+    flushCache(NilPtr);
 
    /* Free all unreferenced objects now */
     for (i = 1; i < otsize; i++) {
