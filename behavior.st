@@ -1,9 +1,13 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.3 2000/02/24 03:10:54 rich Exp rich $ "
+" $Id: behavior.st,v 1.4 2000/08/27 02:17:01 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.4  2000/08/27 02:17:01  rich
+ Fixed ClassCategoryReader.
+ Fixed typos and code cleanup.
+
  Revision 1.3  2000/02/24 03:10:54  rich
  allInstVarNames now uses WriteStream
  kindOfSubclass now uses WriteStream
@@ -18,8 +22,11 @@
 "
 !
 
-Object subclass: 'ClassCategoryReader' instanceVariableNames: 'myClass myCategory'
-       classVariableNames: '' poolDictionaries: '' category: nil
+Object subclass: 'ClassCategoryReader'
+   instanceVariableNames: 'myClass myCategory'
+   classVariableNames: ''
+   poolDictionaries: ''
+   category: nil
 !
 
 ! ClassCategoryReader class methodsFor: 'creation' !
@@ -35,7 +42,7 @@ for: aClass category: aCategory
 
 for: aClass category: aCategory
     myClass <- aClass.
-    myCategory <- aCategory asSymbol.
+    myCategory <- aCategory.
 !
 
 fileInFrom: aStream
@@ -63,7 +70,6 @@ category
 sourceCode
 	| stream |
 	stream <- sourceFiles at: sourceFile.
-	stream <- stream copy.
 	stream position: sourcePos.
 	^ stream nextChunk.
 ! !
@@ -86,27 +92,26 @@ sourceCode: aString
 	| stream |
 	" Save the source code at end of change file. "
 	sourceFile <- 2.
+	category <- nil.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		stream <- stream deepCopy.
 		sourcePos <- stream setToEnd.
 		stream nextChunkPut: aString.
 		stream nextChunkPut: ''.
-	].
+	]
 !
 
 sourceCode: aString forCategory: aCategory
 	| stream |
 	" Save the source code at end of change file. "
 	sourceFile <- 2.
+	category <- aCategory.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		stream <- stream deepCopy.
 		sourcePos <- stream setToEnd.
 		stream nextChunkPut: aString.
 		stream nextChunkPut: ''.
-	].
-	category <- aCategory.
+	]
 !
 
 sourceFile: aFile sourcePos: position category: aCategory
@@ -142,11 +147,13 @@ methodDictionary: aDictionary
 addSelector: selector withMethod: compiledMethod
 	"Adds the selector with compiled method to the class dictionary."
 	methoddict at: selector put: compiledMethod.
+	selector flushCache
 !
 
 removeSelector: selector
 	"Removes the selector from the method."
 	methoddict remove: selector.
+	selector flushCache
 ! !
 
 ! Behavior methodsFor: 'Instance protocol'!
@@ -204,16 +211,16 @@ includesSelector: selector
 canUnderstand: selector
 	(methoddict includesKey: selector) ifTrue: [ ^ true ].
 	superclass isNil ifTrue: [ ^ false ].
-	^ superclass canUnderstand: selector
+	^ superclass canUnderstand: selector 
 !
 
 whichClassIncludesSelector: selector
 	(methoddict includesKey: selector) ifTrue: [ ^ self ].
 	superclass isNil ifTrue: [ ^ nil ].
 	^ superclass whichClassIncludesSelector: selector
-! !	
+! !
 
-! Behavior methodsFor: 'Accessing class heirarchy'!
+! Behavior methodsFor: 'Accessing class heirarchy' !
 
 allSubclasses
 	"Return a set of all subclasses"
@@ -403,14 +410,14 @@ instVarNames: aString
 !
 
 addInstVarName: aString
-    | var |
+    | names |
     " First check if it already exists "
     vars do: [ :v | v = aString ifTrue: [ ^self]].
     " Build new array one size bigger "
-    var <- Array new: (vars size + 1).
-    1 to: vars size do: [ :i | var at: i put: (vars at: i)].
-    var at: (var size) put: aString.
-    vars <- var.
+    names <- Array new: (vars size + 1).
+    1 to: vars size do: [ :i | names at: i put: (vars at: i)].
+    names at: (names size) put: aString.
+    vars <- names.
     flags <- flags + 8.
 !
 
@@ -577,24 +584,25 @@ whichCategoryIncludesSelector: selector
 !
 
 addSelector: aSelector withMethod: meth classified: aCategory
-	| info set oldcat |
+	| info set oldcat newcat |
 	self addSelector: aSelector withMethod: meth.
 	aCategory isNil ifFalse: [
+	    newcat <- aCategory asSymbol.
 	    info <- meth description.
 	    info isNil ifFalse: [
 		  info <- MethodInfo new.
 		  meth description: info ].
-	    info category: aCategory asSymbol.
-	    " Remove it from old category "
-	    (oldcat <- self whichCategoryIncludesSelector: aSelector) isNil
-		    ifFalse: [ (methcats at: aCategory) remove: aSelector ].
+	    info category: aCategory.
 	    " Create dictionary if one does not exist "
 	    methcats isNil ifTrue: [ methcats <- Dictionary new ].
+	    " Remove it from old category "
+	    (oldcat <- self whichCategoryIncludesSelector: aSelector) isNil
+		    ifFalse: [ (methcats at: oldcat asSymbol) remove: aSelector ].
 	    " Add selector into category "
-	    set <- methcats at: aCategory asSymbol ifAbsent:
-		   [ set <- Set new. methcats at: aCategory asSymbol put: set ].
+	    set <- methcats at: newcat ifAbsent:
+		   [ set <- Set new. methcats at: newcat put: set ].
 	    set add: aSelector.
-	]
+	].
 !
 	
 
@@ -812,6 +820,14 @@ subclassOf: aClass
 
 ! MetaClass methodsFor: 'Accesss' !
 
+instVarNames
+    ^ Array new: 0
+!
+
+allInstVarNames
+    ^ Array new: 0
+!
+
 instanceClass
 	^ instanceClass
 !
@@ -1006,3 +1022,4 @@ fileOutMethods: aFileStream with: aString
         ]
      ]
 ! !
+
