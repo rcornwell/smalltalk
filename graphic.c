@@ -2,6 +2,12 @@
  * Smalltalk graphics: Routines for doing graphics primitive.
  *
  * $Log: graphic.c,v $
+ * Revision 1.4  2002/01/16 19:11:51  rich
+ * Fixed calculation of when to preload.
+ * Fixed error when skew == 0.
+ * Return success/failure from scanword, and execption in placeholder.
+ * Character indexes start at 1 not 0.
+ *
  * Revision 1.3  2001/09/17 20:19:55  rich
  * Fixed bug in update range calculation.
  *
@@ -20,7 +26,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: graphic.c,v 1.3 2001/09/17 20:19:55 rich Exp rich $";
+    "$Id: graphic.c,v 1.4 2002/01/16 19:11:51 rich Exp rich $";
 
 #endif
 
@@ -326,9 +332,8 @@ doblit(Copy_bits blit_data)
 	w -= blit_data->cx - dx;
 	dx = blit_data->cx;
     }
-    if ((dx + w) > (blit_data->cx + blit_data->cw)) {
+    if ((dx + w) > (blit_data->cx + blit_data->cw)) 
 	w -= (dx + w) - (blit_data->cx + blit_data->cw);
-    }
 
     /* Now do Y */
     if (dy < blit_data->cy) {
@@ -336,9 +341,8 @@ doblit(Copy_bits blit_data)
 	w -= blit_data->cy - dy;
 	dy = blit_data->cy;
     }
-    if ((dy + h) > (blit_data->cy + blit_data->ch)) {
+    if ((dy + h) > (blit_data->cy + blit_data->ch)) 
 	h -= (dy + h) - (blit_data->cy + blit_data->ch);
-    }
 
     /* Sanity check things */
     if (sx < 0) {
@@ -346,18 +350,16 @@ doblit(Copy_bits blit_data)
 	w += sx;
 	sx = 0;
     }
-    if ((sx + w) > blit_data->sw) {
-	w -= sx + w - blit_data->sw;
-    }
+    if (w > blit_data->sw && blit_data->sw > 0) 
+	w = blit_data->sw;
 
     if (sy < 0) {
 	dy -= sy;
 	h += sy;
 	sy = 0;
     }
-    if ((sy + h) > blit_data->sh) {
-	h -= sy + h - blit_data->sh;
-    }
+    if (h > blit_data->sh && blit_data->sh > 0) 
+	h = blit_data->sh;
 
     if (w <= 0 || h <= 0)
 	return;
