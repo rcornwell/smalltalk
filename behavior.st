@@ -1,9 +1,12 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.6 2001/07/31 14:09:47 rich Exp rich $ "
+" $Id: behavior.st,v 1.7 2001/08/01 16:42:31 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.7  2001/08/01 16:42:31  rich
+ Make sure we have a method dictionary before we go accessing it.
+
  Revision 1.6  2001/07/31 14:09:47  rich
  Code cleanup
  Redid change source saving.
@@ -35,7 +38,7 @@ Object subclass: 'ClassCategoryReader'
    instanceVariableNames: 'myClass myCategory'
    classVariableNames: ''
    poolDictionaries: ''
-   category: nil
+   category: 'Compiler'
 !
 
 ! ClassCategoryReader class methodsFor: 'creation' !
@@ -47,7 +50,7 @@ for: aClass category: aCategory
      ^ reader
 ! !
 
-! ClassCategoryReader methodsFor: 'Basic' !
+! ClassCategoryReader methodsFor: 'basic' !
 
 for: aClass category: aCategory
     myClass <- aClass.
@@ -60,9 +63,11 @@ fileInFrom: aStream
 	[ Compiler compile: aString forClass: myClass classified: myCategory ].
 ! !
 
+MethodInfo category: 'CompiledMethods' !
+
 MethodInfo comment: 'I represent information about compiled methods' !
 
-! MethodInfo methodsFor: 'Accessing' !
+! MethodInfo methodsFor: 'accessing' !
 
 sourceFile
 	^ sourceFile
@@ -84,7 +89,7 @@ sourceCode
 	^ stream nextChunk.
 ! !
 
-! MethodInfo methodsFor: 'Setting' !
+! MethodInfo methodsFor: 'modifying' !
 
 sourceFile: aInteger
 	^ sourceFile <- aInteger
@@ -134,6 +139,11 @@ sourceCode: aString forClass: aClass forCategory: aCategory
 	]
 !
 
+sourceFile: aFile sourcePos: position
+	sourceFile <- aFile.
+	sourcePos <- position
+!
+
 sourceFile: aFile sourcePos: position category: aCategory
 	sourceFile <- aFile.
 	sourcePos <- position.
@@ -150,7 +160,32 @@ sourceCode: aString forClass: aClass forCategory: aCategory
 	^ self new sourceCode: aString forClass: aClass forCategory: aCategory
 ! !
 
-! Behavior methodsFor: 'Creating Method Dictionary'!
+Behavior category: 'Class Management' !
+
+Behavior comment: 
+	'I manage the basic behavior of Classes'. !
+
+! Behavior methodsFor: 'instance creation' !
+
+new
+        ^ self basicNew
+!
+
+new: aNumber
+        ^ self basicNew: aNumber
+!
+
+basicNew
+        <primitive 55>
+        ^ self primitiveFailed
+!
+
+basicNew: aNumbe
+        <primitive 56>
+        ^ self primitiveFailed
+! !
+
+! Behavior methodsFor: 'creating method dictionary'!
 
 methodDictionary: aDictionary
 	" Set the method dictionary to a new dictionary. "
@@ -172,7 +207,7 @@ removeSelector: selector
 	selector flushCache
 ! !
 
-! Behavior methodsFor: 'Instance protocol'!
+! Behavior methodsFor: 'instance protocol'!
 
 superclass: aClass
 	^ superclass <- aClass
@@ -190,7 +225,7 @@ removeSubclass: aClass
         subclasses remove: aClass
 ! !
 
-! Behavior methodsFor: 'Accessing method dictionary'!
+! Behavior methodsFor: 'accessing method dictionary'!
 
 selectors
 	| sels |
@@ -240,7 +275,7 @@ whichClassIncludesSelector: selector
 	^ superclass whichClassIncludesSelector: selector
 ! !
 
-! Behavior methodsFor: 'Accessing class heirarchy' !
+! Behavior methodsFor: 'accessing class heirarchy' !
 
 allSubclasses
 	"Return a set of all subclasses"
@@ -281,7 +316,7 @@ allSuperclasses
 	^ classes
 ! !
 
-! Behavior methodsFor: 'Testing the form of instances' !
+! Behavior methodsFor: 'testing the form of instances' !
 
 instSize
 	^ flags // 8
@@ -311,7 +346,26 @@ isVariable
 	^ ( flags bitAnd: 4) ~= 0
 ! !
 
-! Class methodsFor: 'Accessing'!
+! Behavior methodsFor: 'updating source' !
+
+adjustMethodsSourceChannel: aChannel
+	| desc |
+	" Point all methods on channel aChannel to channel 1. "
+	methoddict isNil ifFalse: [
+		methoddict do: [ :meth |
+			desc <- meth description.
+			desc sourceFile	= aChannel ifTrue: [
+				desc sourceFile: 1
+			].
+		]
+	].
+! !
+
+Class category: 'Class Managment' !
+
+Class comment: 'I manage information about classes not needed to execute code' !
+
+! Class methodsFor: 'accessing'!
 
 name
 	^ name
@@ -384,39 +438,42 @@ category
 ! Class methodsFor: 'printing' !
 
 poolVariableString
-	| stream |
+	| stream cont |
 	stream <- WriteStream on: (String new: 0).
 	self sharedPools do: [ :n |
 		stream nextPutAll: n asString.  stream space.
 	].
 	" Remove trailing blank "
-	stream isEmpty ifFalse: [ stream skip: -1 ].
-	^ stream contents
+	stream isEmpty ifTrue: [ ^'' ].
+	cont <- stream contents.
+	^ cont copyFrom: 1 to: (cont size - 1)
 !
 
 classVariableString
-	| stream |
+	| stream cont |
 	stream <- WriteStream on: (String new: 0).
 	self classVarNames do: [ :n |
 		stream nextPutAll: n asString.  stream space.
 	].
 	" Remove trailing blank "
-	stream isEmpty ifFalse: [ stream skip: -1 ].
-	^ stream contents
+	stream isEmpty ifTrue: [ ^'' ].
+	cont <- stream contents.
+	^ cont copyFrom: 1 to: (cont size - 1)
 !
 
 instanceVariableString
-	| stream |
+	| stream cont |
 	stream <- WriteStream on: (String new: 0).
 	self instVarNames do: [ :n |
 		stream nextPutAll: n asString.  stream space.
 	].
 	" Remove trailing blank "
-	stream isEmpty ifFalse: [ stream skip: -1 ].
-	^ stream contents
+	stream isEmpty ifTrue: [ ^'' ].
+	cont <- stream contents.
+	^ cont copyFrom: 1 to: (cont size - 1)
 ! !
 
-! Class methodsFor: 'Modification' !
+! Class methodsFor: 'modifying' !
 
 instVarNames: aString
     | isize cl |
@@ -521,7 +578,7 @@ instFlags: variableBoolean
 	^ flags <- temp
 ! !
 
-! Class methodsFor: 'Testing class hierarchy' !
+! Class methodsFor: 'testing class hierarchy' !
 
 inheritsFrom: aClass
 	superclass == aClass ifTrue: [ ^ true ].
@@ -541,7 +598,7 @@ kindOfSubclass
 	^ string
 ! !
 
-! Class methodsFor: 'Enumeration' !
+! Class methodsFor: 'enumeration' !
 
 allSubclassesDo: aBlock
  	^ self allSubclasses do: aBlock
@@ -604,25 +661,30 @@ whichCategoryIncludesSelector: selector
 !
 
 addSelector: aSelector withMethod: meth classified: aCategory
-	| info set oldcat newcat |
-	self addSelector: aSelector withMethod: meth.
+	| info set oldcat |
 	aCategory isNil ifFalse: [
-	    newcat <- aCategory asSymbol.
+	    " Create dictionary if one does not exist "
+	    methcats isNil ifTrue: [ methcats <- Dictionary new ].
+
+	    " Remove it from old category "
+	    oldcat <- self whichCategoryIncludesSelector: aSelector.
+	    oldcat isNil
+		   ifFalse: [
+			oldcat <- methcats at: oldcat asSymbol ifAbsent: [nil].
+			oldcat isNil ifFalse: [ oldcat remove: aSelector ]
+		   ].
+
 	    info <- meth description.
 	    info isNil ifTrue: [
 		  info <- MethodInfo new.
 		  meth description: info ].
 	    info category: aCategory.
-	    " Create dictionary if one does not exist "
-	    methcats isNil ifTrue: [ methcats <- Dictionary new ].
-	    " Remove it from old category "
-	    (oldcat <- self whichCategoryIncludesSelector: aSelector) isNil
-		    ifFalse: [ (methcats at: oldcat asSymbol) remove: aSelector ].
 	    " Add selector into category "
-	    set <- methcats at: newcat ifAbsent:
-		   [ set <- Set new. methcats at: newcat put: set ].
+	    set <- methcats at: aCategory asSymbol ifAbsent:
+		   [ set <- Set new. methcats at: aCategory asSymbol put: set ].
 	    set add: aSelector.
 	].
+	self addSelector: aSelector withMethod: meth.
 !
 	
 
@@ -671,7 +733,38 @@ copyCategory: categoryName from: aClass classified: newCategoryName
 	     do: [ :s | self copy: s from: aClass classified: newCategoryName ]
 ! !
 
-! Class methodsFor: 'Instance Creation'!
+! Class methodsFor: 'compiling' !
+
+compile: aString notifying: aBlock
+      Compiler compile: aString forClass: self notify: aBlock
+!
+
+compile: aString
+      Compiler compile: aString forClass: self 
+!
+
+recompile: selector
+      self compile: (self compiledMethodAt: selector) getSource
+!
+
+compileAll
+      self selectors do: [ :sel | self recompile: sel ].
+!
+
+compileAllSubclasses
+      self allSubclasses do: [ :sub | sub compileAll ].
+!
+
+compile: aString classified: aCategory
+      Compiler compile: aString forClass self classified: aCategory
+!
+
+compile: aString classified: aCategory notifing: aBlock
+      Compiler compile: aString forClass self classified: aCategory
+		 notify: aBlock
+! !
+
+! Class methodsFor: 'instance creation'!
 
 subclass: classNameString instanceVariableNames: stringInstVarNames
        classVariableNames: stringClassVarNames
@@ -793,7 +886,168 @@ wordSubclass: classNameString instanceVariableNames: stringInstVarNames
 		  changed: nil
 ! !
 
-! Class methodsFor: 'Private'!
+! Class methodsFor: 'filing' !
+
+fileOutOn: aFileStream
+    " Write out class definitition. "
+     superclass isNil
+	ifTrue: [ aFileStream nextPutAll: 'nil' ]
+	ifFalse: [ aFileStream nextPutAll: superclass class name asString].
+     aFileStream space.
+     aFileStream nextPutAll: self kindOfSubclass.
+     aFileStream space.
+     name printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'instanceVariableNames: '.
+     self  instanceVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'classVariableNames: '.
+     self classVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'poolDictionaries: '.
+     self poolVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'category: '.
+     category printOn: aFileStream.
+     aFileStream nextPut: $!!.
+     aFileStream nl ; nl.
+     " Put a comment string out if one set"
+     comment notNil ifTrue: [
+        aFileStream nextPutAll: name asString.
+	aFileStream nextPutAll: ' comment: '.
+	comment printOn: aFileStream.
+	aFileStream nextPut: $!!.
+	aFileStream nl ; nl.
+      ].
+      self class isNil ifFalse: [
+	 self class fileOutMethods: aFileStream with: 'class'.
+         self fileOutMethods: aFileStream with: nil.
+         (self class includesSelector: #initialize ) ifTrue: [
+	    aFileStream nextPutAll: name asString.
+	    aFileStream nextPutAll: ' initialize !!'.
+	    aFileStream nl; nl.
+          ] ]
+	  ifTrue: [ self fileOutMethods: aFileStream with: nil ].
+!
+
+fileOutMethods: aFileStream with: aString
+     methcats isNil ifFalse: [
+	methcats associationsDo: [ :assoc |
+          aFileStream nextPut: $!!.
+	  aFileStream space.
+          aFileStream nextPutAll: name asString.
+	  aFileStream space.
+          aString notNil ifTrue: [ aFileStream nextPutAll: aString.
+				   aFileStream space ].
+          aFileStream nextPutAll: 'methodsFor: '.
+	  assoc key asString printOn: aFileStream.
+	  aFileStream space.
+          aFileStream nextPut: $!!.
+	  assoc value do: [ :s |
+	        aFileStream nl; nl.
+		aFileStream nextChunkPut: 
+			((self compiledMethodAt: s) getSource) ].
+	  aFileStream space.
+          aFileStream nextPut: $!!.
+	  aFileStream nl; nl.
+        ]
+     ]
+!
+
+storeOnChannel: aChannel
+    " Write out class definitition. "
+    | aFileStream |
+     aFileStream <- sourceFiles at: aChannel.
+     superclass isNil
+	ifTrue: [ aFileStream nextPutAll: 'nil' ]
+	ifFalse: [ aFileStream nextPutAll: superclass class name asString].
+     aFileStream space.
+     aFileStream nextPutAll: self kindOfSubclass.
+     aFileStream space.
+     name printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'instanceVariableNames: '.
+     self  instanceVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'classVariableNames: '.
+     self classVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'poolDictionaries: '.
+     self poolVariableString printOn: aFileStream.
+     aFileStream nlTab.
+     aFileStream nextPutAll: 'category: '.
+     category printOn: aFileStream.
+     aFileStream nextPut: $!!.
+     aFileStream nl ; nl.
+     " Put a comment string out if one set"
+     comment notNil ifTrue: [
+        aFileStream nextPutAll: name asString.
+	aFileStream nextPutAll: ' comment: '.
+	comment printOn: aFileStream.
+	aFileStream nextPut: $!!.
+	aFileStream nl ; nl.
+      ].
+      self class notNil ifTrue: [
+	 self class storeMethodsOn: aChannel with: 'class'.
+         self storeMethodsOn: aChannel with: nil.
+         (self class includesSelector: #initialize ) ifTrue: [
+	    aFileStream nextPutAll: name asString.
+	    aFileStream nextPutAll: ' initialize !!'.
+	    aFileStream nl; nl.
+          ] ]
+	  ifFalse: [ self storeMethodsOn: aChannel with: nil ].
+!
+
+storeMethodsOn: aChannel with: aString
+    | aFileStream meth desc pos |
+     aFileStream <- sourceFiles at: aChannel.
+     methcats isNil ifFalse: [
+	methcats associationsDo: [ :assoc |
+          aFileStream nextPut: $!!.
+	  aFileStream space.
+          aFileStream nextPutAll: name asString.
+	  aFileStream space.
+          aString notNil ifTrue: [ aFileStream nextPutAll: aString.
+				   aFileStream space ].
+          aFileStream nextPutAll: 'methodsFor: '.
+	  assoc key asString printOn: aFileStream.
+	  aFileStream space.
+          aFileStream nextPut: $!!.
+          aFileStream nl.
+	  assoc value do: [ :s |
+	        aFileStream nl.
+		meth <- self compiledMethodAt: s.
+		desc <- meth description.
+		pos <- aFileStream position.
+		desc sourceFile = aChannel ifTrue: [
+			stderr nextPutAll: 'Could not read method '.
+			stderr nextPutAll: self class name asString.
+			stderr space.
+			stderr nextPutAll: s asString.
+			stderr nl.
+		] ifFalse: [
+		    aFileStream nextChunkPut: (desc sourceCode).
+		    desc sourceFile: aChannel sourcePos: pos.
+		]
+	  ].
+	  aFileStream space.
+          aFileStream nextPut: $!!.
+	  aFileStream nl; nl.
+        ]
+     ]
+! !
+
+! Class methodsFor: 'updating source' !
+
+adjustSourceChannel: aChannel
+	| desc |
+	" Point all methods on channel aChannel to channel 1. "
+        self class isNil ifFalse: [
+	    self class adjustMethodsSourceChannel: aChannel ].
+        self adjustMethodsSourceChannel: aChannel.
+! !
+
+! Class methodsFor: 'private'!
 
 metaclassFor: classNameString
 	| aClass |
@@ -829,7 +1083,11 @@ StringasArray: aString
     ^array
 ! !
 
-! MetaClass class methodsFor: 'Creation'!
+MetaClass category: 'Class Managment' !
+
+MetaClass comment: 'I manage the hieharchy of classes within the system.' !
+
+! MetaClass class methodsFor: 'creation'!
 
 subclassOf: aClass
 	| newMeta |
@@ -838,7 +1096,7 @@ subclassOf: aClass
 	^ newMeta
 ! !
 
-! MetaClass methodsFor: 'Accesss' !
+! MetaClass methodsFor: 'accesss' !
 
 instVarNames
     ^ Array new: 0
@@ -856,7 +1114,7 @@ instanceClass: aClass
 	^ instanceClass <- aClass
 ! !
 
-! MetaClass methodsFor: 'Basic'!
+! MetaClass methodsFor: 'basic'!
 
 name: newName
 	enviorment: aSystemDictionary
@@ -947,100 +1205,4 @@ newMeta: newName
 	^ aClass
 ! !
 
-! Class methodsFor: 'compiling' !
-
-compile: aString notifying: aBlock
-      Compiler compile: aString forClass: self notify: aBlock
-!
-
-compile: aString
-      Compiler compile: aString forClass: self 
-!
-
-recompile: selector
-      self compile: (self compiledMethodAt: selector) getSource
-!
-
-compileAll
-      self selectors do: [ :sel | self recompile: sel ].
-!
-
-compileAllSubclasses
-      self allSubclasses do: [ :sub | sub compileAll ].
-!
-
-compile: aString classified: aCategory
-      Compiler compile: aString forClass self classified: aCategory
-!
-
-compile: aString classified: aCategory notifing: aBlock
-      Compiler compile: aString forClass self classified: aCategory
-		 notify: aBlock
-! !
-
-! Class methodsFor: 'Filing' !
-
-fileOutOn: aFileStream
-    " Write out class definitition. "
-     aFileStream nextPutAll: superclass class name asString.
-     aFileStream space.
-     aFileStream nextPutAll: self kindOfSubclass.
-     aFileStream space.
-     name printOn: aFileStream.
-     aFileStream nlTab.
-     aFileStream nextPutAll: 'instanceVariableNames: '.
-     self  instanceVariableString printOn: aFileStream.
-     aFileStream nlTab.
-     aFileStream nextPutAll: 'classVariableNames: '.
-     self classVariableString printOn: aFileStream.
-     aFileStream nlTab.
-     aFileStream nextPutAll: 'poolDictionaries: '.
-     self poolVariableString printOn: aFileStream.
-     aFileStream nlTab.
-     aFileStream nextPutAll: 'category: '.
-     category printOn: aFileStream.
-     aFileStream nextPut: $!!.
-     aFileStream nl ; nl.
-     " Put a comment string out if one set"
-     comment notNil ifTrue: [
-        aFileStream nextPutAll: name asString.
-	aFileStream nextPutAll: ' comment: '.
-	comment printOn: aFileStream.
-	aFileStream nextPut: $!!.
-	aFileStream nl ; nl.
-      ].
-      self class isNil ifFalse: [
-	 self class fileOutMethods: aFileStream with: 'class'.
-         self fileOutMethods: aFileStream with: nil.
-         (self class includesSelector: #initialize ) ifTrue: [
-	    aFileStream nextPutAll: name asString.
-	    aFileStream nextPutAll: ' initialize !!'.
-	    aFileStream nl; nl.
-          ] ]
-	  ifTrue: [ self fileOutMethods: aFileStream with: nil ]
-!
-
-fileOutMethods: aFileStream with: aString
-     methcats isNil ifFalse: [
-	methcats associationsDo: [ :assoc |
-          aFileStream nextPut: $!!.
-	  aFileStream space.
-          aFileStream nextPutAll: name asString.
-	  aFileStream space.
-          aString notNil ifTrue: [ aFileStream nextPutAll: aString.
-				   aFileStream space ].
-          aFileStream nextPutAll: 'methodsFor: '.
-	  assoc key asString printOn: aFileStream.
-	  aFileStream space.
-          aFileStream nextPut: $!!.
-	  assoc value do: [ :s |
-	        aFileStream nl; nl.
-		aFileStream nextChunkPut: 
-			((self compiledMethodAt: s) getSource) ].
-	  aFileStream space.
-          aFileStream nextPut: $!!.
-	  aFileStream nl; nl.
-        ]
-     ]
-! !
 
