@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: symbols.c,v $
+ * Revision 1.4  2001/01/06 21:28:12  rich
+ * Fixed error in find selector
+ *
  * Revision 1.3  2000/02/02 16:12:24  rich
  * Don't need to include primitive or interper anymore.
  *
@@ -17,26 +20,11 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: symbols.c,v 1.3 2000/02/02 16:12:24 rich Exp rich $";
+	"$Id: symbols.c,v 1.4 2001/01/06 21:28:12 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <memory.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "lex.h"

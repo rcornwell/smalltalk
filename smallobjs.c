@@ -2,33 +2,20 @@
  * Smalltalk smallobjs: Routines for modifying smalltalk objects.
  *
  * $Log: smallobjs.c,v $
+ * Revision 1.1  2001/07/28 01:54:16  rich
+ * Initial revision
+ *
  *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: smallobjs.c,v 1.1 2001/07/28 01:54:16 rich Exp rich $";
 
 #endif
 
-/* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <memory.h>
-#include <malloc.h>
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#include <math.h>
-
-#define malloc(x)	GlobalAlloc(GMEM_FIXED, x)
-#define free(x)		GlobalFree(x)
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "interp.h"

@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object space dump utilities.
  *
  * $Log: dump.c,v $
+ * Revision 1.5  2001/01/17 00:28:17  rich
+ * Added display of Float class.
+ *
  * Revision 1.4  2000/08/19 19:24:49  rich
  * Print out if a node is referenced or not.
  *
@@ -24,24 +27,12 @@
 
 #ifndef lint
 static char        *rcsid =
-"$Id: dump.c,v 1.4 2000/08/19 19:24:49 rich Exp rich $";
+"$Id: dump.c,v 1.5 2001/01/17 00:28:17 rich Exp rich $";
 
 #endif
 
 /* System stuff */
-#ifdef unix
-#include <stdio.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <memory.h>
-
-#define wsprintf	sprintf
-#endif
-#ifdef _WIN32
-#include <stddef.h>
-#include <windows.h>
-#endif
-
+#include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "fileio.h"
@@ -62,7 +53,7 @@ dump_class_name(Objptr op)
     Objptr              cname;
     int                 i, sz, len, base;
 
-    wsprintf(buffer, "#%d (", class);
+    sprintf(buffer, "#%d (", class);
     if (class != NilPtr && (cname = get_pointer(class, CLASS_NAME)) != NilPtr) {
 	len = length_of(cname);
 	base = fixed_size(cname);
@@ -90,11 +81,11 @@ dump_object_value(Objptr op)
     double		*fval;
 
     if (is_integer(op)) {
-	wsprintf(buffer, "Integer %d", as_integer(op));
+	sprintf(buffer, "Integer %d", as_integer(op));
 	return buffer;
     }
     class = class_of(op);
-    wsprintf(buffer, "#%d ", op);
+    sprintf(buffer, "#%d ", op);
     switch (class) {
     case UndefinedClass:
 	strcat(buffer, "nil");
@@ -112,9 +103,9 @@ dump_object_value(Objptr op)
     case CharacterClass:
 	value = get_integer(op, CHARVALUE);
 	if (value >= ' ' && value < 0x7f)
-	    wsprintf(buffer, "#%d Character $%c", op, value);
+	    sprintf(buffer, "#%d Character $%c", op, value);
 	else
-	    wsprintf(buffer, "#%d Character $0x%02x", op, value);
+	    sprintf(buffer, "#%d Character $0x%02x", op, value);
 	break;
     case SymLinkClass:
 	op = get_pointer(op, SYM_VALUE);
@@ -129,10 +120,10 @@ dump_object_value(Objptr op)
     case FloatClass:
 	len = strlen(buffer);
 	fval = (double *) get_object_base(op);
-	wsprintf(&buffer[len], "Float %f", *fval);
+	sprintf(&buffer[len], "Float %f", *fval);
 	break;
     default:
-	wsprintf(buffer, "#%d -> Class #%d (", op, class);
+	sprintf(buffer, "#%d -> Class #%d (", op, class);
 	if (class != NilPtr &&
 	    (cname = get_pointer(class, CLASS_NAME)) != NilPtr) {
 	    len = length_of(cname);
@@ -160,7 +151,7 @@ dump_otable()
 
     for (i = 0; i < (otsize / 2); i += 2) {
 	if (notFree(i)) {
-	    wsprintf(buffer, "#%d (%d%s%s%s) %s %d",
+	    sprintf(buffer, "#%d (%d%s%s%s) %s %d",
 		     i, get_object_refcnt(i),
 		     (is_indexable(i)) ? " index" : "",
 		     (is_byte(i)) ? " byte" : "",
@@ -183,13 +174,13 @@ dump_object(int op)
     Objptr              o;
 
     if (!is_object(op)) {
-	wsprintf(buffer, "integer %d", as_integer(op));
+	sprintf(buffer, "integer %d", as_integer(op));
 	dump_string(buffer);
 	return;
     }
 
     if (notFree(op)) {
-	wsprintf(buffer, "#%d (%d%s%s%s) %s %d [",
+	sprintf(buffer, "#%d (%d%s%s%s) %s %d [",
 		 op, get_object_refcnt(op),
 		 (is_indexable(op)) ? " index" : "",
 		 (is_byte(op)) ? " byte" : "",
@@ -205,7 +196,7 @@ dump_object(int op)
 	len = fixed_size(op) / sizeof(Objptr);
 	for (i = 0; i < len; i++) {
 	    o = get_pointer(op, i);
-	    wsprintf(buffer, "   v %d = %s", i, dump_object_value(o));
+	    sprintf(buffer, "   v %d = %s", i, dump_object_value(o));
 	    dump_string(buffer);
 	}
 	if (is_indexable(op)) {
@@ -222,7 +213,7 @@ dump_object(int op)
 	    } else if (is_byte(op)) {
 		dump_string("(");
 		for (i = 0; i < len; i++) {
-		    wsprintf(buffer, "    [%d] = %02x", i,
+		    sprintf(buffer, "    [%d] = %02x", i,
 			     get_byte(op, i + base));
 		    dump_string(buffer);
 		}
@@ -231,7 +222,7 @@ dump_object(int op)
 		dump_string("(");
 		base /= sizeof(Objptr);
 		for (i = 0; i < len; i++) {
-		    wsprintf(buffer, "    [%d] = %8x", i,
+		    sprintf(buffer, "    [%d] = %8x", i,
 			     get_pointer(op, i + base));
 		    dump_string(buffer);
 		}
@@ -240,7 +231,7 @@ dump_object(int op)
 		dump_string("(");
 		base /= sizeof(Objptr);
 		for (i = 0; i < len; i++) {
-		    wsprintf(buffer, "     %d = %s", i,
+		    sprintf(buffer, "     %d = %s", i,
 			   dump_object_value(get_pointer(op, i + base)));
 		    dump_string(buffer);
 		}
@@ -249,7 +240,7 @@ dump_object(int op)
 	    dump_string("]");
 	}
     } else {
-	wsprintf(buffer, "#%d free", op);
+	sprintf(buffer, "#%d free", op);
 	dump_string(buffer);
     }
 }
@@ -289,19 +280,19 @@ dump_method(Objptr op)
     header = get_pointer(op, METH_HEADER);
     lits = LiteralsOf(header);
     bytes = size_of(op) - ((lits + METH_LITSTART) * sizeof(Objptr));
-    wsprintf(buffer, "%08x Flag %d, Lits %d Stack %d Temps %d",
+    sprintf(buffer, "%08x Flag %d, Lits %d Stack %d Temps %d",
     header, 0xf & FlagOf(header), lits, StackOf(header), TempsOf(header));
     dump_string(buffer);
     if (FlagOf(header) == METH_EXTEND) {
 	ehdr = get_pointer(op, METH_HEADER + lits);
-	wsprintf(buffer, " %08x Extended: Args %d, Primitive %d",
+	sprintf(buffer, " %08x Extended: Args %d, Primitive %d",
 		 ehdr, EArgsOf(ehdr), PrimitiveOf(ehdr));
 	dump_string(buffer);
 	lits--;
     }
    /* Dump literals */
     for (i = 0; i < lits; i++) {
-	wsprintf(buffer, " Lit #%d: %s", i,
+	sprintf(buffer, " Lit #%d: %s", i,
 		 dump_object_value(get_pointer(op, METH_LITSTART + i)));
 	dump_string(buffer);
     }
@@ -322,13 +313,13 @@ dump_method(Objptr op)
 		operand += (0xff & get_byte(op, lits + i + 2)) << 8;
 		if (operand > 32768)
 		    operand -= 65536;
-		wsprintf(opc, "j %d", operand + lits);
+		sprintf(opc, "j %d", operand + lits);
 		len = 3;
 		break;
 	    }
 	    if (operand == BLKCPY) {
 		operand = 0xff & get_byte(op, lits + i + 1);
-		wsprintf(opc, "blk %d", operand);
+		sprintf(opc, "blk %d", operand);
 		len = 2;
 		break;
 	    }
@@ -337,25 +328,25 @@ dump_method(Objptr op)
 	    len++;
 	    goto loop;
 	case PSHARG:
-	    wsprintf(opc, "psh arg(%d)", operand);
+	    sprintf(opc, "psh arg(%d)", operand);
 	    break;
 	case PSHLIT:
-	    wsprintf(opc, "psh lit(%d)", operand);
+	    sprintf(opc, "psh lit(%d)", operand);
 	    break;
 	case PSHINST:
-	    wsprintf(opc, "psh ins(%d)", operand);
+	    sprintf(opc, "psh ins(%d)", operand);
 	    break;
 	case PSHTMP:
-	    wsprintf(opc, "psh tmp(%d)", operand);
+	    sprintf(opc, "psh tmp(%d)", operand);
 	    break;
 	case STRINST:
-	    wsprintf(opc, "str ins(%d)", operand);
+	    sprintf(opc, "str ins(%d)", operand);
 	    break;
 	case STRTMP:
-	    wsprintf(opc, "str tmp(%d)", operand);
+	    sprintf(opc, "str tmp(%d)", operand);
 	    break;
 	case RETTMP:
-	    wsprintf(opc, "ret tmp(%d)", operand);
+	    sprintf(opc, "ret tmp(%d)", operand);
 	    break;
 	case JMPT:
 	    if (len == 2) {
@@ -363,7 +354,7 @@ dump_method(Objptr op)
 		if (operand > 127)
 		   operand -= 256;
 	    }
-	    wsprintf(opc, "jpt Byte %d(%d)", i + len + operand + lits,
+	    sprintf(opc, "jpt Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 	case JMPF:
@@ -372,7 +363,7 @@ dump_method(Objptr op)
 		if (operand > 127)
 		   operand -= 256;
 	    }
-	    wsprintf(opc, "jpf Byte %d(%d)", i + len + operand + lits,
+	    sprintf(opc, "jpf Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 	case JMP:
@@ -381,93 +372,93 @@ dump_method(Objptr op)
 		if (operand > 127)
 		   operand -= 256;
 	    }
-	    wsprintf(opc, "jmp Byte %d(%d)", i + len + operand + lits,
+	    sprintf(opc, "jmp Byte %d(%d)", i + len + operand + lits,
 		     operand);
 	    break;
 
 	case SNDSPC2:
 	    operand += 16;
 	case SNDSPC1:
-	    wsprintf(opc, "snd spc(%d, %d)", operand,
+	    sprintf(opc, "snd spc(%d, %d)", operand,
 		     0xff & get_byte(op, lits + i + 1));
 	    
 	    operand = get_byte(op, lits + i + 1);
 	    len = 2;
 	    break;
 	case SNDSUP:
-	    wsprintf(opc, "sup snd(%d, %d)", operand,
+	    sprintf(opc, "sup snd(%d, %d)", operand,
 		     0xff & get_byte(op, lits + i + len++));
 	    break;
 	case SNDLIT:
-	    wsprintf(opc, "snd lit(%d, %d)", operand,
+	    sprintf(opc, "snd lit(%d, %d)", operand,
 		     0xff & get_byte(op, lits + i + len++));
 	    break;
 	case GRP2:
 	    switch (opcode) {
 	    case RETSELF:
-		wsprintf(opc, "ret self");
+		sprintf(opc, "ret self");
 		break;
 	    case RETTOS:
-		wsprintf(opc, "ret top");
+		sprintf(opc, "ret top");
 		break;
 	    case RETTRUE:
-		wsprintf(opc, "ret true");
+		sprintf(opc, "ret true");
 		break;
 	    case RETFALS:
-		wsprintf(opc, "ret false");
+		sprintf(opc, "ret false");
 		break;
 	    case RETNIL:
-		wsprintf(opc, "ret nil");
+		sprintf(opc, "ret nil");
 		break;
 	    case DUPTOS:
-		wsprintf(opc, "dup");
+		sprintf(opc, "dup");
 		break;
 	    case RETBLK:
-		wsprintf(opc, "ret blk");
+		sprintf(opc, "ret blk");
 		break;
 	    case POPSTK:
-		wsprintf(opc, "pop");
+		sprintf(opc, "pop");
 		break;
 	    case PSHVAR:
 		operand = 0xff & get_byte(op, lits + i + 1);
-		wsprintf(opc, "psh var(%d)", operand);
+		sprintf(opc, "psh var(%d)", operand);
 		len = 2;
 		break;
 	    case STRVAR:
 		operand = 0xff & get_byte(op, lits + i + 1);
-		wsprintf(opc, "str var(%d)", operand);
+		sprintf(opc, "str var(%d)", operand);
 		len = 2;
 		break;
 	    case PSHSELF:
-		wsprintf(opc, "psh self");
+		sprintf(opc, "psh self");
 		break;
 	    case PSHNIL:
-		wsprintf(opc, "psh nil");
+		sprintf(opc, "psh nil");
 		break;
 	    case PSHTRUE:
-		wsprintf(opc, "psh true");
+		sprintf(opc, "psh true");
 		break;
 	    case PSHFALS:
-		wsprintf(opc, "psh false");
+		sprintf(opc, "psh false");
 		break;
 	    case PSHONE:
-		wsprintf(opc, "psh 1");
+		sprintf(opc, "psh 1");
 		break;
 	    case PSHZERO:
-		wsprintf(opc, "psh 0");
+		sprintf(opc, "psh 0");
 		break;
 	    }
 	}
 	switch (len) {
 	case 1:
-   	    wsprintf(buffer, " Byte %d: %02x      %s", i + lits, opcode, opc);
+   	    sprintf(buffer, " Byte %d: %02x      %s", i + lits, opcode, opc);
 	    break;
  	case 2:
-   	    wsprintf(buffer, " Byte %d: %02x %02x   %s", i + lits, opcode,
+   	    sprintf(buffer, " Byte %d: %02x %02x   %s", i + lits, opcode,
 			0xff & operand, opc);
 	    break;
 	case 3:
-   	    wsprintf(buffer, " Byte %d: %02x %04x %s", i + lits, opcode,
+   	    sprintf(buffer, " Byte %d: %02x %04x %s", i + lits, opcode,
 			0xffff & operand, opc);
 	    break;
 	}
@@ -493,10 +484,10 @@ dump_token(int tok, void *state)
 	strcpy(buffer, "{Lit} ");
 	break;
     case KeyName:
-	wsprintf(buffer, "{Name} %s", get_token_string(tstate));
+	sprintf(buffer, "{Name} %s", get_token_string(tstate));
 	break;
     case KeyKeyword:
-	wsprintf(buffer, "{Keyword} %s", get_token_string(tstate));
+	sprintf(buffer, "{Keyword} %s", get_token_string(tstate));
 	break;
     case KeyAssign:
 	strcpy(buffer, "{<-}");
@@ -517,7 +508,7 @@ dump_token(int tok, void *state)
 	strcpy(buffer, "{.}");
 	break;
     case KeySpecial:
-	wsprintf(buffer, "{Spec} %s", get_token_spec(tstate));
+	sprintf(buffer, "{Spec} %s", get_token_spec(tstate));
 	break;
     case KeyRBrack:
 	strcpy(buffer, "{[}");
@@ -526,7 +517,7 @@ dump_token(int tok, void *state)
 	strcpy(buffer, "{]}");
 	break;
     case KeyVariable:
-	wsprintf(buffer, "{Var} %s", get_token_string(tstate));
+	sprintf(buffer, "{Var} %s", get_token_string(tstate));
 	break;
     case KeyUnknown:
 	strcpy(buffer, "{Unknown}");
@@ -555,128 +546,128 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
     ip -= LiteralsOf(get_pointer(meth, METH_HEADER)) + METH_LITSTART;
     switch (opcode & 0xf0) {
     case PSHARG:
-	wsprintf(opc, "psh arg: %d [%d]", oprand, oprand2);
+	sprintf(opc, "psh arg: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHLIT:
-	wsprintf(opc, "psh lit: %d [%d]", oprand, oprand2);
+	sprintf(opc, "psh lit: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHINST:
-	wsprintf(opc, "psh ins: %d [%d]", oprand, oprand2);
+	sprintf(opc, "psh ins: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case PSHTMP:
-	wsprintf(opc, "psh tmp: %d [%d]", oprand, oprand2);
+	sprintf(opc, "psh tmp: %d [%d]", oprand, oprand2);
 	dumpflag = TRUE;
 	break;
     case STRINST:
-	wsprintf(opc, "str ins: %d", oprand);
+	sprintf(opc, "str ins: %d", oprand);
 	dumpflag = TRUE;
 	break;
     case STRTMP:
-	wsprintf(opc, "str tmp: %d", oprand);
+	sprintf(opc, "str tmp: %d", oprand);
 	dumpflag = TRUE;
 	break;
     case RETTMP:
-	wsprintf(opc, "ret tmp: %d", oprand);
+	sprintf(opc, "ret tmp: %d", oprand);
 	dumpflag = TRUE;
 	break;
     case JMPT:
-	wsprintf(opc, "jpt %d", oprand);
+	sprintf(opc, "jpt %d", oprand);
 	dumpflag = TRUE;
 	break;
     case JMPF:
-	wsprintf(opc, "jpf %d", oprand);
+	sprintf(opc, "jpf %d", oprand);
 	dumpflag = TRUE;
 	break;
     case LONGOP:
 	if (opcode == BLKCPY) {
-	    wsprintf(opc, "blk %d", oprand);
+	    sprintf(opc, "blk %d", oprand);
 	    dumpflag = TRUE;
 	    break;
 	}
     case JMP:
-	wsprintf(opc, "jmp %d", oprand);
+	sprintf(opc, "jmp %d", oprand);
 	break;
 
     case SNDSPC2:
     case SNDSPC1:
-	wsprintf(opc, "snd spc %d", oprand2);
+	sprintf(opc, "snd spc %d", oprand2);
 	dumpflag = TRUE;
 	break;
     case SNDSUP:
-	wsprintf(opc, "sup snd %d", oprand2);
+	sprintf(opc, "sup snd %d", oprand2);
 	dumpflag = TRUE;
 	break;
     case SNDLIT:
-	wsprintf(opc, "snd lit %d", oprand2);
+	sprintf(opc, "snd lit %d", oprand2);
 	dumpflag = TRUE;
 	break;
     case GRP2:
 	switch (opcode & 0xff) {
 	case RETSELF:
-	    wsprintf(opc, "ret self");
+	    sprintf(opc, "ret self");
 	    dumpflag = TRUE;
 	    break;
 	case RETTOS:
-	    wsprintf(opc, "ret top");
+	    sprintf(opc, "ret top");
 	    dumpflag = TRUE;
 	    break;
 	case RETTRUE:
-	    wsprintf(opc, "ret true");
+	    sprintf(opc, "ret true");
 	    break;
 	case RETFALS:
-	    wsprintf(opc, "ret false");
+	    sprintf(opc, "ret false");
 	    break;
 	case RETNIL:
-	    wsprintf(opc, "ret nil");
+	    sprintf(opc, "ret nil");
 	    break;
 	case DUPTOS:
-	    wsprintf(opc, "dup [%d]", oprand2);
+	    sprintf(opc, "dup [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case RETBLK:
-	    wsprintf(opc, "ret blk");
+	    sprintf(opc, "ret blk");
 	    dumpflag = TRUE;
 	    break;
 	case POPSTK:
-	    wsprintf(opc, "pop");
+	    sprintf(opc, "pop");
 	    break;
 	case PSHVAR:
-	    wsprintf(opc, "psh var [%d]", oprand2);
+	    sprintf(opc, "psh var [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case STRVAR:
-	    wsprintf(opc, "str var");
+	    sprintf(opc, "str var");
 	    dumpflag = TRUE;
 	    break;
 	case PSHSELF:
-	    wsprintf(opc, "psh self [%d]", oprand2);
+	    sprintf(opc, "psh self [%d]", oprand2);
 	    dumpflag = TRUE;
 	    break;
 	case PSHNIL:
-	    wsprintf(opc, "psh nil [%d]", oprand2);
+	    sprintf(opc, "psh nil [%d]", oprand2);
 	    break;
 	case PSHTRUE:
-	    wsprintf(opc, "psh true [%d]", oprand2);
+	    sprintf(opc, "psh true [%d]", oprand2);
 	    break;
 	case PSHFALS:
-	    wsprintf(opc, "psh false [%d]", oprand2);
+	    sprintf(opc, "psh false [%d]", oprand2);
 	    break;
 	case PSHONE:
-	    wsprintf(opc, "psh 1 [%d]", oprand2);
+	    sprintf(opc, "psh 1 [%d]", oprand2);
 	    break;
 	case PSHZERO:
-	    wsprintf(opc, "psh 0 [%d]", oprand2);
+	    sprintf(opc, "psh 0 [%d]", oprand2);
 	    break;
 	}
     }
     if (dumpflag)
-	wsprintf(buffer, "#%d Exec: %d %02x %s %s", meth, ip, opcode, opc,
+	sprintf(buffer, "#%d Exec: %d %02x %s %s", meth, ip, opcode, opc,
 		 dump_object_value(op));
     else
-	wsprintf(buffer, "#%d Exec: %d %02x %s", meth, ip, opcode, opc);
+	sprintf(buffer, "#%d Exec: %d %02x %s", meth, ip, opcode, opc);
     dump_string(buffer);
 }
 /*
@@ -687,7 +678,7 @@ dump_setinst(Objptr op, int inst, Objptr value)
 {
     char                buffer[1024];
 
-    wsprintf(buffer, "Set: %s [%d] to ", dump_object_value(op), inst);
+    sprintf(buffer, "Set: %s [%d] to ", dump_object_value(op), inst);
     strcat(buffer, dump_object_value(value));
     dump_string(buffer);
 }
@@ -700,7 +691,7 @@ dump_getinst(Objptr op, int inst, Objptr value)
 {
     char                buffer[1024];
 
-    wsprintf(buffer, "Get: %s [%d] is ", dump_object_value(op), inst);
+    sprintf(buffer, "Get: %s [%d] is ", dump_object_value(op), inst);
     strcat(buffer, dump_object_value(value));
     dump_string(buffer);
 }
@@ -712,7 +703,7 @@ void
 dump_primitive(int flag, int number)
 {
    char			buffer[1024];
-   wsprintf(buffer, "Primitive: %d ", number);
+   sprintf(buffer, "Primitive: %d ", number);
    strcat(buffer, (flag)?"Success":"Failed");
    dump_string(buffer);
 }
@@ -728,7 +719,7 @@ dump_send(Objptr op, Objptr sel, Objptr meth)
 {
     char                buffer[1024];
 
-    wsprintf(buffer, "Send: to %s sel ", dump_object_value(op));
+    sprintf(buffer, "Send: to %s sel ", dump_object_value(op));
     strcat(buffer, dump_object_value(sel));
     strcat(buffer, " -> ");
     strcat(buffer, dump_object_value(meth));
@@ -744,7 +735,7 @@ dump_str(char *str, Objptr op)
 {
     char                buffer[1024];
 
-    wsprintf(buffer, "%s #%d", str, op);
+    sprintf(buffer, "%s #%d", str, op);
     dump_string(buffer);
 }
 
@@ -769,13 +760,13 @@ dump_code(void *state)
 	case Store:
 	    switch (cur->oper) {
 	    case Temp:
-		wsprintf(buffer, "Store Temp %s", cur->u.symbol->name);
+		sprintf(buffer, "Store Temp %s", cur->u.symbol->name);
 		break;
 	    case Variable:
-		wsprintf(buffer, "Store Var %s", cur->u.symbol->name);
+		sprintf(buffer, "Store Var %s", cur->u.symbol->name);
 		break;
 	    case Inst:
-		wsprintf(buffer, "Store Inst %s", cur->u.symbol->name);
+		sprintf(buffer, "Store Inst %s", cur->u.symbol->name);
 		break;
 	    default:
 		strcpy(buffer, "Store xxx");
@@ -798,20 +789,20 @@ dump_code(void *state)
 		strcpy(buffer, "Push Nil");
 		break;
 	    case Temp:
-		wsprintf(buffer, "Push Temp %s", cur->u.symbol->name);
+		sprintf(buffer, "Push Temp %s", cur->u.symbol->name);
 		break;
 	    case Inst:
-		wsprintf(buffer, "Push Inst %s", cur->u.symbol->name);
+		sprintf(buffer, "Push Inst %s", cur->u.symbol->name);
 		break;
 	    case Arg:
-		wsprintf(buffer, "Push Arg %s", cur->u.symbol->name);
+		sprintf(buffer, "Push Arg %s", cur->u.symbol->name);
 		break;
 	    case Literal:
-		wsprintf(buffer, "Push Lit %s",
+		sprintf(buffer, "Push Lit %s",
 			 dump_object_value(cur->u.literal->value));
 		break;
 	    case Variable:
-		wsprintf(buffer, "Push Var %s", cur->u.symbol->name);
+		sprintf(buffer, "Push Var %s", cur->u.symbol->name);
 		break;
 	    default:
 		strcpy(buffer, "Push xxx");
@@ -842,7 +833,7 @@ dump_code(void *state)
 	        strcpy(buffer, "Ret Nil");
 		break;
 	    case Temp:
-		wsprintf(buffer, "Ret Temp %s", cur->u.symbol->name);
+		sprintf(buffer, "Ret Temp %s", cur->u.symbol->name);
 		break;
 	    case Stack:
 	        strcpy(buffer, "Ret TOS");
@@ -856,33 +847,33 @@ dump_code(void *state)
 	    }
 	    break;
 	case SuperSend:
-	    wsprintf(buffer, "Send Sup %d %s", cur->argcount,
+	    sprintf(buffer, "Send Sup %d %s", cur->argcount,
 		 dump_object_value(cur->u.literal->value));
 	    break;
 	case Send:
-	    wsprintf(buffer, "Send Lit %d %s", cur->argcount,
+	    sprintf(buffer, "Send Lit %d %s", cur->argcount,
 		 dump_object_value(cur->u.literal->value));
 	    break;
 	case SendSpec:
-	    wsprintf(buffer, "Send Spc %d %d", cur->argcount, cur->u.operand);
+	    sprintf(buffer, "Send Spc %d %d", cur->argcount, cur->u.operand);
 	    break;
 	case JTrue:
-	    wsprintf(buffer, "Jmp True %x", cur->u.jump);
+	    sprintf(buffer, "Jmp True %x", cur->u.jump);
 	    break;
 	case JFalse:
-	    wsprintf(buffer, "Jmp False %x", cur->u.jump);
+	    sprintf(buffer, "Jmp False %x", cur->u.jump);
 	    break;
 	case Jump:
-	    wsprintf(buffer, "Jump %x", cur->u.jump);
+	    sprintf(buffer, "Jump %x", cur->u.jump);
 	    break;
 	case BlockCopy:
-	    wsprintf(buffer, "BlkCpy %d %x", cur->argcount, cur->u.jump);
+	    sprintf(buffer, "BlkCpy %d %x", cur->argcount, cur->u.jump);
 	    break;
 	default:
 	    break;
 	}
 	ref = (cur->flags & CODE_LABEL)? '*': ' ';
-        wsprintf(line, "%x: %c%s", cur, ref, buffer);
+        sprintf(line, "%x: %c%s", cur, ref, buffer);
         dump_string(line);
     }
 }
