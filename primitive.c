@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Main byte code interpriter.
  *
  * $Log: primitive.c,v $
+ * Revision 1.7  2001/08/18 16:17:02  rich
+ * Added support for graphics system and largeinteger.
+ * Finished directory management primitives.
+ *
  * Revision 1.6  2001/07/31 14:09:48  rich
  * Fixed to compile under new cygwin
  * Fixed bug in preform.
@@ -32,7 +36,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: primitive.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: primitive.c,v 1.7 2001/08/18 16:17:02 rich Exp rich $";
 
 #endif
 
@@ -437,12 +441,12 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveFloatCeil:
 	if (IsFloat(reciever))
-	    ReturnFloat(exp(floatValue(reciever)));
+	    ReturnInteger((long)(ceil(floatValue(reciever))));
 	break;
 
     case primitiveFloatFloor:
 	if (IsFloat(reciever))
-	    ReturnFloat(exp(floatValue(reciever)));
+	    ReturnInteger((long)(floor(floatValue(reciever))));
 	break;
 
     case primitiveFloatSin:
