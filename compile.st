@@ -1,9 +1,12 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.1 2000/02/01 18:12:03 rich Exp rich $ "
+" $Id: compile.st,v 1.2 2000/03/08 04:13:19 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.2  2000/03/08 04:13:19  rich
+ Major bug fixes.
+
  Revision 1.1  2000/02/01 18:12:03  rich
  Initial revision
 
@@ -12,7 +15,7 @@
 
 Object subclass: 'SmallTalkToken'
        instanceVariableNames: 'token stream value curchar pushback'
-       classVariableNames: 'chartable actiontable arraytable printtable'
+       classVariableNames: 'chartable actiontable arraytable tokentable'
        poolDictionaries: '' category: nil !
 
 ! SmallTalkToken class methodsFor: 'creation'!
@@ -21,172 +24,90 @@ on: aStream
 	^ super new initOn: aStream.
 ! !
 
-! SmallTalkToken class methodsFor: 'Definitions' !
-
-KeyEOS
-	^ 0
-!
-
-KeyLiteral
-	^ 1
-!
-
-KeyName
-	^ 2
-!
-
-KeyKeyword
-	^ 3
-!
-
-KeyAssign
-	^ 4
-!
-
-KeyRParen
-	^ 5
-!
-
-KeyLParen
-	^ 6
-!
-
-KeyReturn
-	^ 7
-!
-
-KeyCascade
-	^ 8
-!
-
-KeyPeriod
-	^ 9
-!
-
-KeySpecial
-	^ 10
-!
-
-KeyRBrack
-	^ 11
-!
-
-KeyLBrack
-	^ 12
-!
-
-KeyVariable
-	^ 13
-!
-
-KeyUnknown
-	^ 14
-!
-
-KeyString
-	^ 15
-!
-
-KeyDollar
-	^ 16
-!
-
-KeyDigit
-	^ 17
-!
-
-KeySpace
-	^ 18
-!
-
-KeyComment
-	^ 19
-! !
-
 ! SmallTalkToken methodsFor: 'testing'!
 isKeyString
-	^ SmallTalkToken KeyString = token
+	^ #KeyString = token
 !
 
 isKeyDollar
-	^ SmallTalkToken KeyDollar = token
+	^ #KeyDollar = token
 !
 
 isKeyDigit
-	^ SmallTalkToken KeyDigit = token
+	^ #KeyDigit = token
 !
 
 isKeySpace
-	^ SmallTalkToken KeySpace = token
+	^ #KeySpace = token
 !
 
 isKeyComment
-	^ SmallTalkToken KeyComment = token
+	^ #KeyComment = token
 !
 
 isKeyEOS
-	^ SmallTalkToken KeyEOS = token
+	^ #KeyEOS = token
 !
 
 isKeyLiteral
-	^ SmallTalkToken KeyLiteral = token
+	^ #KeyLiteral = token
 !
 
 isKeyName
-	^ SmallTalkToken KeyName = token
+	^ #KeyName = token
 !
 
 isKeyKeyword
-	^ SmallTalkToken KeyKeyword = token
+	^ #KeyKeyword = token
 !
 
 isKeyAssign
-	^ SmallTalkToken KeyAssign = token
+	^ #KeyAssign = token
 !
 
 isKeyRParen
-	^ SmallTalkToken KeyRParen = token
+	^ #KeyRParen = token
 !
 
 isKeyLParen
-	^ SmallTalkToken KeyLParen = token
+	^ #KeyLParen = token
 !
 
 isKeyReturn
-	^ SmallTalkToken KeyReturn = token
+	^ #KeyReturn = token
 !
 
 isKeyCascade
-	^ SmallTalkToken KeyCascade = token
+	^ #KeyCascade = token
 !
 
 isKeyPeriod
-	^ SmallTalkToken KeyPeriod = token
+	^ #KeyPeriod = token
 !
 
 isKeySpecial
-	^ SmallTalkToken KeySpecial = token
+	^ #KeySpecial = token
 !
 
 isKeyRBrack
-	^ SmallTalkToken KeyRBrack = token
+	^ #KeyRBrack = token
 !
 
 isKeyLBrack
-	^ SmallTalkToken KeyLBrack = token
+	^ #KeyLBrack = token
 !
 
 isKeyVariable
-	^ SmallTalkToken KeyVariable = token
+	^ #KeyVariable = token
 !
 
 isKeyUnknown
-	^ SmallTalkToken KeyUnknown = token
+	^ #KeyUnknown = token
 !
 
 " Determine if next token is a variable seperator. "
 isVarSep
-    ^ SmallTalkToken KeySpecial = token and: [ value = '|' ].
+    ^ #KeySpecial = token and: [ value = '|' ].
 ! !
 
 ! SmallTalkToken methodsFor: 'Initialize' !
@@ -194,7 +115,7 @@ isVarSep
 " Set up array of characters to speed up parsing "
 initOn: aString
 	stream <- ReadStream on: aString.
-	token <- SmallTalkToken KeyUnknown.
+	token <- #KeyUnknown.
 	pushback <- nil.
 ! !
 
@@ -202,47 +123,69 @@ initOn: aString
 
 initialize
 	| tok table |
+ 	table <- IdentityDictionary new: 21.
+	table at: #KeyEOS put: 1.
+	table at: #KeyLiteral put: 2.
+	table at: #KeyName put: 3.
+	table at: #KeyKeyword put: 4.
+	table at: #KeyAssign put: 5.
+	table at: #KeyRParen put: 6.
+	table at: #KeyLParen put: 7.
+	table at: #KeyReturn put: 8.
+	table at: #KeyCascade put: 9.
+	table at: #KeyPeriod put: 10.
+	table at: #KeySpecial put: 11.
+	table at: #KeyRBrack put: 12.
+	table at: #KeyLBrack put: 13.
+	table at: #KeyVariable put: 14.
+	table at: #KeyUnknown put: 15.
+	table at: #KeyString put: 16.
+	table at: #KeyDollar put: 17.
+	table at: #KeyDigit put: 18.
+	table at: #KeySpace put: 19.
+	table at: #KeyComment put: 20.
+	tokentable <- table.
 	table <- Array new: 128.
-        table at: (Character space asciiValue) put: (SmallTalkToken KeySpace).
-        table at: (Character tab asciiValue) put: (SmallTalkToken KeySpace).
-        table at: (Character cr asciiValue) put: (SmallTalkToken KeySpace).
-        table at: (Character nl asciiValue) put: (SmallTalkToken KeySpace).
-        table at: ($( asciiValue) put: (SmallTalkToken KeyRParen ).
-        table at: ($) asciiValue) put: (SmallTalkToken KeyLParen ).
-        table at: ($; asciiValue) put: (SmallTalkToken KeyCascade ).
-        table at: ($. asciiValue) put: (SmallTalkToken KeyPeriod ).
-        table at: ($^ asciiValue) put: (SmallTalkToken KeyReturn ).
-        table at: ($[ asciiValue) put: (SmallTalkToken KeyLBrack ).
-        table at: ($] asciiValue) put: (SmallTalkToken KeyRBrack ).
-        table at: ($^ asciiValue) put: (SmallTalkToken KeyReturn ).
-	table at: ($< asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($- asciiValue) put: (SmallTalkToken KeyDigit ).
-	table at: ($+ asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($/ asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($\ asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($* asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($~ asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($> asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($= asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($@ asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($% asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($? asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($!! asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($& asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($| asciiValue) put: (SmallTalkToken KeySpecial ).
-        table at: ($, asciiValue) put: (SmallTalkToken KeySpecial ).
-	table at: ($# asciiValue) put: (SmallTalkToken KeyLiteral ).
-	table at: ($$ asciiValue) put: (SmallTalkToken KeyDollar ).
-	table at: ($: asciiValue) put: (SmallTalkToken KeyName ).
-	table at: ($' asciiValue) put: (SmallTalkToken KeyString ).
+        table at: (Character space asciiValue) put: (#KeySpace).
+        table at: (Character tab asciiValue) put: (#KeySpace).
+        table at: (Character cr asciiValue) put: (#KeySpace).
+        table at: (Character nl asciiValue) put: (#KeySpace).
+        table at: ($( asciiValue) put: (#KeyRParen).
+        table at: ($) asciiValue) put: (#KeyLParen).
+        table at: ($; asciiValue) put: (#KeyCascade).
+        table at: ($. asciiValue) put: (#KeyPeriod).
+        table at: ($^ asciiValue) put: (#KeyReturn).
+        table at: ($[ asciiValue) put: (#KeyLBrack).
+        table at: ($] asciiValue) put: (#KeyRBrack).
+        table at: ($^ asciiValue) put: (#KeyReturn).
+	table at: ($< asciiValue) put: (#KeySpecial).
+	table at: ($- asciiValue) put: (#KeyDigit).
+	table at: ($+ asciiValue) put: (#KeySpecial).
+	table at: ($/ asciiValue) put: (#KeySpecial).
+	table at: ($\ asciiValue) put: (#KeySpecial).
+	table at: ($* asciiValue) put: (#KeySpecial).
+	table at: ($~ asciiValue) put: (#KeySpecial).
+	table at: ($> asciiValue) put: (#KeySpecial).
+	table at: ($= asciiValue) put: (#KeySpecial).
+	table at: ($@ asciiValue) put: (#KeySpecial).
+	table at: ($% asciiValue) put: (#KeySpecial).
+	table at: ($? asciiValue) put: (#KeySpecial).
+	table at: ($!! asciiValue) put: (#KeySpecial).
+	table at: ($& asciiValue) put: (#KeySpecial).
+	table at: ($| asciiValue) put: (#KeySpecial).
+        table at: ($, asciiValue) put: (#KeySpecial).
+	table at: ($# asciiValue) put: (#KeyLiteral).
+	table at: ($$ asciiValue) put: (#KeyDollar).
+	table at: ($: asciiValue) put: (#KeyName).
+	table at: ($' asciiValue) put: (#KeyString).
 	$0 asciiValue to: ($9 asciiValue) do: 
-		[ :i | table at: i put:  (SmallTalkToken KeyDigit) ].
-	tok <- SmallTalkToken KeyName.
+		[ :i | table at: i put:  (#KeyDigit) ].
+	tok <- #KeyName.
 	$a asciiValue to: ($z asciiValue) do: 
 		[ :i | table at: i put:  tok].
 	$A asciiValue to: ($Z asciiValue) do: 
 		[ :i | table at: i put:  tok].
-	table at: ($"  asciiValue) put: (SmallTalkToken KeyComment).
+	table at: ($"  asciiValue) put: (#KeyComment).
 	chartable <- table.
 	actiontable <- #(
 	scantoken	"KeyEOS"
@@ -288,32 +231,25 @@ initialize
 	scanspace	"KeySpace"
 	scancomment	"KeyComment"
         ).
-	printtable <- #(
-	'KeyEOS'	"KeyEOS"
-	'Literal'	"KeyLiteral"
-	'Name'		"KeyName"
-	'Keyword'	"KeyKeyword"
-	'Assign'	"KeyAssign"
-	'RParen'	"KeyRParen"
-	'LParen'	"KeyLParen"
-	'Return'	"KeyReturn"
-	'Cascade'	"KeyCascade"
-	'Period'	"KeyPeriod"
-	'Special'	"KeySpecial"
-	'RBrack'	"KeyRBrack"
-	'LBrack'	"KeyLBrack"
-	'Variable'	"KeyVariable"
-	'Unknown'	"KeyUnknown"
-	'String'	"KeyString"
-	'Dollar'	"KeyDollar"
-	'Digit'		"KeyDigit"
-	'Space'		"KeySpace"
-	'Comment'	"KeyComment"
-        ).
 ! !
 
 
 ! SmallTalkToken methodsFor: 'private' !
+
+" Preform the action given by the table "
+action: aTable with: char
+	| index action |
+	" Pick up next character and convert to symbol. "
+	token <- chartable at: (char asciiValue).
+	token isNil ifTrue: [ token <- #KeyUnknown. ].
+	" Look up symbol to get index "
+	index <- tokentable at: token.
+	index isNil ifTrue: [ ^ true ].
+	" Do action at given table "
+	action <- aTable at: index.
+	action notNil ifTrue: [ self preform: action ].
+	^ true
+!
 
 " Read next char off stream. "
 nextchar
@@ -347,7 +283,7 @@ isSpecial: aChar
 
 scancomment
 	| char |
-	token <- -1.
+	token <- #KeyEOS.
 	[ (char <- self nextchar) isNil ] whileFalse: [ 
 		char = $" ifTrue: [
 			self peeknext = $" ifFalse: [ ^self].
@@ -357,7 +293,7 @@ scancomment
 !
 
 scanspace
-	token <- -1.
+	token <- #KeyEOS.
 !
 
 scantoken
@@ -366,7 +302,7 @@ scantoken
 
 scannumber
    | base integer fraction sign exp char multi eseen fseen dig done|
-   token <- SmallTalkToken KeyLiteral.
+   token <- #KeyLiteral.
    char <- curchar.
    sign <- false.
    integer <- 0.
@@ -379,7 +315,7 @@ scannumber
    char = $- ifTrue: [
 	self peeknext isDigit ifFalse: [
 	" Nope, make it a special token "
-		 token <- SmallTalkToken KeySpecial.
+		 token <- #KeySpecial.
 		 value <- '-'.
 		^ self
 	] ifTrue: [
@@ -468,16 +404,16 @@ scanname
     " Check if it is a variable name "
     value <- WriteStream on: (String new: 0).
     curchar = $: ifTrue: [
-	  token <- SmallTalkToken KeyVariable.
+	  token <- #KeyVariable.
           self peeknext isLetter ifFalse: [
-	       token <- SmallTalkToken KeyUnknown. 
+	       token <- #KeyUnknown. 
 	       value nextPut: $:.
 	      ^ self
 	  ] ifTrue: [ 
 		self nextchar.
 	  ].
     ] ifFalse: [    
-          token <- SmallTalkToken KeyName.
+          token <- #KeyName.
     ].
 
     [ curchar isAlphaNumeric ] whileTrue: [ 
@@ -485,9 +421,9 @@ scanname
 	curchar <- self nextchar ].
 
    " Convert it to a keyword if a : follows it and it is not a variable "
-    curchar = $: and: [ SmallTalkToken KeyName = token ] ifTrue: [
+    curchar = $: and: [ #KeyName = token ] ifTrue: [
 	value nextPut: curchar.
-	token <- SmallTalkToken KeyKeyword
+	token <- #KeyKeyword
     ] ifFalse: [
 	self pushback
     ].
@@ -498,7 +434,7 @@ scanname
 scanstring
     | char done |
     done <- true.
-    token <- SmallTalkToken KeyLiteral.
+    token <- #KeyLiteral.
     value <- WriteStream on: (String new: 0).
     [ done ] whileTrue: [
 	char <- self nextchar.
@@ -515,7 +451,7 @@ scanstring
 " Scan a literal, either a array or a symbol. "
 scanliteral
      | char done |
-     token <- SmallTalkToken KeyLiteral.
+     token <- #KeyLiteral.
      char <- self nextchar.
      " Check if array "
      char = $( ifTrue: [ ^ self scanarray ].
@@ -530,23 +466,23 @@ scanliteral
      (self isSpecial: char) ifTrue: [
 		self scanspecial.
 		value <- value asSymbol.
-     		token <- SmallTalkToken KeyLiteral.
+     		token <- #KeyLiteral.
      ] ifFalse: [
-                 token <- SmallTalkToken KeyUnknown.
+                 token <- #KeyUnknown.
      ].
 !
 
 " Scan a char constant "
 scanchar
     value <- self nextchar.
-    token <- SmallTalkToken KeyLiteral.
+    token <- #KeyLiteral.
 !
 
 " Scan a special, check if it is a <- and convert over to a assignment "
 scanspecial
     curchar = $< and: [self peeknext = $- ] ifTrue: [
 	self nextchar.
-	token <- SmallTalkToken KeyAssign.
+	token <- #KeyAssign.
     ] ifFalse: [
 	(self isSpecial: self peeknext)
 	   ifTrue: [
@@ -557,22 +493,19 @@ scanspecial
 	   ifFalse: [
 		value <- curchar asString.
 	  ].
-          token <- SmallTalkToken KeySpecial.
+          token <- #KeySpecial.
     ]
 !
 
 
 " Scan an array and return a literal token "
 scanarray
-     | char array action |
-     token <- SmallTalkToken KeyLiteral.
+     | char array |
+     token <- #KeyLiteral.
      array <- OrderedCollection new.
      [ char <- self nextchar. 0 asCharacter ~= char ] whileTrue: [
-	token <- chartable at: (char asciiValue).
-	token isNil ifTrue: [ token <- SmallTalkToken KeyUnknown. ].
 	" Do this first since rest will set themself to literal "
-	action <- actiontable at: (1 + token).
-	action notNil ifTrue: [ self preform: action ].
+	self action: arraytable with: char.
 
 	" All done scanning, see if we should add it "
 	self isKeyLiteral
@@ -582,9 +515,9 @@ scanarray
 			value <- WriteStream on: (Array new: (array size)).
 			array do: [ :v | value nextPut: v ].
 			value <- value contents.
-			token <- SmallTalkToken KeyLiteral.
+			token <- #KeyLiteral.
 		 ].
-		 token >= 0 ifTrue: [ ^ self ]
+		 self isKeyEOS ifFalse: [ ^ self ]
 	   ].
      ].
 ! !
@@ -596,22 +529,26 @@ value
     ^ value
 !
 
+" Print out a token "
+print
+	| str |
+	str <- 'Token: ' , (token asString).
+	self isKeyLiteral or: [ self isKeyName or: 
+		[ self isKeyKeyword or: [ self isKeySpecial or:
+			[self isKeyVariable ]]]] ifTrue:
+		[ str <- str , ' '. str <- str , (value printString)].
+	str print.
+!
 
 " Return the next token from input stream. "
 next
     | char action |
 
     [ char <- self nextchar. 0 asCharacter ~= char ] whileTrue: [
-	token <- chartable at: (char asciiValue).
-	token isNil ifTrue: [ token <- SmallTalkToken KeyUnknown ].
-	action <- actiontable at: (1 + token).
-	action notNil ifTrue: [ self preform: action ].
-	token >= 0 ifTrue: [
-"		(printtable at: (1 + token)) print.
-		value print."
-		 ^self ]
+	self action: actiontable with: char.
+	self isKeyEOS ifFalse: [ ^self ]
     ].
-    token <- SmallTalkToken KeyEOS.
+    token <- #KeyEOS.
     ^ self
 ! !
 
@@ -692,8 +629,9 @@ offset
 = aSymbol
 	^ aSymbol class == (self class) 
 !
-print
-	(self name , ':')  print
+
+printOn: aStream
+	aStream nextPutAll: (self name) 
 !
 
 " Do nothing, so Literal and symbols work same"
@@ -761,6 +699,14 @@ isSymbolSuper
 name
 	^ 'super'
 ! !
+
+! SmallTalkSymbolSuper methodsFor: 'compiling' !
+
+" Same as push self "
+genPush
+    ^ self genByte: 16rFA.
+! !
+
 
 SmallTalkSymbol subclass: 'SmallTalkSymbolSelf'
        instanceVariableNames: ''
@@ -933,9 +879,9 @@ isSymbolLabel
 	^ true
 !
 
-print
-	'LabelNode' print.
-	offset print.
+printOn: aStream
+	aStream nextPutAll: 'LabelNode: '.
+	offset asOop printOn: aStream.
 !
 
 = aSymbol
@@ -1013,10 +959,9 @@ offset: aOffset
 
 genOpr: byteOne
    | array len opc |
-   (offset between: 0 and: 16) ifTrue: [ len <- 1. 
-					    opc <- byteOne bitOr: offset]
-				 ifFalse: [ len < 2.
-					    opc <- byteOne bitShift: -4 ].
+   (offset between: 0 and: 15)
+	 ifTrue: [ len <- 1.  opc <- byteOne bitOr: offset ]
+	 ifFalse: [ len < 2.  opc <- byteOne bitShift: -4 ].
    array <- ByteArray new: len.
    array at: 1 put: opc.
    len == 2 ifTrue: [ array at: 2 put: offset ].
@@ -1040,8 +985,8 @@ isSymbolArg
 
 ! SmallTalkSymbolArg methodsFor: 'compiling' !
 
-genPush: aCodeNode
-   aCodeNode generateOpr: 16r10 offset: offset.
+genPush
+   ^ self genOpr: 16r10
 ! !
 
 SmallTalkSymbolVarNode subclass: 'SmallTalkSymbolTemp'
@@ -1094,7 +1039,7 @@ genPush
    ^self genOpr: 16r30.
 !
 
-genStore: aCodeNode
+genStore
    ^self genOpr: 16r50.
 ! !
 
@@ -1150,8 +1095,9 @@ isSymbolLiteral
 
 ! SmallTalkLiteral methodsFor: 'accessing' !
 
-print
-	'Literal:' print. value print.
+printOn: aStream
+	aStream nextPutAll: 'Literal:'.
+	value printOn: aStream.
 !
 
 value
@@ -1193,10 +1139,9 @@ genPush
 genSend: superFlag argcount: count
    | opr array len |
    superFlag ifTrue: [ opr <- 16rD0 ] ifFalse: [ opr <- 16rE0 ].
-   (offset between: 0 and: 16) ifTrue: [ len <- 2.
-					    opr <- opr bitOr: offset]
-				 ifFalse: [ len < 2.
-					    opr <- opr bitShift: -4 ].
+   (offset between: 0 and: 15)
+	 ifTrue: [ len <- 2.  opr <- opr bitOr: offset]
+	 ifFalse: [ len < 2.  opr <- opr bitShift: -4 ].
    array <- ByteArray new: len.
    array at: 1 put: opr.
    len == 2 ifTrue: [ array at: 2 put: offset ].
@@ -1235,8 +1180,9 @@ value
 	^ value
 !
 
-print
-	'Special:' print. value print
+printOn: aStream
+	aStream nextPutAll: 'Special: '.
+	value printOn: aStream
 !
 
 = aSymbol
@@ -1406,6 +1352,9 @@ argcount
 	^ 0
 !
 
+name
+	^ 'codenode'
+!
 
 length
 	^ length
@@ -1425,6 +1374,19 @@ release
 
 stack: max
 	^ max
+!
+
+" Note wether node is a label or not "
+printLabel: aStream
+	| l |
+	self asOop printOn: aStream.
+	l <- self isLabel ifTrue: [ $* ] ifFalse: [ $  ].
+	aStream nextPut: l
+!
+
+printOn: aStream
+	self printLabel: aStream.
+	aStream nextPutAll: (self name).
 !
 
 " Check node is begining of block "
@@ -1561,6 +1523,12 @@ value
 
 size
     ^ value genSize.
+!
+
+printOn: aStream
+	self printLabel: aStream.
+	aStream nextPutAll: (self name).
+	value printOn: aStream.
 ! !
 
 ! SmallTalkCodeOper methodsFor: 'modifing' !
@@ -1583,12 +1551,12 @@ isCodeStore
 
 ! SmallTalkCodeStore methodsFor: 'accessing' !
 
-stack: max
-	^ self nextLink stack: max
+name
+	^ 'store '
 !
 
-print	
-	'Store' print. value print.
+stack: max
+	^ self nextLink stack: max
 ! !
 
 ! SmallTalkCodeStore methodsFor: 'compiling' !
@@ -1616,14 +1584,14 @@ isCodePushStack
 
 ! SmallTalkCodePush methodsFor: 'accessing' !
 
+name
+     ^ 'push '
+!
+
 stack: max
 	| size |
 	size <- self nextLink stack: (max + 1).
 	^ max + 1 max: size
-!
-
-print	
-      'push' print. value print.
 ! !
 
 ! SmallTalkCodePush methodsFor: 'compiling' !
@@ -1653,8 +1621,8 @@ isCodeReturnStack
 
 ! SmallTalkCodeReturn methodsFor: 'accessing' !
 
-print	
-	'return' print. value print.
+name
+	^ 'return '
 ! !
 
 ! SmallTalkCodeReturn methodsFor: 'compiling' !
@@ -1689,19 +1657,17 @@ argcount
 size
     | i |
     i <- value offset offset - (offset + length).
-    (i between: 0 and: 16) ifTrue: [ ^ 3 ].
+    (i between: 0 and: 15) ifTrue: [ ^ 3 ].
     (i between: -127 and: 128) ifTrue: [ ^ 4].
     ^ 5.
 !
 
 stack: max
-	'BlockCopy Stack' print.
-	value print. value offset print.
 	^ (value offset stack: (max + 1)) max: argcount
 !
 
-print	
-     'Block' print. value print.
+name
+	^ 'block '
 ! !
 
 ! SmallTalkCodeBlock methodsFor: 'modifing' !
@@ -1725,7 +1691,7 @@ argcount: aCount
 generate
 	| array opc operand |
         operand <- (value offset offset) - (offset + length).
-	( operand between: 0 and: 16) 
+	( operand between: 0 and: 15) 
 	     ifTrue: [ opc <- 16rA0 bitOr: operand ]
 	     ifFalse: [
 	        (operand between: -127 and: 128)
@@ -1791,9 +1757,8 @@ stack: max
      ^ size max: max.
 !
 
-print	
-	superFlag ifTrue: [ 'SSend' print ] ifFalse: [ 'Send' print ].
-	value print.
+name
+	^ superFlag ifTrue: [ 'SSend ' ] ifFalse: [ 'Send ' ]
 ! !
 
 ! SmallTalkCodeSend methodsFor: 'modifing' !
@@ -1806,11 +1771,12 @@ value: aValue argcount: aCount super: ss
 
 advance
     | temp sym |
+    superFlag ifTrue: [ ^ self ].
     sym <- value value.
     temp <- Smalltalk at: #SpecialSelectors ifAbsent: [ Array new: 0 ].
     1 to: temp size do:
 	 [ :sel | (temp at: sel) = sym
-   	       ifTrue: [ value <-
+   	       ifTrue: [ self value:
 		 (SmallTalkSymbolSpecial index: (sel - 1)  value: sym)]].
 ! !
 
@@ -1868,11 +1834,10 @@ cond
 	^ type
 !
 
-	
 size
     | i |
     i <- value offset offset - (offset + length).
-    (i between: 0 and: 16) ifTrue: [ ^ 1 ].
+    (i between: 0 and: 15) ifTrue: [ ^ 1 ].
     (i between: -127 and: 128) ifTrue: [ ^ 2].
     type isNil ifTrue: [ ^ 3.  ] ifFalse: [ ^ 4.  ].
 !
@@ -1882,11 +1847,10 @@ stack: max
 	          ifFalse: [ ^ self nextLink stack: max ]
 !
 
-print	
-	type isNil ifTrue: [ 'Jump' print. ]
-	           ifFalse: [ type ifTrue: [ 'JTrue' print. ]
-	     		           ifFalse: [ 'JFalse' print. ]].
-	value print.
+name
+	type isNil ifTrue: [ ^ 'Jump ' ].
+        type ifTrue: [ ^ 'JTrue ' ].
+	^ 'JFalse '.
 ! !
 
 ! SmallTalkCodeJump methodsFor: 'modification' !
@@ -1901,7 +1865,6 @@ value: aValue cond: aCond
 	self value: aValue.
 	type <- aCond.
 !
-	
 
 cond: aCond 
 	type <- aCond.
@@ -1914,10 +1877,7 @@ advance: aDistance
 advance
 	| i |
 	i <- 0.
-	advance print.
 	[ i < advance ] whileTrue: [
-		 i print.
-		 value print.  value offset print.
 		 value offset: value offset nextLink.
 		 i <- i + 1 ].
 ! !
@@ -1926,30 +1886,32 @@ advance
 
 " Compile a node into binary from "
 generate
-	| array len opc operand |
+	| array len opc operand place |
         operand <- value offset offset - (offset + length).
 	array <- ByteArray new: length.
 	" Set the opcode "
 	type isNil ifTrue: [ opc <- 16rA0 ]
 		   ifFalse: [ type ifTrue: [ opc <- 16r80 ]
 				  ifFalse: [ opc <- 16r90 ]].
+	place <- 2.
 
 	" Fix opcode based on size of jump "
-	( operand between: 0 and: 16) 
+	length = 1
 	     ifTrue: [  opc <- opc bitOr: operand ]
 	     ifFalse: [
-	        (operand between: -127 and: 128)
+	        length = 2
 		 ifTrue: [ opc <- opc bitShift: -4 ]
 		 ifFalse: [
 			type isNil ifTrue: [ opc <- 0 ]
 				   ifFalse: [ opc <- opc bitXor: 16r10 + 3.
-					      array at: 2 put: 0].
+					      array at: 2 put: 0.
+					      place <- 3 ].
 		 ]].
 
 	" Fill in array "
 	array at: 1 put: opc.
-	length > 1 ifTrue: [ array at: (length - 1) put: operand ].
-	length > 2 ifTrue: [ array at: length put: (operand / 256) ].
+	length > 1 ifTrue: [ array at: place put: operand ].
+	length > 2 ifTrue: [ array at: (place + 1) put: (operand bitShift: -8)].
 	^ array
 ! !
 
@@ -1971,11 +1933,11 @@ isCodeBlockReturn
 
 	
 size
-    ^ 1
+        ^ 1
 !
 
-print	
-	'BReturn' print.
+name
+	^ 'BReturn'
 ! !
 
 ! SmallTalkCodeBlockReturn methodsFor: 'compiling' !
@@ -2005,17 +1967,16 @@ isCodePopStack
 
 ! SmallTalkCodePopStack methodsFor: 'accessing' !
 
-	
+name
+    ^ 'pop'
+!
+
 size
     ^ 1
 !
 
 stack: max
 	^ self nextLink stack: max.
-!
-
-print	
-	'Pop' print.
 ! !
 
 ! SmallTalkCodePopStack methodsFor: 'compiling' !
@@ -2145,12 +2106,13 @@ removeNode: aNode
 	| next |
 	next <- aNode nextLink.
 	self relabel: aNode to: next.
-	(self remove: aNode ifAbsent: [ ^ next ]) value: nil.
+	aNode value: nil.
+	self remove: aNode ifAbsent: [ nil ].
 	^ next
 !
 
 peephole
-    | i nxt temp temp1 block |
+    | i nxt temp temp1 block node changed |
 " Preform optimization pass.
   1) Convert sends into sendSpecail if we can.
   2) Remove Dup/Pop pairs when second one is not referenced.
@@ -2161,7 +2123,9 @@ peephole
   7) Convert Dup/Store/Pop into Store.
   8) Convert push special /return to return special.
  "
-    self do: [ :node |
+    node <- firstLink.
+    changed <- false.
+    [ node notNil ] whileTrue: [ 
         nxt <- node nextLink.
 	block <- node beginBlock.
 	node isCodePush ifTrue: [
@@ -2171,6 +2135,7 @@ peephole
 		node <- self removeNode: node.
 		nxt <- node nextLink.
 	 	block <- node beginBlock.
+		changed <- true.
 	    ]
 	].
 
@@ -2191,50 +2156,65 @@ peephole
 		node <- self removeNode: node.
 		nxt <- node nextLink.
 		block <- node beginBlock.
+		changed <- true.
 	    ] ifFalse: [
 
 	   " Check if we can shorten a return TOS "
 	    block and: [ nxt isCodeReturnStack
 		and: [ node canReturn ]] ifTrue: [
-		' return block' print.
 		  nxt value: (node value).
 		  node <- self removeNode: node.
 		  nxt <- node nextLink.
 		  block <- node beginBlock.
+		  changed <- true.
             ] ifFalse: [
 
 	    " Convert  Dup, Store x, Pop, Push x -> Dup, Store "
 	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
 		nxt beginBlock and: [ nxt nextLink isCodePopStack and: [
-		nxt nextLink beginBlock and: [ nxt nextLink nextLink isCodePush and: [
-		   nxt nextLink value = (nxt nextLink nextLink value)]]]]]]] ifTrue: [
-		'store, push' print.
+		nxt nextLink beginBlock and: [
+	        nxt nextLink nextLink isCodePush and: [
+	        nxt nextLink value = (nxt nextLink nextLink value)]]]]]]]
+	       ifTrue: [
 		self removeNode: (self removeNode: (nxt nextLink)).
+		changed <- true.
+	    ] ifFalse: [
+
+	    " Convert  Dup, Store x, Ret y -> Store, Ret y "
+	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
+		nxt beginBlock and: [ nxt nextLink isCodeReturn and: [
+	        nxt nextLink isSymbolStack not ]]]]]
+	       ifTrue: [
+		node <- self removeNode: node.
+		changed <- true.
 	    ] ifFalse: [
 
        	    " Convert  Dup, Store, Pop -> Store "
 	    block and: [ node isSymbolStack and: [ nxt isCodeStore  and: [
 		nxt beginBlock and: [ nxt nextLink isCodePopStack ]]]] ifTrue: [
-		'fixstore' print.
 		node <- self removeNode: node.
 		self removeNode: (node nextLink).
+		changed <- true.
 	    ] ifFalse: [
 
 	     " Remove push bool, jcond "
-	     block and: [ nxt isCodeJcond ]
+	     "block and: [ nxt isCodeJcond ]"
+	     nxt isCodeJcond
 		ifTrue: [
 		   node isSymbolTrue ifTrue: [
 			nxt isCodeJTrue ifTrue: [ nxt cond: nil ]
 				        ifFalse: [ self removeNode: nxt ].
 			node <- self removeNode: node.
+		        changed <- true.
 		   ] ifFalse: [
 		      node isSymbolFalse ifTrue: [
 			nxt isCodeJFalse ifTrue: [ nxt cond: nil ]
 				        ifFalse: [ self removeNode: nxt ].
 			node <- self removeNode: node.
+	  	        changed <- true.
 		      ]
 		   ].
-	     ]]]]].
+	     ]]]]]].
     	     nxt <- node nextLink.
  	     block <- node beginBlock.
 
@@ -2243,29 +2223,31 @@ peephole
 
 	" Remove dead code after jump or return "
 	node isCodeJump or: [ node isCodeReturn ] ifTrue: [
-	    'Jump/Return' print.
-	    [ node beginBlock ] whileTrue: [ self removeNode: (node nextLink) ].
+	    [ node beginBlock ] whileTrue: [
+		 self removeNode: (node nextLink).
+		 changed <- true. ].
 	    nxt <- node nextLink.
  	    block <- node beginBlock.
 	].
-
+	node <- node nextLink.
     ].
-    ^ self
+    ^ changed
 !
 
 " Repoint a label to new node "
 relabel: aNode to: newNode
-	'relabel' print.
-    self do: [ :node |
-	node print.
-    	node isSymbolLabel and: [ node value == aNode ]
-	 	ifTrue: [ node value: newNode ]
+    | node |
+    node <- firstLink.
+    [ node notNil ] whileTrue: [
+    	node isSymbolLabel and: [ node value offset == aNode ]
+	 	ifTrue: [ node value offset: newNode ].
+	node <- node nextLink.
     ].
 !
 
 " Optimize jump instructions. "
 optimizeJump
-    | i nxt temp temp1 changed |
+    | i nxt temp temp1 changed node |
 
 " Preform optimization pass.
   1) Jumps to Jumps get repointed to second Jump.
@@ -2274,9 +2256,12 @@ optimizeJump
   4) Jumps to next location get removed. 
  "
     changed <- false.
-    self do: [ :node |
+    node <- firstLink.
+"    'Code motion' print."
+    [ node notNil ] whileTrue: [
         nxt <- node nextLink.
 	node isCodeJump ifTrue: [
+"	    'checking jump' print. "
 	    temp <- node value offset.
 	    " Redirect jump to a jump "
 	    temp isCodeJump ifTrue: [
@@ -2284,7 +2269,7 @@ optimizeJump
 		changed <- true.
 	    ].
 	    " Remove jump to next "
-	    temp = (node nextLink) ifTrue: [
+	    node nextLink == temp ifTrue: [
 		node <- self removeNode: node.
 		nxt <- node nextLink.
 		changed <- true.
@@ -2292,6 +2277,7 @@ optimizeJump
 	].
 
         node isCodeJcond ifTrue: [
+"	    'checking conditional jump' print. "
 	    temp <- node value offset.
 	    " Redirect jcond to jump "
 	    temp isCodeJump ifTrue: [
@@ -2299,7 +2285,7 @@ optimizeJump
 		changed <- true.
 	    ].
 	    " JCond to next is just a pop "
-	    temp = (node nextLink) ifTrue: [
+	    node nextLink == temp ifTrue: [
 	 	node replace: (SmallTalkCodePopStack new).
 		changed <- true.
 	    ]
@@ -2315,6 +2301,7 @@ optimizeJump
 	     nxt nextLink notNil and: [ nxt nextLink isCodePopStack and: [
 	     nxt value offset isCodeJcond and: [
 	     nxt value offset value notNil ]]]]]] ifTrue: [
+"		'checking pop/jump' print. "
 		" Remove Dup and Pop "
 		node <- self removeNode: node.
 		self removeNode: (node nextLink).
@@ -2327,8 +2314,8 @@ optimizeJump
 	" Check for: blk 0, x	Replace with:   z: 
 		     {C1}			   {C1}
 		     retblk			   jmp x
-		  x: dup  
-		     send value
+		  x: dup                           dup
+		     send value			   send value
 		     jcond y			x: jcond y
 		     {C2}			   {C2}
 		     jmp x			   jmp z
@@ -2336,12 +2323,14 @@ optimizeJump
 	"
 		
 	node isCodeBlockCopy and: [ node argcount == 0 ] ifTrue: [
+"	    'Checking block' print. "
 	    nxt <- node value offset.
 	    nxt notNil and: [nxt isCodePushStack and: [
 		(nxt nextLink isCodeSend: #value ) and: [ 
 	        nxt nextLink nextLink isCodeJcond and: [
 		nxt nextLink nextLink value offset isCodePopStack ]]]] ifTrue:
 	      [
+"		'Optimizing loop' print. "
 		" Point to after blk "
 		temp <- node nextLink.
 
@@ -2366,22 +2355,25 @@ optimizeJump
 		node <- self removeNode: node.		" Blk "
 		changed <- true.
 	      ] 
-	     ]
+	     ].
+	    node <- node nextLink.
 	].
     ^ changed
 !
 
 " Optimize a code block. "
 optimize
-    | temp |
+    | temp temp2 |
     " Fix jump targets to point to next instruction, also set referenced flag. "
-   'fixjumps' print.
    " Adjust jump and Send instructions "
-    self do: [ :cur | cur advance. cur print ].
+    self do: [ :cur | cur advance ].
+    self peephole.
     temp <- true.
-    [ temp ] whileTrue: [
-       self peephole.
-       temp <- self optimizeJump.
+    temp2 <- true.
+    [ temp or: [temp2 ] ] whileTrue: [
+       temp <- self peephole.
+       temp2 <- self optimizeJump.
+    "   self do: [ :cur | cur print ]. "
     ].
     ^ superFlag.
 !
@@ -2437,19 +2429,19 @@ sortLiterals: superClass
 !
 
 " Generate a block of code. "
-genblock
+generate
    | changed i j len arrayStream |
    
     changed <- true.
     [ changed ] whileTrue: [
-	'Optimizing size' print.
+"	'Optimizing size' print. "
 	changed <- false. 
 
        " Set offsets of all blocks "
 	i <- 0.
 	self do: [ :cur | i <- (cur length) + (cur offset: i) ].
 
-       " Convert everything but jumps into code blocks "
+       " Readjust lengths until they don't change anymore "
 	self do: [ :cur |
 	    len <- cur size.
 	    cur length = len ifFalse: [ cur length: len. changed <- true ].
@@ -2459,7 +2451,7 @@ genblock
     arrayStream <- WriteStream on: (ByteArray new: 0).
 
     " Convert everything into code blocks "
-    self do: [ :cur | cur print. arrayStream nextPutAll: (cur generate) ].
+    self do: [ :cur | arrayStream nextPutAll: (cur generate) ].
     ^ arrayStream contents
 ! !
 
@@ -2489,7 +2481,7 @@ isGetInst
  
    psh arg 0       psh arg 0
    str ins #	   dup
-   psh arg 0	   str arg 0
+   psh arg 0	   str ins #
    ret tos         ret tos
 "
 isSetInst
@@ -2516,8 +2508,8 @@ isSetInst
           ifFalse: [ ^ nil ].
     ].
     cur isCodeReturnStack ifFalse: [ ^ nil ].
-    cur <- cur nextLink.
-    cur notNil ifTrue: [ ^ nil ].
+"    cur <- cur nextLink.
+    cur notNil ifTrue: [ ^ nil ]."
     " Build method "
     ^ CompiledMethod newMethod: 0 header: ((inst * 256) + 16r70000000)
 !
@@ -2526,9 +2518,6 @@ isSetInst
 makeMethod: aClass argcount: count temps: tempcount for: primitive
     | bytecodes header eheader method litcount maxstack|
 
-    " Shove a return of self on end of method. "
-    self genPushSelf.
-    self genReturnTOS.
     " Clean up generated code. "
     self optimize.
     " Check if we can shortcut this method "
@@ -2542,23 +2531,23 @@ makeMethod: aClass argcount: count temps: tempcount for: primitive
     litcount <- lits size.
     maxstack <- firstLink stack: 0.
     primitive > 0 or: [ count > 12 ] ifTrue: [ 
-	eheader <- primitive + (count bitShift: 16).
         header <- litcount + 1 + (tempcount bitShift: 8) +
-		   (maxstack bitShift: 16) + 16rE8000000.
+		   (maxstack bitShift: 16) + 16r78000000.
+	eheader <- primitive + (count bitShift: 16).
     ] ifFalse: [
         header <- litcount + (tempcount bitShift: 8) + (maxstack bitShift: 16) +
 		   (count bitShift: 27).
-	eheader <- 0.
+	eheader <- nil.
     ].
 
     " Convert code into byte codes. "
-    bytecodes <- self genblock.
+    bytecodes <- self generate.
 
     " Build method "
     method <- CompiledMethod newMethod: bytecodes size header: header.
     1 to: litcount do: [ :i |
 	 method objectAt: (i + 1) put: ((lits at: i) value)].
-    eheader = 0 ifFalse: [ method objectAt: (litcount + 2) put: eheader ].
+    eheader notNil ifTrue: [ method objectAt: (litcount + 2) put: eheader ].
     " Copy over code "
     1 to: bytecodes size do: [ :i | method byteAt: i put: (bytecodes at: i)].
     ^ method
@@ -2575,8 +2564,9 @@ evaluate: aString
     | comp |
     comp <- self new.
     (comp compileForExecute: aString) ifFalse: [ ^ comp error ].
-    comp method DumpObject.
-    ^ comp method evaluate
+    aString print.
+    comp method print.
+    ^ comp method evaluate.
 !
 
 compile: aString forClass: aClass classified: aCategory
@@ -2585,7 +2575,9 @@ compile: aString forClass: aClass classified: aCategory
     (comp compile: aString forClass: aClass) ifFalse: [ ^ comp error ].
     comp method description:
 	    (MethodInfo sourceCode: aString forCategory: aCategory).
-    aClass addSelector: comp sel withMethod: comp method classified: aCategory.
+    aClass addSelector: comp select 
+	    withMethod: comp method
+	    classified: aCategory.
     ^ self.
 !
 
@@ -2596,7 +2588,9 @@ compile: aString forClass: aClass classified: aCategory notify: aBlock
 	 [ ^ aBlock value: comp errorstr ].
     comp method description:
 	    (MethodInfo sourceCode: aString forCategory: aCategory).
-    aClass addSelector: comp sel withMethod: comp method classified: aCategory.
+    aClass addSelector: comp select
+	    withMethod: comp method
+	    classified: aCategory.
     ^ self.
 !
 
@@ -2669,6 +2663,7 @@ errorstr
 " Compile a string for a class. "
 compile: aString forClass: aClass
     | offset |
+    stdout nextPutAll: aString.
     self init: aString.
     (class <- aClass) notNil ifTrue: [
          offset <- 0.
@@ -2682,11 +2677,15 @@ compile: aString forClass: aClass
     " Check if primitive method. "
     self parsePrimitive ifFalse: [ ^ false ].
     self doBody ifFalse: [ ^ false ].
+    " Shove a return of self on end of method. "
+    code genPushSelf.
+    code genReturnTOS.
     token <- nil.
     method <- code makeMethod: aClass superclass
 		   argcount: argcount
 		   temps: tempcount
 	           for: primnum.
+    method print.
     syms <- code <- nil.
     ^ true 
 !
@@ -2696,6 +2695,7 @@ compileForExecute: aString
     self init: aString.
     self doTemps.
     self doBody ifFalse: [ ^ false].
+    code genReturnTOS.
     token <- nil.
     method <- code makeMethod: nil argcount: 0 temps: tempcount for: primnum.
     syms <- code <- nil.
@@ -2722,6 +2722,7 @@ addSym: aSym
 addTemp
      | sym |
      sym <- SmallTalkSymbolTemp new: (token value) offset: tempcount.
+     token next.
      tempcount <- tempcount + 1.
      ^ self addSym: sym.
 !
@@ -2730,6 +2731,7 @@ addTemp
 addArg
      | sym |
      sym <- SmallTalkSymbolArg new: (token value) offset: argcount.
+     token next.
      argcount <- argcount + 1.
      ^ self addSym: sym.
 !
@@ -2738,7 +2740,7 @@ addArg
 removeSym: aSym
     | sym |
     sym <- aSym name asSymbol.
-    syms removeKey: sym ifAbsent: [ nil ]
+    syms removeKey: sym ifAbsent: [ ^ nil ].
 !
 
 " Lookup symbol in symbol table. "
@@ -2752,7 +2754,7 @@ findSymbol
     " See if it is a class variable "
     var <- nil.
     class notNil and: [(var <- class classPool) notNil] ifTrue: [
-	var <- var associationAt: name ifAbsent: [nil]
+	var <- var associationAt: name ifAbsent: [nil].
 	var isNil ifTrue: [
            " See if it is a shared pool "
 	   class allSharedPools do: [ :pool |
@@ -2779,6 +2781,7 @@ findSymbol
 	^ syms at: name put: (SmallTalkSymbolVar new: name asString
 					offset: (code addLiteral: var)).
     ].
+    self parseError: ('Unable to find symbol ' , name).
     ^ nil
 ! !
 
@@ -2789,13 +2792,11 @@ messagePattern
     token isKeyName
        ifTrue: [ sel <- token value.  token next. ]
        ifFalse: [ token isKeyKeyword
-	 ifTrue: [ self keyMessage. ]
+	 ifTrue: [ ^ self keyMessage ]
 	 ifFalse: [ token isKeySpecial 
 	   ifTrue: [
 		sel <- token value. 
-		token next isKeyName ifTrue: [
-		   self addArg.
-		   token next. ]
+		token next isKeyName ifTrue: [ self addArg ]
 	           ifFalse: [ ^ self parseError: 'Binary not followd by name' ]
 	        ]
            ifFalse: [ ^ self parseError: 'Illegal message selector' ]
@@ -2809,10 +2810,8 @@ keyMessage
     sel <- token value.
     [ token next isKeyName ] whileTrue: [
 	self addArg.
-	token next.
-	token isKeyKeyWord ifFalse: [ ^ true ].
-	sel <- sel , (token value)
-	token next.
+	token isKeyKeyword ifFalse: [ ^ true ].
+	sel <- sel , (token value).
     ].
     self parseError: 'Keyword message pattern not followed by a name'.
     ^ false
@@ -2821,7 +2820,8 @@ keyMessage
 " Parse temporaries.   "
 doTemps
     token isVarSep ifTrue: [
-	[ token next isKeyName ] whileTrue: [ self addTemp ].
+	token next.
+	[ token isKeyName ] whileTrue: [ self addTemp ].
 	token isVarSep ifTrue: [ token next ]
 		       ifFalse: [ ^self parseError: 'Needs to be name or |' ].
     ].
@@ -2834,9 +2834,9 @@ parsePrimitive
 	" Handle Primitive "
 	token next isKeyName and: [token value = 'primitive' ] ifTrue: [
 	    token next isKeyLiteral and:
-			 [ token value class = Integer ] ifTrue: [
+			 [ token value class == SmallInteger ] ifTrue: [
 		primnum <- token value.
-		token next isSpecial and: [ token value = '>' ] ifTrue: [
+		token next isKeySpecial and: [ token value = '>' ] ifTrue: [
 			token next.
 			^ true
 		]
@@ -2866,7 +2866,7 @@ doBody
 	].
 
 	token isKeyEOS ifTrue: [
-		code genPopTOS.
+"		code genPopTOS.  "
 		^ true
 	] ifFalse: [
 	    token isKeyPeriod ifTrue: [
@@ -2900,7 +2900,7 @@ doExpression
     token isKeyName ifTrue: [
 	asgname <- self findSymbol.
 	asgname isNil ifTrue: [
-            ^ self parseError: 'Invalid name ' , token value.
+            ^ self parseError: 'Invalid asgname ' , token value.
         ].
 	token next isKeyAssign ifTrue: [
 	    asgname canAssign ifFalse: [
@@ -2919,14 +2919,18 @@ doExpression
 
 " Parse a term. "
 doTerm
-    | superFlag |
+    | superFlag sym |
 
     token isKeyLiteral ifTrue: [
 	  code genPushLit: token value.
 	  token next.
 	  ^ false ].
     token isKeyName ifTrue: [
-	  superFlag <- self nameTerm: (self findSymbol).
+	  sym <- self findSymbol.
+	  sym isNil ifTrue: [
+            ^ self parseError: 'Invalid name ' , token value.
+	  ].
+	  superFlag <- self nameTerm: sym.
 	  token next.
 	  ^ superFlag ].
     token isKeyLBrack ifTrue: [ ^self doBlock ].
@@ -3002,14 +3006,15 @@ keyContinue: superFlag
 
 " Handle binary continuation "
 doBinaryContinue: superFlag
-    | msg s |
+    | msg s s2 |
 
     (s <- self doUnaryContinue: superFlag) isNil ifTrue: [ ^ nil ].
     [ token isKeySpecial ] whileTrue: [
 	msg <- token value.
 	token next.
-	(s <- self doUnaryContinue: self doTerm) isNil ifTrue: [ ^ nil ].
+	(s2 <- self doUnaryContinue: self doTerm) isNil ifTrue: [ ^ nil ].
         code genSend: msg argcount: 1 super: s.
+	s <- s2.
     ].
     ^ s
 !
@@ -3036,7 +3041,8 @@ doBlock
     saveInblock <- inBlock.
     saveOptimBlk <- optimBlk.
 
-    [ token next isKeyVariable ] whileTrue: [
+    token next.
+    [ token isKeyVariable ] whileTrue: [
 	args add: (self addTemp).
 	argc <- argc + 1.
     ].
@@ -3096,20 +3102,22 @@ optimBlock
 
 " Compile ifTrue: or ifFalse: as a built in. "
 doIfCond: key
-    | block cond else |
+    | block cond else adv |
 
+    adv <- 0.
     key = 'ifTrue:' ifTrue: [ cond <- false. else <- 'ifFalse:' ]
 		    ifFalse: [ cond <- true. else <- 'ifTrue:' ].
     block <- code genJumpCond: cond.    " Jump forward to end of block. "
     self optimBlock ifFalse: [ ^ false ].
 
     token isKeyKeyword and: [ token value = else ] ifTrue: [
-        code genDupTOS.
-	code setJumpTarget: block advance: 1.
+   "     code genDupTOS. "
+	code setJumpTarget: block advance: 2.
 	block <- code genJumpForw.	" Skip around else block "
 	self optimBlock ifFalse: [ ^ false ].	" Do else part "
-    ].
-    code setJumpTarget: block advance: 1.
+	adv <- 1.
+    ] ifFalse: [ code genDupTOS ].
+    code setJumpTarget: block advance: adv.
     ^ true
 
 !
@@ -3122,8 +3130,9 @@ doWhile: aBoolean
     code genSend: 'value' argcount: 0 super: false.
     block <- code genJumpCond: aBoolean.  " Jump forward to end of block. "
     self optimBlock ifFalse: [ ^ false ]." Block body "
+    code genPopTOS.
     code genJump: loop.			" Jump to start of block "
-    code genPopTOS.			" Remove result of block "
+"    code genPopTOS."			" Remove result of block "
     code setJumpTarget: block advance: 1.
     ^ true
 !
@@ -3139,13 +3148,13 @@ doWhile: aBoolean
 "   
 doAndOr: key
    | block kword |
-    [ token isKeyWord and: [key = 'and:' or: [ key = 'or:' ]]] whileTrue: [
+    [ token isKeyKeyword and: [key = 'and:' or: [ key = 'or:' ]]] whileTrue: [
         code genDupTOS.
  	" Jump forward to end of block. "
-        block = code genJumpCond: (key = 'or:').
+        block <- code genJumpCond: (key = 'or:').
         code genPopTOS.
         self optimBlock ifFalse: [ ^ false ].
-        code setJumpTarget: block advance: 0.
+        code setJumpTarget: block advance: 1.
      ].
      " Keep grabing if we got another builtin "
      token isKeyKeyword ifTrue: [
@@ -3157,4 +3166,105 @@ doAndOr: key
 ! !
 
 SmallTalkToken initialize !
+
+! CompiledMethod methodsFor: 'Printing' !
+
+printOn: aStream
+	| lits byte done basic op opr len temp |
+	lits <- self literals.
+	done <- self bytecodes.
+	aStream nextPutAll: 'Flags '.
+	(self flags) printOn: aStream.
+	aStream nextPutAll: ' Args '.
+	(self argcount) printOn: aStream.
+	aStream nextPutAll: ' Lits '.
+	lits printOn: aStream.
+	aStream nextPutAll: ' Stack '.
+	(self stacksize) printOn: aStream.
+	aStream nextPutAll: ' Temps '.
+	(self temporaries) printOn: aStream.
+	aStream nextPutAll: ' Bytes '.
+	done printOn: aStream.
+        self flags = 16rF ifTrue: [ 
+		aStream nextPutAll: ' Primitive '.
+		(self primitiveOf) printOn: aStream.
+	     ].
+	aStream nl.
+	1 to: lits do: [ :i |
+		aStream nextPutAll: ' Lit '.
+		(i - 1) printOn: aStream.
+		aStream nextPutAll: ': #'.
+		(self objectAt: (i + 1)) printOn: aStream.
+		aStream nl.
+	].
+	basic <- #( jmpl psharg pshlit pshinst pshtmp stinst strtmp
+		    rettmp jmpt jmpf jmp sndspc sndspc2 sndsup sndlit blk
+		    retself rettos rettrue retfalse retnil retblk dup pop
+		    pshvar stvar pshself pshnil pshtrue pshfalse pshone pshzero).
+	byte <- 1.
+	[ byte <= done ] whileTrue: [
+		op <- self byteAt: byte.
+		opr <- op bitAnd: 16rF.
+		len <- 1.
+		op <- op bitShift: -4.
+		op = 0 ifTrue: [
+			opr = 0 ifTrue: [
+			    len <- 3.
+			    byte + len > done
+				ifTrue: [ opr <- 0 ]
+			        ifFalse: [opr <- self byteAt: (byte + 1).
+			            opr <- opr + (self byteAt: (byte + 2)).
+			            opr > 32768 ifTrue: [ opr <- opr - 65536 ].
+			    ]
+			] ifFalse: [
+			    op <- opr.
+			    opr <- self byteAt: (byte + 1).
+			    len <- 2.
+			]
+		] ifFalse: [
+			" Check if group 2 "
+			op = 16rF ifTrue: [
+				op <- opr + 16.
+				opr <- nil.
+				" Variable operate inst "
+				op = 24 or: [op = 25 ] ifTrue: [
+			    		opr <- self byteAt: (byte + 1).
+			    		len <- 2.
+				].
+			].
+		].
+		" Check if send special "
+		op = 12 ifTrue: [ op <- op - 1. opr <- opr + 16. ].
+		op = 11 ifTrue: [
+			temp <- Smalltalk at: #SpecialSelectors
+					 ifAbsent: [ Array new: 0 ].
+			temp size <= opr ifFalse: [
+				temp <- temp at: (opr + 1).
+				opr <- '#' , temp asString.
+				opr <- opr asSymbol ].
+		].
+		" Convert jump argument to bytecode index "
+		op = 8 or: [ op = 9 or: [ op = 10 ]] ifTrue: [
+			opr > 127 ifTrue: [ opr <- opr - 256 ]].
+		op = 0 or: [op = 8 or: [ op = 9 or: [ op = 10 ]]] ifTrue: [
+			opr <- byte + len + opr ].
+		aStream nextPutAll: ' Byte '.
+		byte printOn: aStream.
+		aStream nextPutAll: ':  '.
+		(basic at: (op + 1)) printOn: aStream.
+		opr notNil ifTrue: [
+		    aStream nextPutAll: '  '.
+		    opr printOn: aStream.
+		    " Handle sends "
+		    op = 11 or: [ op = 13 or: [ op = 14]] ifTrue: [
+			aStream nextPut: $(.
+			(self byteAt: (byte + len)) printOn: aStream.
+			aStream nextPut: $).
+			len <- len + 1.
+		    ].
+		].
+		aStream nl.
+		byte <- byte + len.
+	]
+! !
 
