@@ -1,9 +1,14 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: stream.st,v 1.4 2001/01/13 16:35:19 rich Exp rich $ "
+" $Id: stream.st,v 1.5 2001/07/31 14:09:49 rich Exp rich $ "
 
 "
  $Log: stream.st,v $
+ Revision 1.5  2001/07/31 14:09:49  rich
+ Code cleanup
+ Moved File class from basic.st
+ Redid FileStream class to work correctly.
+
  Revision 1.4  2001/01/13 16:35:19  rich
  Rewrote FileStream initialize code.
 
@@ -22,8 +27,13 @@
 
 "
 
-Object subclass: 'File' instanceVariableNames: 'name mode position'
-       classVariableNames: '' poolDictionaries: '' category: nil!
+Object subclass: 'File'
+       instanceVariableNames: 'name mode position'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'File-Access' !
+
+File comment: 'I represent system files.' !
 
 ! File class methodsFor: 'creation' !
 
@@ -38,6 +48,14 @@ open: aName mode: aMode ifFail: aBlock
 	file <- self new setName: aName mode: aMode.
 	file open ifFalse: [ ^ aBlock value ].
 	^ file
+!
+
+name: aName mode: aMode
+	^ self new setName: aName mode: aMode
+!
+
+name: aName
+	^ self new setName: aName mode: 'r'
 !
 
 fromArray: aArray
@@ -89,6 +107,21 @@ open
 	^ false
 !
 
+isDirectory
+	<primitive 108>
+	^ self primitiveFailed
+!
+
+rename: aName
+	<primitive 109>
+	^ self primitiveFailed
+!
+
+delete
+	<primitive 110>
+	^ self primitiveFailed
+!
+
 close
 	<primitive 81>
 
@@ -98,28 +131,43 @@ close
 
 next
 	<primitive 84>
-	^ 0 asCharacter
+	^ self primitiveFailed
+	"^ 0 asCharacter"
 !
 
-read: anArray
-	<primitive 86>
+nextPutAll: aString
+	<primitive 87>
+	^ self primitiveFailed
 !
+
+directory
+	<primitive 90>
+	^ self primitiveFailed
+!
+
+next: aNumber
+	<primitive 86>
+	^ self primitiveFailed
+!	
 
 nextPut: anInteger
 	<primitive 85>
-!
-
-write: anArray
-	<primitive 87>
+	^ self primitiveFailed
 !
 
 size
 	<primitive 88>
 ! !
 
-Object subclass: 'Stream' instanceVariableNames: 'contents'
-       classVariableNames: '' poolDictionaries: '' category: nil
+Object subclass: 'Stream'
+       instanceVariableNames: 'contents'
+       classVariableNames: '' 
+       poolDictionaries: ''
+       category: 'Streaming'
 !
+
+Stream comment:
+    'I am a abstract class that represent sequential access to collections'. !
 
 ! Stream methodsFor: 'accessing-reading'!
 
@@ -182,10 +230,15 @@ store: anObject
 
 Stream subclass: 'PositionableStream'
        instanceVariableNames: 'position endPtr'
-       classVariableNames: '' poolDictionaries: '' category: nil
+       classVariableNames: '' 
+       poolDictionaries: ''
+       category: 'Streaming'
 !
 
-! PositionableStream class methodsFor: 'instance creation'!
+PositionableStream comment: 
+    'I represent a stream which understand about position.' !
+
+! PositionableStream class methodsFor: 'creation'!
 
 on: aCollection
     ^(self new initCollection: aCollection)
@@ -303,8 +356,11 @@ initCollection: aCollection
     endPtr <- contents size
 ! !
 
-PositionableStream subclass: 'ReadStream' instanceVariableNames: ''
-                   classVariableNames: '' poolDictionaries: '' category: nil!
+PositionableStream subclass: 'ReadStream'
+		   instanceVariableNames: ''
+                   classVariableNames: ''
+		   poolDictionaries: ''
+		   category: 'Streaming' !
 
 ! ReadStream methodsFor: 'accessing-reading'!
 
@@ -327,9 +383,9 @@ PositionableStream subclass: 'WriteStream'
 		   instanceVariableNames: 'maxSize'
                    classVariableNames: ''
 		   poolDictionaries: ''
-		   category: nil!
+		   category: 'Streaming' !
 
-! WriteStream class methodsFor: 'instance creation'!
+! WriteStream class methodsFor: 'creation'!
 
 on: aCollection
     ^ self new initCollection: aCollection.
@@ -396,7 +452,7 @@ tab
 ! !
 
 
-! WriteStream methodsFor: 'private methods'!
+! WriteStream methodsFor: 'private'!
 
 initCollection: aCollection
     contents <- aCollection.
@@ -430,10 +486,13 @@ upTo: anObject
     ^newStream contents
 ! !
 
-WriteStream subclass: 'ReadWriteStream' instanceVariableNames: ''
-            classVariableNames: '' poolDictionaries: '' category: nil!
+WriteStream subclass: 'ReadWriteStream'
+	    instanceVariableNames: ''
+            classVariableNames: ''
+	    poolDictionaries: ''
+	    category: 'Streaming' !
 
-! ReadWriteStream class methodsFor: 'instance creation'!
+! ReadWriteStream class methodsFor: 'instance'!
 
 on: aCollection
     | stream |
@@ -464,8 +523,14 @@ useWholeStream
 
 ReadWriteStream subclass: 'CharStream' 
        instanceVariableNames: 'stream mode'
-       classVariableNames: '' poolDictionaries: '' category: nil
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Streaming'
 !
+
+CharStream comment:
+ 'I represent access to standard input and ouput channels. My instances are
+ stdin, stdout, stderr. '. !
 
 ! CharStream class methodsFor: 'creation'!
 
@@ -496,7 +561,7 @@ setUnbuffered
 ! CharStream methodsFor: 'testing'!
 
 atEnd
-     position > endPtr ifTrue: [
+     [ position > endPtr ] whileTrue: [
 	 contents <- self fill: stream mode: mode.
 	 position <- 1.
 	 endPtr <- contents size. ].
@@ -512,7 +577,7 @@ isEmpty
 
 fill: aStream mode: aMode
 	<primitive 101>
-	^ self primitiveFailed
+	^ String new: 0
 !
 
 flush: aStream buffer: aBuffer
@@ -543,9 +608,14 @@ CharStream initialize !
 
 ReadWriteStream subclass: 'FileStream'
                 instanceVariableNames: 'file'
-                classVariableNames: '' poolDictionaries: '' category: nil!
+                classVariableNames: ''
+		poolDictionaries: ''
+		category: 'Streaming' !
 
-! FileStream class methodsFor: 'basic'!
+FileStream comment: 
+   'I wrap File objects in a Stream. '!
+
+! FileStream class methodsFor: 'creation'!
 
 on: fileName
     ^self new open: fileName mode: 'r'
@@ -566,7 +636,7 @@ fileIn: aFileName
     fileStream close.
 ! !
 
-! FileStream methodsFor: 'basic' !
+! FileStream methodsFor: 'control' !
 
 open: fileName mode: fileMode
     self open: fileName mode: fileMode
@@ -609,12 +679,20 @@ size
 
 nextPut: anObject
     file nextPut: anObject
+!
+
+nextPutAll: aString
+    file nextPutAll: aString
 ! !
 
 ! FileStream methodsFor: 'accessing-reading'!
 
 next
     ^file next
+!
+
+next: aInteger
+    ^file next: aInteger
 ! !
 
 ! FileStream methodsFor: 'testing'!
@@ -684,5 +762,4 @@ nextChunkPut: aString
      self nextPut: $!!.
      self nl.
 ! !
-
 
