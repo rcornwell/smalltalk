@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Log: $
+ * $Log: symbols.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: symbols.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -128,27 +131,33 @@ freename(Namenode nstate)
 void
 for_class(Namenode nstate, Objptr aClass)
 {
-    char               *vars;
-    char               *ptr, *ptr2, c;
+    Objptr		op;
+    Objptr              var;
+    char               *str;
+    int			base, length, i;
 
     if (aClass == NilPtr)
 	return;
+   /* Add superclass names first */
+    op = get_pointer(aClass, SUPERCLASS);
+    if (op != NilPtr)
+	for_class(nstate, op);
+
+   /* After we ran superclass, see if any more vars. */
     nstate->classptr = aClass;
-    vars = Cstring(get_pointer(aClass, CLASS_VARS));
-    if (vars == NULL)
+    op = get_pointer(aClass, CLASS_VARS);
+    if (op == NilPtr)
 	return;
-    ptr2 = ptr = vars;
-    do {
-	c = *ptr++;
-	if (c == ' ' || c == '\0') {
-	    *--ptr = '\0';
-	    if (ptr2 != ptr)
-		add_symbol(nstate, ptr2, Inst);
-	    *ptr++ = c;
-	    ptr2 = ptr++;
+    base = fixed_size(op);
+    length = length_of(op);
+    for (i = 0; i < length; i++) {
+	var = get_pointer(op, i + (base / sizeof(Objptr)));
+	if (var != NilPtr) {
+	    str = Cstring(var);
+	    add_symbol(nstate, str, Inst);
+	    free(str);
 	}
-    } while (c != '\0');
-    free(vars);
+    }
 }
 
 /*
@@ -344,11 +353,11 @@ sort_literals(Namenode nstate, int superFlag, Objptr superClass)
 	return;
     }
    /* Clear array */
-    for (i = 0; i < nstate->litcount; nstate->litarray[i++] = 0) ;
+    for (i = 0; i < nstate->litcount; nstate->litarray[i++] = NULL) ;
 
    /* Now load the array in usage order */
     for (lp = nstate->lits; lp != NULL; lp = lp->next) {
-	if (lp->usage == 0)
+	if (lp->usage <= 0)
 	    continue;
        /* Find slot based on usage */
 	if (lp->offset == -1) {
@@ -364,7 +373,7 @@ sort_literals(Namenode nstate, int superFlag, Objptr superClass)
 	    }
 	    if (lp->usage > nstate->litarray[i]->usage) {
 	       /* Find next empty slot */
-		for (j = i + 1; j < nstate->litcount; j++) {
+		for (j = i + 1; j <= nstate->litcount; j++) {
 		    if (nstate->litarray[j] == NULL) {
 	       		/* Slide the elements down */
 			for (; j > i; j--)
