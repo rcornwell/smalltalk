@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Id: symbols.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: symbols.h,v 1.2 2000/02/01 18:10:05 rich Exp rich $
  *
  * $Log: symbols.h,v $
+ * Revision 1.2  2000/02/01 18:10:05  rich
+ * Added Operand Class for sendSpec
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -12,7 +15,7 @@
 
 enum oper_type {
     Arg, Inst, Literal, Temp, Variable, Self, True, False, Nil, Stack, Super,
-	 Label, Block, Operand
+	 Label, Block, Operand, Context
 };
 
 
