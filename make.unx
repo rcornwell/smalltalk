@@ -10,10 +10,10 @@ LIBS=-lm
 
 
 SRCS = $(PROJ).c about.c image.c object.c interp.c primitive.c fileio.c \
-	 	init.c dump.c lex.c code.c symbols.c parse.c
+	 	init.c dump.c lex.c code.c symbols.c parse.c smallobjs.c
 
 OBJS = $(PROJ).o about.o image.o object.o interp.o primitive.o fileio.o \
- 		init.o dump.o lex.o code.o symbols.o parse.o
+ 		init.o dump.o lex.o code.o symbols.o parse.o smallobjs.o
 SMALLSRC = basic.st stream.st magnitude.st collection.st misc.st compile.st \
 	behavior.st process.st object.st
 
@@ -48,6 +48,8 @@ code.o:		code.c smallobjs.h object.h interp.h primitive.h lex.h \
 symbols.o:	symbols.c smallobjs.h object.h interp.h primitive.h lex.h \
 			 symbols.h
 parse.o:	parse.c smallobjs.h dump.h object.h interp.h fileio.h \
+			primitive.h lex.h symbols.h code.h parse.h
+smallobjs.o:	smallobjs.c smallobjs.h dump.h object.h interp.h fileio.h \
 			primitive.h lex.h symbols.h code.h parse.h
 
 
