@@ -1,9 +1,13 @@
 " Last piece of bootstrap code. "
 
-" $Id: boottail.st,v 1.1 2001/07/31 14:10:39 rich Exp rich $ "
+" $Id: boottail.st,v 1.2 2001/08/18 16:17:00 rich Exp rich $ "
 
 "
  $Log: boottail.st,v $
+ Revision 1.2  2001/08/18 16:17:00  rich
+ Clear changes file before we start reloading system.
+ Build a new source file after we have completed system load.
+
  Revision 1.1  2001/07/31 14:10:39  rich
  Initial revision
 
@@ -32,7 +36,7 @@
 	stderr nl.
 
 	" Reload full system now"
-	FileStream fileIn: 'smalltalk.st'. 
+	FileStream fileIn: 'source.st'. 
 
 	" Remove flag... we don't need it anymore "
 	Smalltalk removeKey: #loading ifAbsent: [nil].
