@@ -1,9 +1,13 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.4 2000/08/27 02:17:01 rich Exp rich $ "
+" $Id: behavior.st,v 1.5 2001/01/17 01:45:41 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.5  2001/01/17 01:45:41  rich
+ Code cleanup.
+ Remember to flush method cache after adding a selector.
+
  Revision 1.4  2000/08/27 02:17:01  rich
  Fixed ClassCategoryReader.
  Fixed typos and code cleanup.
@@ -69,6 +73,7 @@ category
 
 sourceCode
 	| stream |
+	sourceFile isNil ifTrue: [ ^ ' No source available ' ].
 	stream <- sourceFiles at: sourceFile.
 	stream position: sourcePos.
 	^ stream nextChunk.
@@ -92,25 +97,35 @@ sourceCode: aString
 	| stream |
 	" Save the source code at end of change file. "
 	sourceFile <- 2.
-	category <- nil.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		sourcePos <- stream setToEnd.
+		stream setToEnd.
+		sourcePos <- stream position.
 		stream nextChunkPut: aString.
-		stream nextChunkPut: ''.
+		stream nextPut: $!!.
+		stream nl.
 	]
 !
 
-sourceCode: aString forCategory: aCategory
-	| stream |
+sourceCode: aString forClass: aClass forCategory: aCategory
+	| stream preamble |
 	" Save the source code at end of change file. "
 	sourceFile <- 2.
 	category <- aCategory.
 	stream <- sourceFiles at: sourceFile.
 	stream isNil ifFalse: [
-		sourcePos <- stream setToEnd.
+		stream setToEnd.
+		preamble <- WriteStream on: (String new: 0).
+		preamble nextPutAll: aClass name.
+		preamble nextPutAll: ' methodsFor: '.
+		aCategory printOn: preamble.
+		stream nextPut: $!!.
+		stream space.
+		stream nextChunkPut: preamble contents.
+		sourcePos <- stream position.
 		stream nextChunkPut: aString.
-		stream nextChunkPut: ''.
+		stream nextPut: $!!.
+		stream nl.
 	]
 !
 
@@ -126,14 +141,8 @@ sourceFile: aFile sourcePos: position category: aCategory
 	^ self new sourceFile: aFile sourcePos: position category: aCategory
 !
 
-sourceCode: aString forCategory: aCategory
-	^ self new sourceCode: aString forCategory: aCategory
-! !
-
-! CompiledMethod methodsFor: 'source access' !
-
-getSource
-	^ description sourceCode.
+sourceCode: aString forClass: aClass forCategory: aCategory
+	^ self new sourceCode: aString forClass: aClass forCategory: aCategory
 ! !
 
 ! Behavior methodsFor: 'Creating Method Dictionary'!
@@ -276,11 +285,11 @@ isBits
 !
 
 isBytes
-	^ ( flags bitAnd: 2) ~= 0
+	^ self isBits and: [( flags bitAnd: 2) ~= 0]
 !
 
 isWords
-	^ ( flags bitAnd: 2) == 0
+	^ self isBits and: [( flags bitAnd: 2) == 0]
 !
 
 isFixed
@@ -515,7 +524,7 @@ kindOfSubclass
 	self isVariable ifTrue: [ string nextPutAll: 'Variable' ].
 	self isBytes ifTrue: [ string nextPutAll: 'Byte' ]
 	  ifFalse: [ self isWords ifTrue: [ string nextPutAll: 'Word' ]].
-	string nextPutAll: 'SubClass:'.
+	string nextPutAll: 'Subclass:'.
 	string <- string contents.
 	string at: 1 put: ((string at: 1) asLowercase ).
 	^ string
@@ -538,7 +547,7 @@ allInstancesDo: aBlock
 		aBlock value: inst.
 		[ (inst <- inst nextInstance) notNil ] whileTrue:
 			 [ aBlock value: inst]].
-!	
+!
 
 allSubinstancesDo: aBlock
 	self allSubclasses do: [ :sub | sub allInstancesDo: aBlock ].
@@ -589,7 +598,7 @@ addSelector: aSelector withMethod: meth classified: aCategory
 	aCategory isNil ifFalse: [
 	    newcat <- aCategory asSymbol.
 	    info <- meth description.
-	    info isNil ifFalse: [
+	    info isNil ifTrue: [
 		  info <- MethodInfo new.
 		  meth description: info ].
 	    info category: aCategory.
@@ -1011,9 +1020,10 @@ fileOutMethods: aFileStream with: aString
 				   aFileStream space ].
           aFileStream nextPutAll: 'methodsFor: '.
 	  assoc key asString printOn: aFileStream.
+	  aFileStream space.
           aFileStream nextPut: $!!.
 	  assoc value do: [ :s |
-	        aFileStream nl.
+	        aFileStream nl; nl.
 		aFileStream nextChunkPut: 
 			((self compiledMethodAt: s) getSource) ].
 	  aFileStream space.
