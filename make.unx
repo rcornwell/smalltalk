@@ -1,0 +1,52 @@
+#
+# Makefile for Smalltalk
+#
+.SUFFIXES:      .sti
+PROJ = smalltalk
+CC = gcc 
+CFLAGS = -g -O2 -Wall -DINLINE_OBJECT_MEM
+LDFLAGS = -g 
+LIBS=-lm
+
+
+SRCS = $(PROJ).c about.c image.c object.c interp.c primitive.c fileio.c \
+	 	init.c dump.c lex.c code.c symbols.c parse.c
+
+OBJS = $(PROJ).o about.o image.o object.o interp.o primitive.o fileio.o \
+ 		init.o dump.o lex.o code.o symbols.o parse.o
+SMALLSRC = basic.st stream.st magnitude.st collection.st behavior.st object.st
+
+all:	$(PROJ).sti 
+
+$(PROJ).sti: $(PROJ) $(PROJ).st
+	$(PROJ) $(PROJ).st
+
+$(PROJ).st: $(SMALLSRC)
+	cat $(SMALLSRC) > $(PROJ).st
+
+$(PROJ): $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) 
+
+clean:
+	rm -f $(OBJS) $(PROJ).sti $(PROJ).st
+
+about.o:	about.c about.h
+$(PROJ).o:	$(PROJ).c $(PROJ).h  about.h
+object.o:	object.c smallobjs.h object.h
+interp.o:	interp.c smallobjs.h object.h interp.h primitive.h dump.h
+primitive.o:	primitive.c smallobjs.h fileio.h object.h interp.h \
+		primitive.h image.h
+fileio.o:	fileio.c smallobjs.h object.h primitive.h fileio.h 
+image.o:	image.c object.h fileio.h image.h
+dump.o:		dump.c smallobjs.h lex.h object.h fileio.h dump.h
+init.o:		init.c smallobjs.h object.h interp.h fileio.h primitive.h \
+			 dump.h parse.h
+lex.o:		lex.c smallobjs.h object.h primitive.h lex.h
+code.o:		code.c smallobjs.h object.h interp.h primitive.h lex.h \
+			 symbols.h code.h
+symbols.o:	symbols.c smallobjs.h object.h interp.h primitive.h lex.h \
+			 symbols.h
+parse.o:	parse.c smallobjs.h dump.h object.h interp.h fileio.h \
+			primitive.h lex.h symbols.h code.h parse.h
+
+

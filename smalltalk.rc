@@ -1,0 +1,81 @@
+/*
+ * Smalltalk interpreter: Windows Resource file.
+ *
+ * $Id: $
+ *
+ * $Log: $
+ *
+ */
+
+#include <windows.h>
+#include <winver.h>
+#include "smalltalk.h"
+#include "about.h"
+
+SMALLTALK ICON smalltalk.ico
+SMALLIMAGE ICON smallImage.ico
+SMALLFILE ICON smallfile.ico
+
+VS_VERSION_INFO	VERSIONINFO
+	FILEVERSION	1,0,2,0
+	PRODUCTVERSION	1,0,2,0
+	FILEFLAGSMASK	VS_FFI_FILEFLAGSMASK
+	FILEFLAGS	VS_FF_PRERELEASE|VS_FF_DEBUG
+	FILEOS		VOS_DOS_WINDOWS32
+	FILETYPE	VFT_APP
+	FILESUBTYPE	VFT_UNKNOWN
+	BEGIN
+	   BLOCK "StringFileInfo"
+	   BEGIN
+	      BLOCK "040904e4"
+	      BEGIN
+		VALUE  "CompanyName",	"Richard Cornwell\0"
+		VALUE  "FileDescription", "Smalltalk\0"
+		VALUE  "FileVersion",	VERSION "\0"
+		VALUE  "InternalName",  "Smalltalk\0"
+		VALUE  "LegalCopyright", "1999 Richard Cornwell\0"
+		VALUE  "OriginalFilename", "Smalltalk\0"
+		VALUE  "ProductName", "Smalltalk\0"
+		VALUE  "ProductVersion", "1.0\0" 
+		VALUE  "Email", "skyvis@best.com\0"
+	      END
+	   END
+	   BLOCK "VarFileInfo"
+	   BEGIN
+		VALUE	"Translation", 0x409, 1252
+           END
+       END
+
+Smalltalk MENU
+    BEGIN
+	POPUP	"&File"
+	   BEGIN
+		MENUITEM "&New	Ctrl+N",	IDM_NEW
+		MENUITEM "&Open	Ctrl+O",	IDM_OPEN
+		MENUITEM "&Save	Ctrl+S",	IDM_SAVE
+		MENUITEM "Save &As...",		IDM_SAVEAS
+		MENUITEM SEPARATOR
+		MENUITEM "E&xit", 		IDM_EXIT
+	   END
+	POPUP	"&Help"
+	BEGIN
+		MENUITEM "&Help	F1",IDM_HELP
+		MENUITEM SEPARATOR
+		MENUITEM "&About Smalltalk...",	IDM_ABOUT
+	END
+    END
+
+Smalltalk ACCELERATORS
+    BEGIN
+	"^N",		IDM_NEW
+	"^O",		IDM_OPEN
+	"^S",		IDM_SAVE
+	VK_F1,		IDM_HELP, VIRTKEY
+    END
+
+
+STRINGTABLE BEGIN
+    IDS_INVARG		"Invalid argument: "
+END
+
+
