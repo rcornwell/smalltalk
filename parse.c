@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: parse.c,v $
+ * Revision 1.7  2001/08/18 16:17:02  rich
+ * Removed section generating incorrect categories.
+ *
  * Revision 1.6  2001/07/31 14:09:48  rich
  * Fixed to compile under new cygwin
  *
@@ -33,7 +36,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: parse.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: parse.c,v 1.7 2001/08/18 16:17:02 rich Exp rich $";
 
 #endif
 
@@ -104,8 +107,6 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     Objptr	aSelector;
     Objptr	methinfo;
     Objptr	dict;
-    Objptr	catdict;
-    Objptr	catset;
 
     rootObjects[TEMP2] = aSelector = internString(selector);
 
@@ -124,22 +125,6 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     Set_integer(methinfo, METHINFO_POS, pos);
     Set_object(methinfo, METHINFO_CAT, aCatagory);
     rootObjects[TEMP2] = NilPtr;
-
-#if 0
-    if ((catdict = get_pointer(aClass, CLASS_METHCAT)) == NilPtr) {
-	catdict = new_Dictionary();
-	Set_object(aClass, CLASS_METHCAT, catdict);
-    }
-
-    /* Place Category into dictionary */
-    if ((catset = FindSelectorInDictionary(catdict, aCatagory)) == NilPtr) {
-        rootObjects[TEMP2] = catset = new_Set();
-        rootObjects[TEMP2] = catset = create_association(aCatagory, catset);
-	AddSelectorToDictionary(catdict, catset);
-        rootObjects[TEMP2] = NilPtr;
-    }
-    AddSelectorToSet(get_pointer(catset, ASSOC_VALUE), aSelector);
-#endif
 }
  
 /*
