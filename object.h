@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: $
+ * $Id: object.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
  *
- * $Log: $
+ * $Log: object.h,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
@@ -42,7 +45,6 @@ typedef struct _region {
 } region           , *Region;
 
 typedef struct _otentry {
-    Objhdr              va;			/* Address of object */
     unsigned int        refcnt:28;		/* Reference count */
     unsigned int        indexable:1;		/* Object is indexable */
     unsigned int        byte:1;			/* Object is bytes */
@@ -53,7 +55,8 @@ typedef struct _otentry {
 extern Objptr       rootObjects[19];
 extern int          otsize;
 extern int          growsize;
-extern Otentry      otable;
+extern Otentry      otable;			/* Array of object info */
+extern Objhdr	   *objmem;			/* Pointer to objects */
 extern int	    noreclaim;
 
 /* object.c */
@@ -129,13 +132,13 @@ void		    free_all_other_objects(Objptr);
 
 /* Accessing Functions. */
 
-#define get_object_pointer(op) (otable[(op) / 2].va)
+#define get_object_pointer(op) (objmem[(op) / 2])
 
 #define get_object_base(op) ((char *)(get_object_pointer(op) + 1))
 
 #define get_object_refcnt(op) (otable[(op) / 2].refcnt)
 
-#define set_object_pointer(op, addr) (otable[(op) / 2].va = (addr))
+#define set_object_pointer(op, addr) (objmem[(op) / 2] = (addr))
 
 #define set_object_refcnt(op,  cnt)  (otable[(op) / 2].refcnt = (cnt))
 

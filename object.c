@@ -2,13 +2,16 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Log: $
+ * $Log: object.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: object.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -35,7 +38,8 @@ static char        *rcsid =
 int                 growsize = 64;		/* Region grow rate */
 Region              regions = NULL;		/* Memory regions */
 Region              curregion = NULL;		/* Pointer to current region */
-Otentry             otable = NULL;		/* Pointer to object table */
+Otentry             otable = NULL;		/* Pointer to object info */
+Objhdr		   *objmem = NULL;		/* Pointer to objects */
 Objptr              freeobj;			/* Next free object pointer */
 int                 otsize;			/* Size of object table */
 int		    noreclaim = TRUE;		/* Don't allow reclaimes */
@@ -149,7 +153,7 @@ create_object(Objptr op, int flags, Objptr class, int size)
 	add_to_free(new_ptr);
 	return NULL;
     }
-    otable[op].va = new_ptr;
+    objmem[op] = new_ptr;
     otable[op].refcnt = 0;
     otable[op].free = 0;
     otable[op].ptrs = (flags & CLASS_PTRS) != 0;
@@ -176,13 +180,12 @@ void
 rebuild_free()
 {
     int                 i;
-    Otentry             ptr;
 
     freeobj = NilPtr;
    /* Add all free objects into free list */
-    for (i = otsize - 1, ptr = &otable[i]; i > 0; i--, ptr--) {
-	if (ptr->free) {
-	    ptr->va = (Objhdr) freeobj;
+    for (i = otsize - 1; i > 0; i--) {
+	if (otable[i].free) {
+	    objmem[i] = (Objhdr) freeobj;
 	    freeobj = i;
 	}
     }
@@ -197,10 +200,14 @@ new_objectable(int number)
 {
     int                 i;
     Otentry             ptr;
+    Objhdr	       *optr;
 
    /* Free any existing objects */
     if (otable != NULL)
 	free(otable);
+    if (objmem != NULL)
+	free(objmem);
+
     while (regions != NULL) {
 	Region              reg = regions->next;
 
@@ -212,10 +219,18 @@ new_objectable(int number)
     if ((otable = (Otentry) malloc(sizeof(otentry) * otsize)) == NULL)
 	return FALSE;
 
+    if ((objmem = (Objhdr *) malloc(sizeof(Objhdr) * otsize)) == NULL) {
+	otable = NULL;
+	free(otable);
+	return FALSE;
+    }
+
     freeobj = NilPtr;
    /* Clear and free all objects. */
-    for (i = otsize - 1, ptr = &otable[i]; i > ((int) NilPtr); i--, ptr--) {
-	ptr->va = (Objhdr) freeobj;
+    for (i = otsize - 1, ptr = &otable[i], optr = &objmem[i];
+	 i > ((int) NilPtr);
+	 i--, ptr--, optr--) {
+	*optr = (Objhdr) freeobj;
 	ptr->refcnt = 0;
 	ptr->free = 1;
 	ptr->ptrs = 0;
@@ -225,7 +240,7 @@ new_objectable(int number)
     }
 
    /* Intialize the null object. */
-    otable[(int) NilPtr].va = &nilhdr;
+    objmem[(int) NilPtr] = &nilhdr;
     otable[(int) NilPtr].refcnt = MAXREFCNT;
     otable[(int) NilPtr].free = 0;
     otable[(int) NilPtr].indexable = 0;
@@ -322,7 +337,7 @@ as_integer_object(int value)
 INLINE              Objhdr
 get_object_pointer(Objptr op)
 {
-    return otable[op / 2].va;
+    return objmem[op / 2];
 }
 
 INLINE char        *
@@ -346,7 +361,7 @@ set_object_refcnt(Objptr op, int cnt)
 INLINE void
 set_object_pointer(Objptr op, Objhdr addr)
 {
-    otable[op / 2].va = addr;
+    objmem[op / 2] = addr;
 }
 
 INLINE void
@@ -537,15 +552,15 @@ swapPointers(Objptr first, Objptr second)
     sp = &otable[second / 2];
 /*    fprintf(stderr, "%08x Becomes1 Object #%d %d\n", fp->va, first, fp->va->size);
     fprintf(stderr, "%08x Becomes2 Object #%d %d\n", sp->va, second, sp->va->size); */
-    old_ptr = fp->va;
+    old_ptr = objmem[first / 2];
     indexable = fp->indexable;
     byte = fp->byte;
     ptrs = fp->ptrs;
-    fp->va = sp->va;
+    objmem[first / 2] = objmem[second / 2];
     fp->indexable = sp->indexable;
     fp->byte = sp->byte;
     fp->ptrs = sp->ptrs;
-    sp->va = old_ptr;
+    objmem[second / 2] = old_ptr;
     sp->indexable = indexable;
     sp->byte = byte;
     sp->ptrs = ptrs;
@@ -562,7 +577,7 @@ initialInstance(Objptr class)
     Otentry             ptr;
 
     for (i = 0, ptr = &otable[i]; i < otsize; i++, ptr++) {
-	if (ptr->free == 0 && ptr->va->u.class == class)
+	if (ptr->free == 0 && objmem[i]->u.class == class)
 	    return (i * 2);
     }
     return NilPtr;
@@ -575,15 +590,13 @@ Objptr
 nextInstance(Objptr op)
 {
     int                 i = op / 2;
-    Otentry             ptr;
     Objptr              class;
 
     if (op == NilPtr || !is_object(op))
 	return NilPtr;
-    ptr = &otable[i];
-    class = ptr->va->u.class;
-    for (i++, ptr++; i < otsize; i++, ptr++) {
-	if (ptr->free == 0 && ptr->va->u.class == class)
+    class = objmem[i]->u.class;
+    for (i++; i < otsize; i++) {
+	if (otable[i].free == 0 && objmem[i]->u.class == class)
 	    return (i * 2);
     }
     return NilPtr;
@@ -608,11 +621,11 @@ next_object(Objptr * op, int *flags, Objptr * class, int *size)
 	    *flags = (ptr->ptrs) ? CLASS_PTRS : 0;
 	    *flags |= (ptr->indexable) ? CLASS_INDEX : 0;
 	    *flags |= (ptr->byte) ? CLASS_BYTE : 0;
-	    optr = ptr->va;
-	    *class = ptr->va->u.class;
-	    *size = ptr->va->size;
+	    optr = objmem[i];
+	    *class = objmem[i]->u.class;
+	    *size = objmem[i]->size;
 	    *op = i * 2;
-	    return (int *) (ptr->va + 1);
+	    return (int *) (objmem[i] + 1);
 	}
     }
     return NULL;
@@ -700,8 +713,8 @@ new_object_pointer(int ptrs, int indexable, int byte, Objhdr addr)
     Objptr              new_ptr = freeobj;
 
     if (new_ptr != NilPtr) {
-	freeobj = (Objptr) otable[new_ptr].va;
-	otable[new_ptr].va = addr;
+	freeobj = (Objptr) objmem[new_ptr];
+	objmem[new_ptr] = addr;
 	otable[new_ptr].refcnt = 0;
 	otable[new_ptr].free = 0;
 	otable[new_ptr].ptrs = ptrs;
@@ -719,17 +732,20 @@ free_object_pointer(Objptr op)
 {
    /* Make sure it is a object an not NilObject */
     if (is_object(op) && op != 0 && notFree(op)) {
-    	Otentry      optr = &otable[op / 2];		/* Convert to index */
+    	Otentry      optr;
 
-/*        fprintf(stderr, "%08x Freeing Object #%d %d\n", optr->va, op, optr->va->size); */
-	add_to_free(optr->va);		/* Free space used by object */
-	optr->va = (Objhdr) freeobj;	/* Append to free list */
+	op /= 2;
+    	optr = &otable[op];			/* Convert to index */
+
+/*        fprintf(stderr, "%08x Freeing Object #%d %d\n", objmem[op], op, objmem[op]->size); */
+	add_to_free(objmem[op]);		/* Free space used by object */
+	objmem[op] = (Objhdr) freeobj;		/* Append to free list */
 	optr->refcnt = 0;
 	optr->free = 1;
 	optr->ptrs = 0;
 	optr->indexable = 0;
 	optr->byte = 0;
-	freeobj = op / 2;
+	freeobj = op;
     }
 }
 
@@ -973,14 +989,14 @@ compact_region()
     highWater = curregion->limit;
     for (i = 0; i < otsize; i++) {
 	if (otable[i].free == 0) {
-	    ptr = otable[i].va;
+	    ptr = objmem[i];
 	    if (ptr > lowWater && ptr < highWater) {
 	       /*
 	        * Put object number into size field, and squirel away
 	        * size in objects address pointer.
 	        */
 	        /*fprintf(stderr, "%08x Object #%d %d\n", ptr, i * 2, ptr->size); */
-		otable[i].va = (Objhdr) ptr->size;
+		objmem[i] = (Objhdr) ptr->size;
 		ptr->size = i;
 	    }
 	}
@@ -997,13 +1013,13 @@ compact_region()
 	} else {
 	   /* Rebuild object */
 	    i = (int) (((Objhdr) src)->size);
-	    size = (int) otable[i].va;
+	    size = (int) objmem[i];
 
             /*fprintf(stderr, "%08x Moving Object #%d %d\n", src, i * 2, size); */
 
 	    if ((src + (wordsize(size)/sizeof(int))) > (int *)highWater)
 		error("Compact out of range");
-	    otable[i].va = (Objhdr) dst;	/* Where it will land */
+	    objmem[i] = (Objhdr) dst;	/* Where it will land */
 
 	   /* Build new header */
 	    ((Objhdr) dst)->size = size;
