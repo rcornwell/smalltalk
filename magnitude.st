@@ -1,9 +1,15 @@
 " Methods for Class magnitude and all it's subclasses"
 
-" $Id: magnitude.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: magnitude.st,v 1.2 2000/02/01 18:09:55 rich Exp rich $ "
 
 "
  $Log: magnitude.st,v $
+ Revision 1.2  2000/02/01 18:09:55  rich
+ Added asString method to class Character.
+ Fixed Character constants.
+ Remove range checks from SmallInteger asCharacter since same
+  checks are done in Character value:.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -56,6 +62,7 @@ max: aMagnitude
 	
 Magnitude subclass: 'Number' instanceVariableNames: ''
        classVariableNames: '' poolDictionaries: '' category: ''!
+
 Number comment: 
  'I am a abstract class. I represent numeric objects.' !
 
@@ -79,6 +86,7 @@ generality
 
 retry: aSymbol coercing: aNumber
 	| selfGen aNumGen |
+	'Retry' print.
 	selfGen <- self generality.
 	aNumGen <- aNumber generality.
 	selfGen > aNumGen
@@ -301,6 +309,7 @@ Character class superclass: (Magnitude class).
 Magnitude addSubclass: Character. !
 
 ! SmallInteger methodsFor: 'arithmetic' !
+
 + aNumber
     <primitive 1>
     ^ self retry: #+ coercing: aNumber
@@ -563,6 +572,7 @@ signedStringBase: radix showRadix: showRadix
 ! !
 
 ! Float methodsFor: 'arithmetic' !
+
 + aNumber
     <primitive 19>
     ^ self retry: #+ coercing: aNumber
@@ -774,7 +784,7 @@ storeOn: aStream
 printFloatOn: aStream
     | num str intDigits |
     num <- self.
-    num < 0.0 ifTrue:
+    num < (0.0 asFloat) ifTrue:
         [ aStream nextPut: $-.
           num <- num negated. ].
     intDigits <- num printIntegerPartOn: aStream.
@@ -1145,6 +1155,7 @@ I provide methods for instance creation (including via "symbolic" dates,
 such as "Date newDay: 14 month: #Feb year: 1990"' !
 
 Smalltalk at: #DayNameDict put: Dictionary new!
+
 Smalltalk at: #MonthNameDict put: Dictionary new!
 
 !Date class methodsFor: 'basic'!
@@ -1255,6 +1266,7 @@ newDay: day month: monthName year: yearInteger
         (day + (self daysUntilMonth: monthName year: yearInteger)
              + (self yearAsDays: yearInteger))
 ! !
+
 !Date class methodsFor: 'private methods'!
 
 yearAsDays: yearInteger
@@ -1330,6 +1342,7 @@ subtractDate: aDate
 hash
     ^days
 ! !
+
 !Date methodsFor: 'printing'!
 
 printOn: aStream
@@ -1393,3 +1406,6 @@ computeDateParts: aBlock
           tempDays <- tempDays - daysInMonth ].
     ^aBlock value: yearInteger value: monthIndex value: tempDays
 ! !
+
+Date initialize !
+
