@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Object memory system.
  *
  * $Log: object.c,v $
+ * Revision 1.2  2000/01/03 16:23:22  rich
+ * Moved object pointer out to a new structure to reduce access cost.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -11,7 +14,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: object.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: object.c,v 1.2 2000/01/03 16:23:22 rich Exp rich $";
 
 #endif
 
@@ -45,7 +48,7 @@ int                 otsize;			/* Size of object table */
 int		    noreclaim = TRUE;		/* Don't allow reclaimes */
     
 
-Objptr              rootObjects[19];
+Objptr              rootObjects[ROOTSIZE];
 static objhdr       nilhdr;
 
 #define wordsize(x)  (((x) + (sizeof(int) - 1)) & ~(sizeof(int) - 1))
@@ -63,7 +66,6 @@ static void         compact_region();
 static INLINE int   last_pointer_of(Objptr);
 static void         mark_all_other_objects(Objptr);
 static INLINE int   decr_ref_count(Objptr);
-static void         reclaimSpace();
 
 /* Creation. */
 
@@ -92,7 +94,7 @@ create_new_object(Objptr class, int size)
     i = (obj_flag / 16) * sizeof(Objptr);
 
    /* Don't create a non indexable object larger than it's fixed size */
-    if ((!indexable) && size > 0)
+    if ((!indexable) && size > 0) 
 	return NilPtr;
 
    /* Compute size of object */
@@ -106,7 +108,7 @@ create_new_object(Objptr class, int size)
     allocsize += i;
 
    /* Try to grab space for object */
-    if ((new_ptr = allocate_chunk(allocsize)) == NULL)
+    if ((new_ptr = allocate_chunk(allocsize)) == NULL) 
 	return NilPtr;
 
    /* Now get a new pointer */
@@ -118,7 +120,6 @@ create_new_object(Objptr class, int size)
    /* Initialize object */
     new_ptr->u.class = class;
     new_ptr->size = size + i;
-/*    fprintf(stderr, "%08x Alloc Object #%d %d\n", new_ptr, new_obj, size); */
     object_incr_ref(class);
     addr = (int *) (new_ptr + 1);
     for (allocsize /= sizeof(int); allocsize > 0; allocsize--)
@@ -144,13 +145,16 @@ create_object(Objptr op, int flags, Objptr class, int size)
    /* Try to grab space for object */
     if ((new_ptr = attempt_to_allocate(allocsize)) == NULL) {
 	new_region(allocsize);
-	if ((new_ptr = attempt_to_allocate(allocsize)) == NULL)
+	if ((new_ptr = attempt_to_allocate(allocsize)) == NULL) {
+	    dump_string("Out of space");
 	    return NULL;
+	}
     }
    /* Now get a new pointer */
     op /= 2;
     if ((otable[op].free) != 1) {
 	add_to_free(new_ptr);
+        dump_string("Object already exists");
 	return NULL;
     }
     objmem[op] = new_ptr;
@@ -164,7 +168,6 @@ create_object(Objptr op, int flags, Objptr class, int size)
     new_ptr->u.class = class;
     new_ptr->size = size;
     addr = (int *) (new_ptr + 1);
-/*    fprintf(stderr, "%08x Set Object #%d %d\n", new_ptr, op, size); */
     object_incr_ref(class);		/* Reference count Class */
     for (allocsize /= sizeof(int); allocsize > 0; allocsize--)
 	*addr++ = 0;
@@ -550,8 +553,6 @@ swapPointers(Objptr first, Objptr second)
 	return FALSE;
     fp = &otable[first / 2];
     sp = &otable[second / 2];
-/*    fprintf(stderr, "%08x Becomes1 Object #%d %d\n", fp->va, first, fp->va->size);
-    fprintf(stderr, "%08x Becomes2 Object #%d %d\n", sp->va, second, sp->va->size); */
     old_ptr = objmem[first / 2];
     indexable = fp->indexable;
     byte = fp->byte;
@@ -612,12 +613,12 @@ next_object(Objptr * op, int *flags, Objptr * class, int *size)
     Otentry             ptr;
     Objhdr              optr;
 
-    if (!is_object(*op))
+    if (!is_object(*op)) 
 	return NULL;
-    i = *op / 2;
+    i = (*op / 2) + 1;
     ptr = &otable[i];
-    for (i++, ptr++; i < otsize; i++, ptr++) {
-	if (ptr->free == 0) {
+    for (; i < otsize; i++, ptr++) {
+	if (!ptr->free) {
 	    *flags = (ptr->ptrs) ? CLASS_PTRS : 0;
 	    *flags |= (ptr->indexable) ? CLASS_INDEX : 0;
 	    *flags |= (ptr->byte) ? CLASS_BYTE : 0;
@@ -736,8 +737,6 @@ free_object_pointer(Objptr op)
 
 	op /= 2;
     	optr = &otable[op];			/* Convert to index */
-
-/*        fprintf(stderr, "%08x Freeing Object #%d %d\n", objmem[op], op, objmem[op]->size); */
 	add_to_free(objmem[op]);		/* Free space used by object */
 	objmem[op] = (Objhdr) freeobj;		/* Append to free list */
 	optr->refcnt = 0;
@@ -965,7 +964,7 @@ compact_region()
     if (curregion->freespace == 0)
 	return;
 
-    dump_string("Compacting");
+    dump_objstring("Compacting");
 
    /* 
     * Find lowest free area, also clear out freelist.
@@ -977,7 +976,6 @@ compact_region()
 	while (ptr != NULL) {
 	    if (ptr < lowWater)
 		lowWater = ptr;
-	    /*fprintf(stderr, "%08x Free %d\n", ptr, ptr->size); */
 	    next = ptr->u.next;
 	    ptr->u.class = -1;
 	    ptr = next;
@@ -995,7 +993,6 @@ compact_region()
 	        * Put object number into size field, and squirel away
 	        * size in objects address pointer.
 	        */
-	        /*fprintf(stderr, "%08x Object #%d %d\n", ptr, i * 2, ptr->size); */
 		objmem[i] = (Objhdr) ptr->size;
 		ptr->size = i;
 	    }
@@ -1008,14 +1005,12 @@ compact_region()
        /* Check if free or allocated object. */
 	if (((Objhdr) src)->u.class == -1) {
 	    /* Free area, skip it */
-	    /*fprintf(stderr, "%08x Skiping Free %d\n", src, src[0]); */
 	    src += (sizeof(objhdr) + ((Objhdr) src)->size) / sizeof(int);
 	} else {
 	   /* Rebuild object */
 	    i = (int) (((Objhdr) src)->size);
 	    size = (int) objmem[i];
 
-            /*fprintf(stderr, "%08x Moving Object #%d %d\n", src, i * 2, size); */
 
 	    if ((src + (wordsize(size)/sizeof(int))) > (int *)highWater)
 		error("Compact out of range");
@@ -1043,7 +1038,7 @@ compact_region()
     ((Objhdr) dst)->u.next = 0;
     i = freebin(((Objhdr) dst)->size);
     curregion->freeptrs[i] = (Objhdr) dst;
-   /* dump_string("Compacting done"); */
+    dump_objstring("Compacting done"); 
 }
 
 /*
@@ -1182,7 +1177,7 @@ free_all_other_objects(Objptr op)
 /*
  * Attempt to reclaim inaccessable objects.
  */
-static void
+void
 reclaimSpace()
 {
     int                 i, j;
@@ -1192,7 +1187,7 @@ reclaimSpace()
     if (noreclaim)
 	return;
 
-    dump_string("Reclaim");
+    dump_objstring("Reclaim"); 
    /* zero all object reference counts */
     for (i = 1; i < otsize; i++)
 	set_object_refcnt(i * 2, 0);
