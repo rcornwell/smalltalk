@@ -1,9 +1,12 @@
-" Methods for Class collection and all it's subclasses"
 
-" $Id: collection.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+
+" $Id: collection.st,v 1.2 2000/02/01 18:09:47 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.2  2000/02/01 18:09:47  rich
+ Fixed a few misc errors.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -1391,14 +1394,14 @@ species
 !Symbol methodsFor: 'printing'!
 
 printOn: aStream
-    aStream nextPutAll: self
+    aStream nextPutAll: (self asString)
 ! !
 
 !Symbol methodsFor: 'storing'!
 
 storeOn: aStream
     aStream nextPut: $#;
-        nextPutAll: self
+        nextPutAll: (self asString)
 ! !
 
 
@@ -1557,7 +1560,7 @@ add: newObject
 
 remove: anObject 
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ nil ].
+	index <- self findIndexOrNil: anObject ifFull: [ ^ nil ].
 	index notNil ifTrue: [ 
 		tally <- tally - 1 .
 		self rehashAfterIndex: index
@@ -1567,7 +1570,7 @@ remove: anObject
 
 remove: anObject ifAbsent: aBlock
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ nil ].
+	index <- self findIndexOrNil: anObject ifFull: [ ^ nil ].
 	index isNil ifTrue: [ ^ aBlock value ].
 	tally <- tally - 1 .
 	self rehashAfterIndex: index.
@@ -1671,7 +1674,6 @@ rehashAfterIndex: index
 	    whileTrue:
 		[ self basicAt: i put: nil.
 		  self basicAt: (self findObjectIndex: element) put: element ].
-	^ self
 !
 
 grow
@@ -1761,7 +1763,7 @@ values
     ^aBag
 ! !
 
-!Dictionary methodsFor: 'dictionary testing'!
+!Dictionary methodsFor: 'testing'!
 
 includesAssociation: anAssociation
     | assoc |
@@ -1787,7 +1789,7 @@ occurrencesOf: aValue
     ^count
 ! !
 
-!Dictionary methodsFor: 'dictionary removing'!
+!Dictionary methodsFor: 'removing'!
 
 removeAssociation: anAssociation
     self removeKey: anAssociation key ifAbsent: [].
@@ -1800,11 +1802,11 @@ removeKey: key
 
 removeKey: key ifAbsent: aBlock
     | index assoc |
-    index <- self findKeyIndexNoGrow: key ifAbsent: [ ^aBlock value ].
-    assoc <- self basicAt: index.
-    self basicAt: index put: nil.
+    index <- self findIndexOrNil: key ifFull: [ nil ].
+    index isNil ifTrue: [ ^aBlock value ].
+    assoc <- self basicAt: index. 
     tally <- tally - 1.
-    self rehashObjectsAfter: index.
+    self rehashAfterIndex: index.
     ^assoc value
 !
 
@@ -1816,7 +1818,7 @@ remove: anObject ifAbsent: aBlock
     self error: 'remove:ifAbsent: not allowed in Dictionary'
 ! !
 
-!Dictionary methodsFor: 'dictionary enumerating'!
+!Dictionary methodsFor: 'enumerating'!
 associationsDo: aBlock
     super do: [ :assoc | aBlock value: assoc ]
 !
@@ -1885,6 +1887,7 @@ printOn: aStream
                        nextPut: Character space ].
     aStream nextPut: $)
 ! !
+
 !Dictionary methodsFor: 'storing'!
 
 storeOn: aStream
@@ -1902,35 +1905,18 @@ storeOn: aStream
     aStream nextPut: $)
 ! !
 
-!Dictionary methodsFor: 'removing'!
-
-remove: anObject
-	self shouldNotImplement
-!
-
-remove: anObject ifAbsent: aBlock
-	self shouldNotImplement
-!
-
-removeAssociation: anAssociation
-	self removeKey: anAssociation key ifAbsent: [].
-	^ anAssociation
-!
-
-removeKey: aKey ifAbsent: aBlock
-	| index assoc |
-	index <- self findIndexOrNil: aKey ifAbsent: [ ^ aBlock value ].
-	assoc <- self basicAt: index.
-	tally <- tally - 1 .
-	self basicAt: index put: nil.
-	self rehashAfterIndex: index.
-	^ assoc value
-! !
-
 ! Dictionary methodsFor: 'private' !
 
+findObjectIndex: anObject
+	"Finds an object, if no space, grows Set."
+	^ self findIndexOrNil: anObject ifFull: [
+		 self grow.
+		 ^ self findIndexOrNil: anObject ifFull: [ ^ nil ]
+		].
+!
+
 findIndexOrNil: aKey ifFull: aBlock
-	" Try and find the object in the array, return index or nil"
+	" Try and find the object in the array, return index or nil "
 	| index wrap size assoc |
 	size <- self basicSize.
 	index <- 1 + (aKey hash \\ (size - 1)).
@@ -1947,29 +1933,24 @@ findIndexOrNil: aKey ifFull: aBlock
 	]
 !
 
-findObjectIndex: aKey
-	"Finds an object, if no space, grows Set."
-	^ self findIndexOrNil: aKey ifFull: [
-		 self grow.
-		 ^ self findIndexOrNil: aKey ifFull: [ ^ nil ]
-		].
-!
-
-rehashAfterIndex: index
+rehashAfterIndex: startIndex
 	"Adjust objects if after index"
-	| i size count element |
+	| index i size count element j |
+	index <- startIndex.
 	i <- index.
 	size <- self basicSize.
 	count <- size.
 	self basicAt: index put: nil.
-	[ count <- count - 1 .
-	  i <- 1 + (i \\ size).
-	  element <- self basicAt: i.
-	  count > 0 and: [ element notNil ] ]
-	    whileTrue:
-		[ self basicAt: i put: nil.
-		  self basicAt: (self findObjectIndex: element) put: element ].
-	^ self
+	[  count > 0 ] whileTrue:
+		[ i <- 1 + (i \\ size).
+		  element <- self basicAt: i.
+		element isNil ifTrue: [ ^self ].
+		((element key hash \\ size) + 1) = index 
+		    ifTrue: [ self basicAt: index put: element.
+		   	      self basicAt: i put: nil.
+			      index <- i ].
+		count <- count - 1.
+	]
 !
 
 grow
@@ -2036,7 +2017,7 @@ keyAtValue: value ifAbsent: exceptionBlock
     ^exceptionBlock value
 ! !
 
-!IdentityDictionary methodsFor: 'dictionary testing'!
+!IdentityDictionary methodsFor: 'testing'!
 
 includesAssociation: anAssociation
     | index |
@@ -2050,7 +2031,7 @@ includesKey: key
 ! !
 
 
-!IdentityDictionary methodsFor: 'dictionary removing'!
+!IdentityDictionary methodsFor: 'removing'!
 
 removeKey: key ifAbsent: aBlock
     | index value|
@@ -2062,7 +2043,7 @@ removeKey: key ifAbsent: aBlock
     self rehashObjectsAfter: index.
     ^ value
 ! !
-!IdentityDictionary methodsFor: 'dictionary enumerating'!
+!IdentityDictionary methodsFor: 'enumerating'!
 
 associationsDo: aBlock
     self indicesDo:
@@ -2116,13 +2097,14 @@ hash
 !IdentityDictionary methodsFor: 'printing'!
 
 printOn: aStream
-    aStream nextPutAll: self class name , ' (' ; nl.
+    aStream nextPutAll: self class name , ' ('.
+    aStream nl.
     self indicesDo:
         [ :i | aStream tab;
                    print: (self basicAt: i);
                    nextPutAll: '->';
-                   print: (values basicAt: i);
-                   nl ].
+                   print: (values basicAt: i).
+                   aStream nl ].
     aStream nextPut: $)
 ! !
 
@@ -2205,8 +2187,8 @@ findKeyIndex: aKey
     would go is returned."
     ^self findKeyIndex: aKey
           ifFull: [ self grow.
-                    self findKeyIndexNoGrow: aKey
-                         ifAbsent: [ ^self error: 'failed to grow a new empty el
+                    self findKeyIndex: aKey
+                         ifFull: [ ^self error: 'failed to grow a new empty el
 ement!!' ] ]
 !
 
