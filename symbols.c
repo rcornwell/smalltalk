@@ -2,6 +2,9 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: symbols.c,v $
+ * Revision 1.5  2001/07/31 14:09:49  rich
+ * Fixed to compile under new cygwin.
+ *
  * Revision 1.4  2001/01/06 21:28:12  rich
  * Fixed error in find selector
  *
@@ -20,7 +23,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: symbols.c,v 1.4 2001/01/06 21:28:12 rich Exp rich $";
+	"$Id: symbols.c,v 1.5 2001/07/31 14:09:49 rich Exp rich $";
 
 #endif
 
@@ -86,6 +89,7 @@ newname()
     add_builtin_symbol(nname, "true", True);
     add_builtin_symbol(nname, "false", False);
     add_builtin_symbol(nname, "nil", Nil);
+    add_builtin_symbol(nname, "thisContext", Context);
     return nname;
 }
 
