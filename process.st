@@ -1,9 +1,12 @@
 " Methods for Class process control and block context stuff"
 
-" $Id: process.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: process.st,v 1.2 2000/02/01 18:10:02 rich Exp rich $ "
 
 "
  $Log: process.st,v $
+ Revision 1.2  2000/02/01 18:10:02  rich
+ Made compileable.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -203,8 +206,10 @@ signal: aSemaphore atMilliseconds: millis
 !ProcessorScheduler class methodsFor: 'initialization'!
 
 initialize
+    | newsched |
     " Create correct process scheduler object"
-     (Smalltalk at: #Processor) become: (ProcessorScheduler basicNew). 
+    newsched <- ProcessorScheduler basicNew.
+    (Smalltalk at: #Processor) become: newsched.
 ! !
 
 "ProcessorScheduler initialize "!
@@ -299,6 +304,7 @@ wait
                               ].
     sem wait
 ! !
+
 !Delay methodsFor: 'comparing'!
 
 = aDelay
@@ -439,3 +445,4 @@ MethodContext comment:
 'My instances represent an actively executing method.  They record various
 bits of information about the execution environment, and contain the
 execution stack.' !
+
