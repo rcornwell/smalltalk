@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: File IO routines.
  *
- * $Id: fileio.h,v 1.3 2001/01/13 15:50:19 rich Exp rich $
+ * $Id: fileio.h,v 1.4 2001/07/31 14:09:48 rich Exp rich $
  *
  * $Log: fileio.h,v $
+ * Revision 1.4  2001/07/31 14:09:48  rich
+ * Removed unused element of file_buffer.
+ *
  * Revision 1.3  2001/01/13 15:50:19  rich
  * Added check_files routine
  *
@@ -23,25 +26,15 @@ int                 peek_for(Objptr, char);
 int                 open_buffer(Objptr op);
 void                close_buffer(Objptr op);
 int                 read_buffer(Objptr op, int *c);
+int                 read_str_buffer(Objptr op, int len, Objptr *res);
 int                 size_buffer(Objptr op);
 int                 write_buffer(Objptr op, int c);
+int                 write_str_buffer(Objptr op, char *str, int len);
 void		    close_files();
 void		    check_files();
-
-/* OS Wrapper functions */
-long                file_open(char *, char *, int *);
-long                file_seek(long, long);
-int                 file_write(long, char *, long);
-int                 file_read(long, char *, long);
-int                 file_close(long);
-long                file_size(long);
-char	           *fill_buffer(int, int);
-int		    flush_buffer(int, char *);
-
-/* Misc functions. */
-void                error(char *);
-void                errorStr(char *, char *);
-void		    dump_string(char *);
+int		    file_isdirect(Objptr);
+void		    init_console(Objptr);
+Objptr		    read_console(int, int);
 
 struct file_buffer {
     Objptr              file_oop;	/* File identifier */
@@ -54,9 +47,11 @@ struct file_buffer {
 };
 
 extern struct file_buffer *files;
+extern struct file_buffer console;
 
 #define BUFSIZE		8192
 #define FILE_READ	1
 #define FILE_WRITE	2
 #define FILE_DIRTY	4
 #define FILE_APPEND	8
+#define FILE_CHAR	16
