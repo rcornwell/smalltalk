@@ -1,7 +1,10 @@
-" $Id: collection.st,v 1.5 2001/07/31 14:09:47 rich Exp rich $ "
+" $Id: collection.st,v 1.6 2001/08/18 16:17:01 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.6  2001/08/18 16:17:01  rich
+ Placed classes and methods in correct categories.
+
  Revision 1.5  2001/07/31 14:09:47  rich
  Code cleanup
  Fixed bug in storeOn: methods.
@@ -24,6 +27,13 @@
 
 "
 
+Object subclass: 'Link'
+       instanceVariableNames: 'next'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Basic' !
+
+
 Link comment:
  'I represent simple linked lists.' !
 
@@ -38,6 +48,12 @@ nextLink
 nextLink: aLink
 	^next <- aLink
 ! !
+
+Object subclass: 'Association'
+       instanceVariableNames: 'key value'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Basic' !
 
 ! Association class methodsFor: 'creating' !
 
@@ -104,7 +120,7 @@ Object variableSubclass: 'Collection'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: 'Collection.st' !
+       category: 'Collections' !
 
 Collection comment: 
  'I am a abstract class. I represent collections of objects.' !
@@ -764,11 +780,11 @@ deepCopy
 
 ! !
 
-Array superclass: ArrayedCollection.
-Array class superclass: (ArrayedCollection class).
-ArrayedCollection addSubclass: Array!
-
-Array category: 'Collections' !
+ArrayedCollection variableSubclass: 'Array'
+       instanceVariableNames: ''
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
 
 Array comment: 
 'My instances are objects that have array-like properties: they are directly 
@@ -1291,12 +1307,11 @@ growTo: anInteger
     ^newCollection
 ! !
 
-" Fix up class hierchy now that we have superclasses defined"
-String superclass: ArrayedCollection.
-String class superclass: (ArrayedCollection class).
-ArrayedCollection addSubclass: String!
-
-String category: 'Collections' !
+ArrayedCollection variableByteSubclass: 'String'
+       instanceVariableNames: ''
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
 
 String comment: 
 'My instances represent string data types.  I provide accessing and
@@ -1529,6 +1544,12 @@ matchSubstring: p in: aString at: s
     ^false
 ! !
 
+Link subclass: 'Symbol'
+       instanceVariableNames: 'value'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
+
 Symbol comment: 
 'My instances are unique throughout the Smalltalk system.  My instances 
 behave for the most part like strings, except that they print differently,
@@ -1705,12 +1726,11 @@ errorNotKeyed
 ! !
 
 
-"Fix up class hierchy now that we have superclasses defined"
-Set superclass: Collection.
-Set class superclass: (Collection class).
-Collection addSubclass: Set!
-
-Set category: 'Collections' !
+Collection variableSubclass: 'Set'
+       instanceVariableNames: 'tally'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
 
 Set comment: 'I represent collections of objects without quantity'. !
 
@@ -1820,7 +1840,7 @@ do: aBlock
 	| element |
 	1 to: self basicSize do: [ :index |
 	   element <- self basicAt: index.
-	   element notNil ifTrue: [ aBlock value: element ]
+	   element notNil ifTrue: [ aBlock value: element ].
 	].
 ! !
 
@@ -1882,6 +1902,12 @@ grow
 growSize
 	^ 32
 ! !
+
+Set variableSubclass: 'Dictionary'
+       instanceVariableNames: ''
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
 
 ! Dictionary methodsFor: 'accessing' !
 
@@ -2166,6 +2192,12 @@ grow
 errorKeyNotFound: aKey
     self error: ('Key "', aKey asString , '" not found: ')
 ! !
+
+Dictionary variableSubclass: 'IdentityDictionary'
+       instanceVariableNames: 'values'
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Collections' !
 
 IdentityDictionary comment:
 'I am similar to dictionary, except that my representation is
