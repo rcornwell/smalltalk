@@ -1,9 +1,14 @@
 " Bootstrap methods to define classes"
 
-" $Id: basic.st,v 1.4 2001/01/17 02:00:53 rich Exp rich $ "
+" $Id: basic.st,v 1.5 2001/07/31 14:09:47 rich Exp rich $ "
         
 "
  $Log: basic.st,v $
+ Revision 1.5  2001/07/31 14:09:47  rich
+ Code cleanup
+ Make methods consitent with rest of system.
+ Moved File class to stream.st
+
  Revision 1.4  2001/01/17 02:00:53  rich
  Added flushCache
  Changed location of flags field in header.
@@ -605,6 +610,12 @@ isNil
 
 notNil
 	^false
+! !
+
+! Number methodsFor: 'arithmetic' !
+
+negated
+   ^ 0 - self
 ! !
 
 ! SmallInteger methodsFor: 'arithmetic' !
@@ -1211,7 +1222,7 @@ instFlags: variableBoolean
 	pointers: pointerBoolean
 	| temp |
 	flags isNil ifTrue: [ temp <- 0 ]
-		    ifFalse: [ temp <- flags bitAnd: ( 7 negated)].
+		    ifFalse: [ temp <- flags bitAnd: ( 7 negated ) ].
 	pointerBoolean
 	  ifTrue: [ temp <- temp bitOr: 1 ]
 	  ifFalse: [
@@ -1462,8 +1473,8 @@ name: newName
 	" Update subclass chain "
 	aClass superclass notNil ifTrue: [
 		aClass superclass ~= superClass ifTrue:
-		      [ aClass superclass removeSubclass: aClass
-			superClass addSubclass: aClass ].
+		      [ aClass superclass removeSubclass: aClass ].
+		superClass addSubclass: aClass.
 	].
 	aClass superclass: superClass.
 	superClass notNil
@@ -1515,4 +1526,5 @@ newMeta: newName
 
 " Put a place holder in for later. "
 Smalltalk at: #sourceFiles put: nil !
+
 
