@@ -2,13 +2,16 @@
 /*
  * Smalltalk interpreter: Lexiconal Scanner.
  *
- * $Log: $
+ * $Log: lex.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: lex.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -33,6 +36,8 @@ static char        *rcsid =
 #include "smallobjs.h"
 #include "primitive.h"
 #include "lex.h"
+#include "fileio.h"
+#include "dump.h"
 
 #define ALLOCSIZE	16
 
@@ -71,7 +76,7 @@ new_tokscanner(char *str)
 	return NULL;
     }
     tstate->buffer = tstate->str = str;
-    tstate->pushptr = 0;
+    tstate->pushback = -1;
     tstate->spec[0] = '\0';
     tstate->string = NULL;
     tstate->object = NilPtr;
@@ -86,7 +91,6 @@ done_scan(Token tstate)
 {
     if (tstate->string != NULL)
 	free(tstate->string);
-    free(tstate->buffer);
     free(tstate);
 }
 
@@ -97,8 +101,11 @@ done_scan(Token tstate)
 static char
 nextchar(Token tstate)
 {
-    if (tstate->pushptr != 0)
-	return tstate->push[--tstate->pushptr];
+    if (tstate->pushback != -1) {
+	char c = tstate->pushback;
+	tstate->pushback = -1;
+	return c;
+    }
 
     if (*tstate->str == '\0')
 	return '\0';
@@ -112,7 +119,9 @@ nextchar(Token tstate)
 static void
 pushback(Token tstate, char c)
 {
-    tstate->push[tstate->pushptr++] = c;
+    if (tstate->pushback != -1)
+	parseError(tstate, "Push back exceeded", NULL);
+    tstate->pushback = c;
 }
 
 /*
@@ -121,8 +130,8 @@ pushback(Token tstate, char c)
 static char
 peekchar(Token tstate)
 {
-    if (tstate->pushptr != 0)
-	return tstate->push[tstate->pushptr - 1];
+    if (tstate->pushback != -1)
+    	return tstate->pushback;
     return *tstate->str;
 }
 
@@ -135,7 +144,9 @@ parseError(Token tstate, char *msg, char *value)
     char	       *ptr, *solptr, *wptr, *optr;
     char		buffer[1024];
 
-    ptr = tstate->str - tstate->pushptr;
+    ptr = tstate->str;
+    if (tstate->pushback != 0)
+	ptr--;
     optr = buffer;
     /* Dump method up till error */
     for(solptr = wptr = tstate->buffer; wptr != ptr && *wptr != '\0'; wptr++) {
@@ -286,6 +297,60 @@ scanarray(Token tstate)
 	case '9':
 	    scannumber(tstate, c);
 	    break;
+
+	case 'a':
+	case 'b':
+	case 'c':
+	case 'd':
+	case 'e':
+	case 'f':
+	case 'g':
+	case 'h':
+	case 'i':
+	case 'j':
+	case 'k':
+	case 'l':
+	case 'm':
+	case 'n':
+	case 'o':
+	case 'p':
+	case 'q':
+	case 'r':
+	case 's':
+	case 't':
+	case 'u':
+	case 'v':
+	case 'w':
+	case 'x':
+	case 'y':
+	case 'z':
+	case 'A':
+	case 'B':
+	case 'C':
+	case 'D':
+	case 'E':
+	case 'F':
+	case 'G':
+	case 'H':
+	case 'I':
+	case 'J':
+	case 'K':
+	case 'L':
+	case 'M':
+	case 'N':
+	case 'O':
+	case 'P':
+	case 'Q':
+	case 'R':
+	case 'S':
+	case 'T':
+	case 'U':
+	case 'V':
+	case 'W':
+	case 'X':
+	case 'Y':
+	case 'Z':
+	    pushback(tstate, c);
 	case '#':
 	    scanliteral(tstate);
 	    break;
@@ -331,6 +396,8 @@ scannumber(Token tstate, char c)
 {
     int                 base = 10;
     int                 baseseen = FALSE;
+    int			eseen = FALSE;
+    int			fseen = FALSE;
     int                 value;
     int                 integer = 0;
     double              fraction = 0.0;
@@ -367,13 +434,14 @@ scannumber(Token tstate, char c)
 
    /* Check if fractional value */
     if (c == '.') {
-	double              multi = 0.1;
+	double              multi = 1.0 / ((double) base);
 
 	c = peekchar(tstate);
 	if (!isNumber(c) && (c < 'A' || c > 'Z')) {
 	    c = '.';
 	} else {
 	    c = nextchar(tstate);
+	    fseen = TRUE;
 	    while (isNumber(c) || (c >= 'A' && c <= 'Z')) {
 	        if (isNumber(c))
 		    value = c - '0';
@@ -382,7 +450,7 @@ scannumber(Token tstate, char c)
 	        if (value > base)
 		    break;
 	        fraction += value * multi;
-	        multi /= 10.0;
+	        multi /= (double) base;
 	        c = nextchar(tstate);
 	    }
 	}
@@ -404,22 +472,24 @@ scannumber(Token tstate, char c)
 	    c = nextchar(tstate);
 	}
 
+	eseen = TRUE;
 	exp *= esign;
-    }
+    } 
 
    /* We read one char to many, put it back */
     pushback(tstate, c);
 
    /* Got a number now convert it to a object */
-    if (fraction != 0.0 || exp != 0) {
+    if (fseen || eseen) {
 	double             *fval;
 
        /* Floating point value */
 	tstate->object = create_new_object(FloatClass, sizeof(double));
 
 	fval = (double *) get_object_base(tstate->object);
-	*fval = ((double) (sign * integer)) + fraction;
-	*fval = pow(*fval, (double) exp);
+	*fval = ((double) sign) * (((double)integer) + fraction);
+	if (eseen)
+	    *fval = pow(*fval, (double) exp);
     } else {
 	integer *= sign;
 	tstate->object = as_integer_object(integer);
@@ -501,7 +571,9 @@ scanstring(Token tstate)
 	}
 	*ptr++ = c;
 	left--;
-    } while (1);
+    } while (c != '\0');
+    if (c == '\0')
+	return FALSE;
     *ptr++ = '\0';
     tstate->object = MakeString(buf);
     free(buf);
@@ -516,10 +588,11 @@ scanliteral(Token tstate)
 {
     char                c;
 
-    c = nextchar(tstate);
+    c = peekchar(tstate);
 
     if (c == '(') {
        /* Scan an array */
+	(void)nextchar(tstate);
 	scanarray(tstate);
     } else if (isLetter(c)) {
 	char               *buf, *ptr;
@@ -548,11 +621,11 @@ scanliteral(Token tstate)
 	tstate->object = internString(buf);
 	free(buf);
     } else if (c == '-') {
-	tstate->spec[0] = c;
+	tstate->spec[0] = nextchar(tstate);
 	tstate->spec[1] = '\0';
 	tstate->object = internString(tstate->spec);
     } else if (isSpecial(c)) {
-	tstate->spec[0] = c;
+	tstate->spec[0] = nextchar(tstate);
 	if (isSpecial(peekchar(tstate))) {
 	    tstate->spec[1] = nextchar(tstate);
 	    tstate->spec[2] = '\0';
@@ -686,8 +759,10 @@ get_token(Token tstate)
 	    }
 	    break;
 	case '\'':
-	    scanstring(tstate);
-	    tok = KeyLiteral;
+	    if (scanstring(tstate))
+	        tok = KeyLiteral;
+	    else
+	        tok = KeyUnknown;
 	    break;
 
 	case 'a':
@@ -743,13 +818,13 @@ get_token(Token tstate)
 	case 'Y':
 	case 'Z':
 	    pushback(tstate, c);
+ 	    tok = KeyName;
 	    if (scanname(tstate)) {
 		if (peekchar(tstate) == ':') {
 		    (void) nextchar(tstate);
 		    strcat(tstate->string, ":");
 		    tok = KeyKeyword;
-		} else
-		    tok = KeyName;
+		}
 	    }
 	    break;
 	default:
@@ -765,5 +840,5 @@ get_token(Token tstate)
 	}
     }
     tstate->tok = KeyEOS;
-    return tok;
+    return KeyEOS;
 }
