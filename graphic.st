@@ -1,10 +1,13 @@
 
 " Methods for Class graphics subclasses"
 
-" $Id: graphic.st,v 1.2 2001/08/29 20:16:34 rich Exp rich $ "
+" $Id: graphic.st,v 1.3 2001/09/17 20:19:55 rich Exp rich $ "
 
 "
  $Log: graphic.st,v $
+ Revision 1.3  2001/09/17 20:19:55  rich
+ Added methods to read values from BitBlt objects.
+
  Revision 1.2  2001/08/29 20:16:34  rich
  Misc bug fixes.
  Added OpaqueForm, Cursor, Pen and Commander class.
@@ -820,7 +823,7 @@ clipHeight
 !
 
 clipExtent
-    ^ clipwidth @ clipHeight
+    ^ clipWidth @ clipHeight
 !
 
 sourceX
@@ -1560,10 +1563,6 @@ keyboardPressed
     ^keyboardQueue isEmpty not
 !
 
-keyboardPeek
-    ^keyboardQueue peek
-!
-
 flushKeyboard
     self initKeyboardQueue
 ! !
@@ -1596,11 +1595,9 @@ waitKey
 !
 
 waitEvent
-    [ (self keyboardPressed or: [ self anyButtonPressed] ) ] whileFalse: [
-        waitSemaphore <- Semaphore new.
-        waitEvent <- 7.
-        waitSemaphore wait
-    ]
+    waitSemaphore <- Semaphore new.
+    waitEvent <- 7.
+    waitSemaphore wait
 !
 
 waitMouse
@@ -1797,7 +1794,7 @@ maskAt: aPoint put: bitCode
 
 OpaqueForm subclass: 'Cursor'
   instanceVariableNames: ''
-  classVariableNames: 'Normal Execute Up Down Origin Corner Read Write Crosshair Move Marker Wait'
+  classVariableNames: 'Normal Execute Up Down Origin Corner Read Write Crosshair Move Marker Wait Menu'
   poolDictionaries: ''
   category: 'Graphics-Kernel'
 !
@@ -2033,6 +2030,25 @@ initialize
 				 2r0000000000000000 2r0000000000000000
 				 2r0000000000000000 2r0000000000000000)
 		      offset: 8@8.
+
+    Menu <- Cursor extent: 16@16
+                   fromArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000001000
+				 2r0000000000001100 2r1111111111111110
+				 2r0000000000001111 2r1111111111111110
+				 2r0000000000001100 2r0000000000001000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		   maskArray: #( 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000001000
+				 2r0000000000001100 2r1111111111111110
+				 2r0000000000001111 2r1111111111111110
+				 2r0000000000001100 2r0000000000001000
+				 2r0000000000000000 2r0000000000000000
+				 2r0000000000000000 2r0000000000000000)
+		      offset: 8@8.
 ! !
 
 ! Cursor class methodsFor: 'shapes' !
@@ -2083,6 +2099,10 @@ marker
 
 wait
     ^ Wait
+!
+
+menu
+    ^ Menu
 ! !
 
 ! Cursor methodsFor: 'displaying' !
