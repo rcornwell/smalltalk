@@ -1,9 +1,13 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: object.st,v 1.2 2000/02/01 18:09:58 rich Exp rich $ "
+" $Id: object.st,v 1.3 2000/08/27 17:08:55 rich Exp rich $ "
 
 "
  $Log: object.st,v $
+ Revision 1.3  2000/08/27 17:08:55  rich
+ Fixed some typos.
+ Added last of code to link in compiler.
+
  Revision 1.2  2000/02/01 18:09:58  rich
  Changed print to use CharStream class.
  Fixed bugs.
@@ -15,6 +19,7 @@
 "
 
 !
+
 ! Object methodsFor: 'Printing' !
 
 printString
@@ -78,7 +83,7 @@ storeOn: aStream
 	semi ifTrue: [ aStream nextPutAll: ' self' ].
 	aStream nextPut: $)
 		   
-! ! 
+! !
 
 ! Undefined methodsFor: 'Printing' !
 
@@ -100,7 +105,8 @@ storeString
 storeOn: aStream
 	"Store the object onto the stream."
 	aStream put: 'nil'.
-! ! 
+! !
+
 
 !Object methodsFor: 'Shortcut' !
 
@@ -145,6 +151,7 @@ stackTrace
 ! !
 
 !Stream methodsFor: 'file I/O' !
+
 fileIn
 	| aString sawExclaim |
 	[ self atEnd] whileFalse: [
@@ -156,26 +163,57 @@ fileIn
 !
 
 executeLoop
-	| aString |
-	stderr nextPutAll: 'Smalltalk Loaded'.
+	| aString chunk char |
+	stderr nextPutAll: 'Smalltalk Started'.
 	stderr nl.
-	[ stdin atEnd] whileFalse: [
-	    stderr nextPutAll: 'Ready'.
-	    stderr nl.
-	    aString <- self nextChunk.
-	    Compiler evaluate: aString.
+	chunk <- WriteStream on: (String new: 0).
+	[ self atEnd] whileFalse: [
+	    char <- self next.
+	    char == $!!
+	       ifTrue: [
+		    char <- self next.
+		    (Character nl == char) or: [ (Character cr == char) ]
+		        ifTrue: [
+			    aString <- chunk contents.
+	    		    Compiler evaluate: aString.
+	    		    chunk <- WriteStream on: (String new: 0). 
+	    		    stderr nextPutAll: 'Ready'.
+			    stderr nl. ]
+		        ifFalse: [
+			    chunk nextPut: $!!.
+			    chunk nextPut: char.
+		     ]]
+	       ifFalse: [
+		    (Character nl == char) or: [ (Character cr == char) ]
+		        ifFalse: [ chunk nextPut: char ]
+			ifTrue: [ chunk nextPut: (Character space) ]
+	      ]
 	]
 ! !
 
 !Class methodsFor: 'compiler' !
+
 methodsFor: aCategory
       ^ ClassCategoryReader for: self category: aCategory
-! !  
+! !
 
-stderr nextPutAll: 'Saving image'.
-stderr nl.
-(System snapShot: 'smalltalk.sti') .
- stdin executeLoop 
+(Smalltalk at: #loading ifAbsent: [nil]) isNil
+  ifTrue: [
+	" First time through, define and reload self with native compiler."
+	stderr nextPutAll: 'Base Loaded'.
+	stderr nl.
+	Smalltalk at: #loading put: true.
+	"FileStream fileIn: 'object.st'. "
+	stderr nextPutAll: 'Saving image'.
+	stderr nl.
+	Smalltalk removeKey: #loading ifAbsent: [nil].
+	(System snapShot: 'smalltalk.sti')
+		 ifTrue: [ System quit ]
+		" When we come back after reload, run execute loop. "
+		 ifFalse: [ stdin executeLoop ]
+].
+System quit.
+
+!
 !
 
-!
