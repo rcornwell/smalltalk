@@ -2,14 +2,20 @@
 /*
  * Smalltalk interpreter: Interface to system
  *
- * $Id: $
+ * $Id: system.h,v 1.1 2001/08/18 16:22:13 rich Exp rich $
  *
- * $Log: $
+ * $Log: system.h,v $
+ * Revision 1.1  2001/08/18 16:22:13  rich
+ * Initial revision
+ *
  *
  */
 
 /* Initialize the system */
 int		    initSystem();
+
+/* End graphics system */
+void		    endSystem();
 
 /* Wait for a external event. */
 int		    WaitEvent(int);
