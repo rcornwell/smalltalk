@@ -1,9 +1,12 @@
 
 
-" $Id: collection.st,v 1.3 2000/08/26 20:23:50 rich Exp rich $ "
+" $Id: collection.st,v 1.4 2001/02/04 02:43:10 rich Exp rich $ "
 
 "
  $Log: collection.st,v $
+ Revision 1.4  2001/02/04 02:43:10  rich
+ Code Cleanup
+
  Revision 1.3  2000/08/26 20:23:50  rich
  Fixed some typos.
  Work around cascade problem.
@@ -16,13 +19,83 @@
 
 "
 
+Link comment:
+ 'I represent simple linked lists.' !
+
+! Link methodsFor: 'basic' !
+
+nextLink
+	^next
+!
+
+nextLink: aLink
+	^next <- aLink
+! !
+
+! Association class methodsFor: 'Creating' !
+
+key: aKey value: aValue
+	^ self new key: aKey value: aValue
+! !
+
+! Association methodsFor: 'Accessing' !
+
+key
+	^ key
+!
+
+value
+	^ value
+!
+
+key: aKey
+	^ key <- aKey
+!
+
+value: aValue
+	^ value <- aValue
+!
+
+key: aKey value: aValue
+	key <- aKey.
+	value <- aValue
+! !
+
+! Association methodsFor: 'Testing' !
+
+= anAssociation
+	^ key = anAssociation key and: [ value = anAssociation value ]
+!
+
+hash
+	^ key hash + (value hash)
+! !
+
+! Association methodsFor: 'printing' !
+
+printOn: aStream
+    key printOn: aStream.
+    aStream nextPutAll: '->'.
+    value printOn: aStream
+! !
+
+! Association methodsFor: 'storing' !
+
+storeOn: aStream
+    aStream nextPutAll: '(Association key: '.
+    self key storeOn: aStream.
+    aStream nextPutAll: ' value: '.
+    self value storeOn: aStream.
+    aStream nextPut: $)
+! !
+
 Object variableSubclass: 'Collection' instanceVariableNames: ''
        classVariableNames: '' poolDictionaries: '' category: ''!
 
 Collection comment: 
  'I am a abstract class. I represent collections of objects.'!
 
-!Collection class methodsFor: 'instance creation'!
+! Collection class methodsFor: 'instance creation'!
 
 with: anObject
     | newCollection |
@@ -58,7 +131,7 @@ with: firstObject with: secondObject with: thirdObject with: fourthObject
     ^ newCollection
 ! !
 
-!Collection methodsFor: 'adding'!
+! Collection methodsFor: 'adding'!
 
 add: newObject
     self subclassResponsibility
@@ -70,7 +143,7 @@ addAll: aCollection
 ! !
 
 
-!Collection methodsFor: 'removing'!
+! Collection methodsFor: 'removing'!
 
 remove: oldObject ifAbsent: anExceptionBlock
     self subclassResponsibility
@@ -87,7 +160,7 @@ removeAll: aCollection
     ^aCollection
 ! !
 
-!Collection methodsFor: 'testing'!
+! Collection methodsFor: 'testing'!
 
 isEmpty
     ^self size == 0
@@ -105,7 +178,7 @@ occurrencesOf: anObject
     ^tally
 ! !
 
-!Collection methodsFor: 'private'!
+! Collection methodsFor: 'private'!
 
 errorNotFound
     self error: 'Object is not in the collection'
@@ -115,7 +188,7 @@ maxPrint
     ^5000
 ! !
 
-!Collection methodsFor: 'accessing'!
+! Collection methodsFor: 'accessing'!
 
 size
     | tally |
@@ -125,7 +198,7 @@ size
 ! !
 
 
-!Collection methodsFor: 'enumerating'!
+! Collection methodsFor: 'enumerating'!
 
 do: aBlock
     self subclassResponsibility
@@ -173,7 +246,7 @@ SequenceableCollection comment:
 some access and manipulation methods.' !
 
 
-!SequenceableCollection methodsFor: 'basic'!
+! SequenceableCollection methodsFor: 'basic'!
 
 atAll: aCollection put: anObject
     aCollection do: [ :index | self at: index put: anObject ]
@@ -209,7 +282,7 @@ indexOf: anElement
     (size <- self size) == aCollection size ifFalse: [ ^false ].
     1 to: size do:
         [ :i | (self at: i) = (aCollection at: i)
-                   ifFalse: [ ^false ] ].
+                   ifFalse: [ ^false ]. ].
     ^true
 !
 
@@ -222,7 +295,7 @@ hash
     ^hashValue
 ! !
 
-!SequenceableCollection methodsFor: 'private'!
+! SequenceableCollection methodsFor: 'private'!
 
 matchSubCollection: aSubCollection startingAt: anIndex
     2 to: aSubCollection size do:
@@ -273,7 +346,7 @@ replacement collection' ].
     self replaceFrom: start to: stop with: replacementCollection startingAt: 1
 ! !
 
-!SequenceableCollection methodsFor: 'copying'!
+! SequenceableCollection methodsFor: 'copying'!
 
 , aSequenceableCollection
     | newCollection |
@@ -368,7 +441,7 @@ copyWithout: oldElement
     ^newCollection
 ! !
 
-!SequenceableCollection methodsFor: 'enumerating'!
+! SequenceableCollection methodsFor: 'enumerating'!
 
 do: aBlock
     "Evaluate aBlock for all elements in the sequenceable collection"
@@ -406,7 +479,7 @@ with: aSequenceableCollection do: aBlock
                       value: (aSequenceableCollection at: i) ]
 ! !
 
-!SequenceableCollection methodsFor: 'private'!
+! SequenceableCollection methodsFor: 'private'!
 
 countSubCollectionOccurrencesOf: aSubCollection
     | colIndex subColIndex count |
@@ -527,7 +600,7 @@ remove: newObject
     self error: 'elements canot be removed from an Interval'
 ! !
 
-!Interval methodsFor: 'testing'!
+! Interval methodsFor: 'testing'!
 
 = anInterval
     ^(start = anInterval start) &
@@ -540,7 +613,7 @@ hash
 ! !
 
 
-!Interval methodsFor: 'printing'!
+! Interval methodsFor: 'printing'!
 
 printOn: aStream
     aStream nextPutAll: self classNameString.
@@ -552,7 +625,7 @@ printOn: aStream
     step printOn: aStream
 ! !
 
-!Interval methodsFor: 'storing'!
+! Interval methodsFor: 'storing'!
 
 storeOn: aStream
     aStream nextPut: $(.
@@ -566,7 +639,7 @@ storeOn: aStream
     aStream nextPut: $)
 ! !
 
-!Interval methodsFor: 'private methods'!
+! Interval methodsFor: 'private methods'!
 
 initializeFrom: startInteger to: stopInteger by: stepInteger
     start <- startInteger.
@@ -595,7 +668,7 @@ ArrayedCollection comment:
 by an integer index.  The ordering of my instance''s elements is determined 
 externally; I will not rearrange the order of the elements.' !
 
-!ArrayedCollection class methodsFor: 'instance creation'!
+! ArrayedCollection class methodsFor: 'instance creation'!
 
 with: element1
     | anArrayedCollection |
@@ -631,7 +704,7 @@ with: element1 with: element2 with: element3 with: element4
     ^anArrayedCollection
 ! !
 
-!ArrayedCollection methodsFor: 'basic'!
+! ArrayedCollection methodsFor: 'basic'!
 
 size
     <primitive 47>
@@ -653,7 +726,7 @@ indexable by integers starting at 1, and they are fixed in size.  I inherit
 object creation behavior messages such as #with:, as well as iteration
 and general access behavior from SequenceableCollection.' !
 
-!Array methodsFor: 'printing'!
+! Array methodsFor: 'printing'!
 
 printOn: aStream
     aStream nextPut: $(.
@@ -664,22 +737,22 @@ printOn: aStream
 ! !
 
 
-!Array methodsFor: 'storing'!
+! Array methodsFor: 'storing'!
 
 storeOn: aStream
     | index |
-    aStream nextPutAll: '((';
-        nextPutAll: self classNameString;
-        nextPutAll: ' basicNew: ';
-        print: self basicSize;
-        nextPut: $).
+    aStream nextPutAll: '(('.
+    aStream nextPutAll: self classNameString.
+    aStream nextPutAll: ' basicNew: '.
+    aStream print: self basicSize.
+    aStream nextPut: $).
     index <- 1.
     self do:
-        [ :element | aStream nextPutAll: ' at: ';
-                         print: index;
-                         nextPutAll: ' put: ';
-                         store: element; 
-                         nextPut: $;.
+        [ :element | aStream nextPutAll: ' at: '.
+                     aStream print: index.
+                     aStream nextPutAll: ' put: '.
+                     aStream store: element. 
+                     aStream nextPut: $;.
                      index <- index + 1 ].
     index > 1 ifTrue: [ aStream nextPutAll: ' yourself' ].
     aStream nextPut: $)
@@ -693,7 +766,7 @@ ByteArray comment:
 a sequence of bytes, but my individual elements are integers, where as
 a String''s elements are characters.' !
 
-!ByteArray methodsFor: 'copying'!
+! ByteArray methodsFor: 'copying'!
 
 shallowCopy
     | newArray |
@@ -708,7 +781,7 @@ deepCopy
 ! !
 
 
-!ByteArray methodsFor: 'converting'!
+! ByteArray methodsFor: 'converting'!
 
 asString
     | string size |
@@ -718,7 +791,36 @@ asString
     ^string
 ! !
 
-!ByteArray methodsFor: 'private'!
+! ByteArray methodsFor: 'private'!
+
+growSize
+    ^40
+! !
+
+ArrayedCollection variableWordSubclass: 'WordArray'
+		  instanceVariableNames: ''
+                  classVariableNames: ''
+		  poolDictionaries: ''
+		  category: nil!
+
+WordArray comment: 
+'My instances are arrays of words.' !
+
+! WordArray methodsFor: 'copying'!
+
+shallowCopy
+    | newArray |
+    newArray <- self species new: self size.
+    newArray replaceFrom: 1 to: self size with: self.
+    ^newArray
+!
+
+deepCopy
+    ^self shallowCopy
+
+! !
+
+! WordArray methodsFor: 'private'!
 
 growSize
     ^40
@@ -732,7 +834,7 @@ SequenceableCollection subclass: 'LinkedList'
 
 LinkedList comment: 'I provide methods that access and manipulate linked lists.' !
 
-!LinkedList methodsFor: 'accessing'!
+! LinkedList methodsFor: 'accessing'!
 
 at: index
     "Return the element that is index into the linked list."
@@ -750,7 +852,7 @@ at: index put: object
     self error: 'Do not store into a LinkedList using at:put:'
 ! !
 
-!LinkedList methodsFor: 'adding'!
+! LinkedList methodsFor: 'adding'!
 
 add: aLink
     "Add aLink at the end of the list; return aLink."
@@ -807,7 +909,7 @@ remove: aLink ifAbsent: aBlock
     ^aLink
 ! !
 
-!LinkedList methodsFor: 'enumerating'!
+! LinkedList methodsFor: 'enumerating'!
 
 do: aBlock
     | aLink |
@@ -817,7 +919,7 @@ do: aBlock
           aLink <- aLink nextLink]
 ! !
 
-!LinkedList methodsFor: 'testing'!
+! LinkedList methodsFor: 'testing'!
 
 isEmpty
     "Returns true if the list contains no members"
@@ -838,7 +940,7 @@ are not directly accessible by an index.  They can be accessed indirectly
 through an index, and can be manipulated by adding to the end or based
 on content (such as add:after:)' !
 
-!OrderedCollection class methodsFor: 'instance creation'!
+! OrderedCollection class methodsFor: 'instance creation'!
 
 new: anInteger
     ^(super new: anInteger) initIndices
@@ -849,7 +951,7 @@ new
 
 ! !
 
-!OrderedCollection methodsFor: 'accessing'!
+! OrderedCollection methodsFor: 'accessing'!
 
 at: index
     | location |
@@ -904,7 +1006,7 @@ size
 ! !
 
 
-!OrderedCollection methodsFor: 'adding'!
+! OrderedCollection methodsFor: 'adding'!
 
 add: anObject
     ^self addLast: anObject
@@ -954,7 +1056,7 @@ addLast: newObject
     ^self basicAt: lastIndex put: newObject
 ! !
 
-!OrderedCollection methodsFor: 'removing'!
+! OrderedCollection methodsFor: 'removing'!
 
 removeFirst
     lastIndex < firstIndex
@@ -972,7 +1074,7 @@ removeLast
     ^self basicAt: lastIndex + 1
 ! !
 
-!OrderedCollection methodsFor: 'private methods'!
+! OrderedCollection methodsFor: 'private methods'!
 
 initIndices
     firstIndex <- self basicSize // 2 max: 1.
@@ -1058,7 +1160,7 @@ is a predicate which returns true if the first argument should be sorted
 earlier than the second.  The default block is [ :a :b | a <= b ], but I
 will accept any block that conforms to the above criteria.' !
 
-!SortedCollection class methodsFor: 'instance creation'!
+! SortedCollection class methodsFor: 'instance creation'!
 
 new
     ^self sortBlock: [ :a :b | a <= b ]
@@ -1069,7 +1171,7 @@ sortBlock: aSortBlock
 
 ! !
 
-!SortedCollection methodsFor: 'basic'!
+! SortedCollection methodsFor: 'basic'!
 
 addFirst: anObject
     self shouldNotImplement
@@ -1104,7 +1206,7 @@ add: anObject
     ^anObject
 ! !
 
-!SortedCollection methodsFor: 'instance protocol'!
+! SortedCollection methodsFor: 'instance protocol'!
 
 sortBlock
     ^sortBlock
@@ -1119,14 +1221,14 @@ sortBlock: aSortBlock
     ^self become: newSortedCollection
 ! !
 
-!SortedCollection methodsFor: 'copying'!
+! SortedCollection methodsFor: 'copying'!
 
 copyEmpty
     ^(super copyEmpty) setSortBlock: sortBlock
 ! !
 
 
-!SortedCollection methodsFor: 'private methods'!
+! SortedCollection methodsFor: 'private methods'!
 
 setSortBlock: aSortBlock
     sortBlock <- aSortBlock
@@ -1155,7 +1257,7 @@ asSymbol
 	<primitive 91>
 ! !
 
-!String methodsFor: 'basic'!
+! String methodsFor: 'basic'!
 
 size
     <primitive 47>
@@ -1199,7 +1301,7 @@ readFrom: aStream
     ^str contents
 ! !
 
-!String methodsFor: 'comparing'!
+! String methodsFor: 'comparing'!
 
 < aString
     "Return true if the receiver is less than aString, ignoring case
@@ -1262,7 +1364,7 @@ match: aString
 ! !
 
 
-!String methodsFor: 'converting'!
+! String methodsFor: 'converting'!
 
 asUppercase
     "Returns a copy of self as an uppercase string"
@@ -1304,7 +1406,7 @@ asInteger
     ^result
 ! !
 
-!String methodsFor: 'copying'!
+! String methodsFor: 'copying'!
 
 shallowCopy
     | newStr |
@@ -1335,13 +1437,13 @@ deepCopy
 ! !
 
 
-!String methodsFor: 'printing'!
+! String methodsFor: 'printing'!
 
 printOn: aStream
     self storeOn: aStream
 ! !
 
-!String methodsFor: 'storing'!
+! String methodsFor: 'storing'!
 
 storeOn: aStream
     aStream nextPut: $'.
@@ -1351,7 +1453,7 @@ storeOn: aStream
     aStream nextPut: $'
 ! !
 
-!String methodsFor: 'private'!
+! String methodsFor: 'private'!
 
 matchSubstring: p in: aString at: s
     | pc |
@@ -1380,7 +1482,7 @@ behave for the most part like strings, except that they print differently,
 and I guarantee that any two instances that have the same printed 
 representation are in fact the same instance.' !
 
-!Symbol class methodsFor: 'instance creation'!
+! Symbol class methodsFor: 'instance creation'!
 
 internCharacter: aCharacter
     | s |
@@ -1389,32 +1491,38 @@ internCharacter: aCharacter
     ^s asSymbol.
 ! !
 
-!Symbol methodsFor: 'converting'!
+! Symbol methodsFor: 'accessing' !
+
+asString
+    ^value
+! !
+
+! Symbol methodsFor: 'converting'!
 
 asSymbol
     ^self
 ! !
 
-!Symbol methodsFor: 'misc'!
+! Symbol methodsFor: 'misc'!
 
 species
     ^String
 ! !
 
-!Symbol methodsFor: 'printing'!
+! Symbol methodsFor: 'printing'!
 
 printOn: aStream
     aStream nextPutAll: (self asString)
 ! !
 
-!Symbol methodsFor: 'storing'!
+! Symbol methodsFor: 'storing'!
 
 storeOn: aStream
-    aStream nextPut: $#;
-        nextPutAll: (self asString)
+    aStream nextPut: $#.
+    aStream nextPutAll: (self asString)
 ! !
 
-!Symbol methodsFor: 'primitives'!
+! Symbol methodsFor: 'primitives'!
 
 flushCache
      " Flush the method cache of this selector. "
@@ -1430,13 +1538,13 @@ Bag comment:
 of me as a set with a memory; that is, if the same object is added to me
 twice, then I will report that that element has been stored twice.'!
 
-!Bag class methodsFor: 'basic'!
+! Bag class methodsFor: 'basic'!
 
 new
     ^super new setDictionary
 ! !
 
-!Bag methodsFor: 'adding'!
+! Bag methodsFor: 'adding'!
 
 add: newObject
     ^self add: newObject withOccurrences: 1.
@@ -1448,7 +1556,7 @@ add: newObject withOccurrences: anInteger
     ^newObject
 ! !
 
-!Bag methodsFor: 'accessing'!
+! Bag methodsFor: 'accessing'!
 
 at: index
     self errorNotKeyed
@@ -1475,7 +1583,7 @@ occurrencesOf: anObject
 	ifFalse: [ ^0 ]
 ! !
 
-!Bag methodsFor: 'removing'!
+! Bag methodsFor: 'removing'!
 
 remove: oldObject ifAbsent: anExceptionBlock
     | count |
@@ -1486,7 +1594,7 @@ remove: oldObject ifAbsent: anExceptionBlock
     ^oldObject
 ! !
 
-!Bag methodsFor: 'testing'!
+! Bag methodsFor: 'testing'!
 
 hash
     ^contents hash
@@ -1498,33 +1606,33 @@ hash
     ^contents = aBag contents
 ! !
 
-!Bag methodsFor: 'enumerating'!
+! Bag methodsFor: 'enumerating'!
 
 do: aBlock
      contents associationsDo: 
          [ :assoc | assoc value timesRepeat: [ aBlock value: assoc key ]]
 ! !
 
-!Bag methodsFor: 'storing'!
+! Bag methodsFor: 'storing'!
 
 storeOn: aStream
     | noElements |
-    aStream nextPut: $(;
-        nextPutAll: self classNameString;
-        nextPutAll: ' new'.
+    aStream nextPut: $(.
+    aStream nextPutAll: self classNameString.
+    aStream nextPutAll: ' new'.
     noElements <- true.
     contents associationsDo:
-      [ :assoc | aStream nextPutAll: ' add: ';
-                     store: assoc key;
-                     nextPutAll: ' withOccurrences: ';
-                     store: assoc value;
-                     nextPut: $;.
+      [ :assoc | aStream nextPutAll: ' add: '.
+                 aStream store: assoc key.
+                 aStream nextPutAll: ' withOccurrences: '.
+                 aStream store: assoc value.
+                 aStream nextPut: $;.
                  noElements <- false ].
     noElements ifFalse: [ aStream nextPutAll: '; yourself' ].
     aStream nextPut: $)
 ! !
 
-!Bag methodsFor: 'private'!
+! Bag methodsFor: 'private'!
 
 setDictionary
     contents <- Dictionary new
@@ -1657,7 +1765,7 @@ findIndexOrNil: anObject ifFull: aBlock
 	wrap <- false.
 	[ true ] whileTrue: [
 		key <- self basicAt: index.
-		(key isNil  or: [key = anObject ] ) ifTrue: [ ^ index ].
+		(key isNil or: [key = anObject]) ifTrue: [ ^ index ].
 		index <- index + 1.
 		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
@@ -1779,7 +1887,7 @@ values
     ^aBag
 ! !
 
-!Dictionary methodsFor: 'testing'!
+! Dictionary methodsFor: 'testing'!
 
 includesAssociation: anAssociation
     | assoc |
@@ -1805,7 +1913,7 @@ occurrencesOf: aValue
     ^count
 ! !
 
-!Dictionary methodsFor: 'removing'!
+! Dictionary methodsFor: 'removing'!
 
 removeAssociation: anAssociation
     self removeKey: anAssociation key ifAbsent: [].
@@ -1818,9 +1926,9 @@ removeKey: key
 
 removeKey: key ifAbsent: aBlock
     | index assoc |
-    index <- self findIndexOrNil: key ifFull: [ nil ].
-    index isNil ifTrue: [ ^aBlock value ].
+    index <- self findIndexOrNil: key ifFull: [ ^aBlock value ].
     assoc <- self basicAt: index. 
+    self basicAt: index put: nil.
     tally <- tally - 1.
     self rehashAfterIndex: index.
     ^assoc value
@@ -1834,7 +1942,7 @@ remove: anObject ifAbsent: aBlock
     self error: 'remove:ifAbsent: not allowed in Dictionary'
 ! !
 
-!Dictionary methodsFor: 'enumerating'!
+! Dictionary methodsFor: 'enumerating'!
 
 associationsDo: aBlock
     super do: [ :assoc | aBlock value: assoc ]
@@ -1874,7 +1982,7 @@ inject: value into: aBlock
     self shouldNotImplement
 ! !
 
-!Dictionary methodsFor: 'misc math methods'!
+! Dictionary methodsFor: 'misc math methods'!
 
 = aDictionary
     self class == aDictionary class
@@ -1895,28 +2003,28 @@ hash
     ^hashValue
 ! !
 
-!Dictionary methodsFor: 'printing'!
+! Dictionary methodsFor: 'printing'!
 
 printOn: aStream
     aStream nextPutAll: self class name , ' (' .
     self associationsDo:
-        [ :assoc | aStream print: assoc;
-                       nextPut: Character space ].
+        [ :assoc | aStream print: assoc.
+                   aStream nextPut: Character space ].
     aStream nextPut: $)
 ! !
 
-!Dictionary methodsFor: 'storing'!
+! Dictionary methodsFor: 'storing'!
 
 storeOn: aStream
     | hasElements |
     aStream nextPutAll: '(', self class name , ' new'.
     hasElements <- false.
     self associationsDo:
-        [ :assoc | aStream nextPutAll: ' at: ';
-                       store: assoc key;
-                       nextPutAll: ' put: ';
-                       store: assoc value;
-                       nextPut: $;.
+        [ :assoc | aStream nextPutAll: ' at: '.
+                   aStream store: assoc key.
+                   aStream nextPutAll: ' put: '.
+                   aStream store: assoc value.
+                   aStream nextPut: $;.
                    hasElements <- true ].
     hasElements ifTrue: [ aStream nextPutAll: ' yourself' ].
     aStream nextPut: $)
@@ -1940,7 +2048,7 @@ findIndexOrNil: aKey ifFull: aBlock
 	wrap <- false.
 	[ true ] whileTrue: [
 		assoc <- self basicAt: index.
-		assoc isNil or: [assoc key = aKey ] ifTrue: [ ^ index ].
+		(assoc isNil or: [assoc key = aKey]) ifTrue: [ ^ index ].
 		index <- index + 1.
 		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
@@ -1952,21 +2060,20 @@ findIndexOrNil: aKey ifFull: aBlock
 
 rehashAfterIndex: startIndex
 	"Adjust objects if after index"
-	| index i size count element j |
+	| index i size count element |
 	index <- startIndex.
 	i <- index.
 	size <- self basicSize.
 	count <- size.
-	self basicAt: index put: nil.
 	[  count > 0 ] whileTrue:
-		[ i <- 1 + (i \\ size).
+		[ i <- i \\ size + 1.
 		  element <- self basicAt: i.
-		element isNil ifTrue: [ ^self ].
-		((element key hash \\ size) + 1) = index 
-		    ifTrue: [ self basicAt: index put: element.
-		   	      self basicAt: i put: nil.
-			      index <- i ].
-		count <- count - 1.
+		  element isNil ifTrue: [ ^self ].
+		  (1 + (element key hash \\ (size - 1))) = index 
+		      ifTrue: [ self basicAt: index put: element.
+		   	        self basicAt: i put: nil.
+			        index <- i ].
+		  count <- count - 1
 	]
 !
 
@@ -1986,7 +2093,7 @@ IdentityDictionary comment:
 different, and I use the object identity comparision message == to
 determine equivalence of indices.' !
 
-!IdentityDictionary class methodsFor: 'instance creation'!
+! IdentityDictionary class methodsFor: 'instance creation'!
 
 new
     ^self new: 4
@@ -1997,7 +2104,7 @@ new: anInteger
 
 ! !
 
-!IdentityDictionary methodsFor: 'accessing'!
+! IdentityDictionary methodsFor: 'accessing'!
 
 add: anAssociation
     self at: anAssociation key put: anAssociation value.
@@ -2034,7 +2141,7 @@ keyAtValue: value ifAbsent: exceptionBlock
     ^exceptionBlock value
 ! !
 
-!IdentityDictionary methodsFor: 'testing'!
+! IdentityDictionary methodsFor: 'testing'!
 
 includesAssociation: anAssociation
     | index |
@@ -2047,7 +2154,7 @@ includesKey: key
     ^(self basicAt: (self findKeyIndex: key)) notNil
 ! !
 
-!IdentityDictionary methodsFor: 'removing'!
+! IdentityDictionary methodsFor: 'removing'!
 
 removeKey: key ifAbsent: aBlock
     | index value|
@@ -2060,7 +2167,7 @@ removeKey: key ifAbsent: aBlock
     ^ value
 ! !
 
-!IdentityDictionary methodsFor: 'enumerating'!
+! IdentityDictionary methodsFor: 'enumerating'!
 
 associationsDo: aBlock
     self indicesDo:
@@ -2089,7 +2196,7 @@ select: aBlock
     ^newDict
 ! !
 
-!IdentityDictionary methodsFor: 'misc math methods'!
+! IdentityDictionary methodsFor: 'misc math methods'!
 
 = aDictionary
     self class == aDictionary class
@@ -2111,38 +2218,38 @@ hash
     ^hashValue
 ! !
 
-!IdentityDictionary methodsFor: 'printing'!
+! IdentityDictionary methodsFor: 'printing'!
 
 printOn: aStream
     aStream nextPutAll: self class name , ' ('.
     aStream nl.
     self indicesDo:
-        [ :i | aStream tab;
-                   print: (self basicAt: i);
-                   nextPutAll: '->';
-                   print: (values basicAt: i).
-                   aStream nl ].
+        [ :i | aStream tab.
+               aStream print: (self basicAt: i).
+               aStream nextPutAll: '->'.
+               aStream print: (values basicAt: i).
+               aStream nl ].
     aStream nextPut: $)
 ! !
 
-!IdentityDictionary methodsFor: 'storing'!
+! IdentityDictionary methodsFor: 'storing'!
 
 storeOn: aStream
     | hasElements |
     aStream nextPutAll: '(', self class name , ' new'.
     hasElements <- false.
     self indicesDo:
-        [ :i | aStream nextPutAll: ' at: ';
-                   store: (self basicAt: i);
-                   nextPutAll: ' put: ';
-                   store: (values basicAt: i);
-                   nextPut: $;.
+        [ :i | aStream nextPutAll: ' at: '.
+               aStream store: (self basicAt: i).
+               aStream nextPutAll: ' put: '.
+               aStream store: (values basicAt: i).
+               aStream nextPut: $;.
                hasElements <- true ].
     hasElements ifTrue: [ aStream nextPutAll: ' yourself' ].
     aStream nextPut: $)
 ! !
 
-!IdentityDictionary methodsFor: 'private methods'!
+! IdentityDictionary methodsFor: 'private methods'!
 
 initValues
     values <- Array new: self basicSize
@@ -2169,7 +2276,7 @@ rehashObjectsAfter: anIndex
             [ i <- i \\ size + 1.
               key <- self basicAt: i.
               key isNil ifTrue: [ ^self ].
-              ((key hash \\ size) + 1) = index
+              (1 + (key hash \\ (size - 1))) = index
                 ifTrue: [ self basicAt: index put: key.
                           values basicAt: index put: (values basicAt: i).
                           self basicAt: i put: nil.  "Be tidy"
@@ -2234,7 +2341,7 @@ between external names and indices into domain, which contains the
 real association.  In order to work properly, the domain and map objects must
 be instances of a subclass of SequenceableCollection or Dictionary. ' !
 
-!MappedCollection class methodsFor: 'basic'!
+! MappedCollection class methodsFor: 'basic'!
 
 collection: aCollection map: aMap
     ^self new setCollection: aCollection andMap: aMap
@@ -2245,7 +2352,7 @@ new
 ! !
 
 
-!MappedCollection methodsFor: 'basic'!
+! MappedCollection methodsFor: 'basic'!
 
 at: key
     ^domain at: (map at: key)
@@ -2296,7 +2403,7 @@ select: aBlock
     ^aStream contents
 ! !
 
-!MappedCollection methodsFor: 'private'!
+! MappedCollection methodsFor: 'private'!
 
 setCollection: aCollection andMap: aMap
     domain <- aCollection.
@@ -2307,7 +2414,7 @@ species
     ^domain species
 ! !
 
-!Collection methodsFor: 'converting'!
+! Collection methodsFor: 'converting'!
 
 asBag
     | aBag |
@@ -2345,7 +2452,7 @@ asSortedCollection: aBlock
     ^aSortedCollection
 ! !
 
-!Collection methodsFor: 'printing'!
+! Collection methodsFor: 'printing'!
 
 printOn: aStream
     | tooMany |
@@ -2360,7 +2467,7 @@ printOn: aStream
     aStream nextPut: $)
 ! !
 
-!Collection methodsFor: 'storing'!
+! Collection methodsFor: 'storing'!
 
 storeOn: aStream
     | noneYet |
