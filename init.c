@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.4  2000/08/19 15:01:59  rich
+ * Always create instance variable arrays even if no instance variables.
+ *
  * Revision 1.3  2000/02/02 16:11:08  rich
  * Changed order of includes.
  *
@@ -19,7 +22,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.3 2000/02/02 16:11:08 rich Exp rich $";
+	"$Id: init.c,v 1.4 2000/08/19 15:01:59 rich Exp rich $";
 
 #endif
 
@@ -83,7 +86,7 @@ struct _class_template {
     { PointClass, 0, 2, ObjectClass, "Point", "x y" },
     { MessageClass, 0, MESSAGE_SIZE, ObjectClass, "Message", "args selector" },
     { CharacterClass, 0, 1, ObjectClass, "Character", "value" },
-    { FloatClass, 0, 4, ObjectClass, "Float", NULL },
+    { FloatClass, CLASS_INDEX|CLASS_BYTE, 0, ObjectClass, "Float", NULL },
     { UndefinedClass, 0, 0, ObjectClass, "Undefined", NULL },
     { TrueClass, 0, 0, BooleanClass, "True", NULL },
     { FalseClass, 0, 0, BooleanClass, "False", NULL },
@@ -317,7 +320,7 @@ smallinit(int otsize)
     create_classes();
     create_object(FalsePointer, 0, FalseClass, 0);
     create_object(TruePointer, 0, TrueClass, 0);
-    create_object(SchedulerAssociationPointer, 0, NilPtr, 4 * sizeof(Objptr));
+    create_object(SchedulerAssociationPointer, 0, TrueClass, 0 /*4 * sizeof(Objptr)*/);
     create_object(DoesNotUnderstandSelector, 0, SymLinkClass,
 		  2 * sizeof(Objptr));
     create_object(CannotReturnSelector, 0, SymLinkClass, 2 * sizeof(Objptr));
@@ -372,6 +375,12 @@ smallinit(int otsize)
 	Set_object(CharacterTable, i, temp);
     }
 
+   /* Add Smalltalk as a class variable of Object. */
+    temp = new_Dictionary();
+    AddSelectorToDictionary(temp,
+	create_association(internString("Smalltalk"), SmalltalkPointer));
+    Set_object(ObjectClass, CLASS_DICT, temp);
+
    /* Add known objects to symbol table */
     AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("true"), TruePointer));
@@ -380,12 +389,10 @@ smallinit(int otsize)
     AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("nil"), NilPtr));
     AddSelectorToDictionary(SmalltalkPointer,
-	create_association(internString("Smalltalk"), SmalltalkPointer));
-    AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("SpecialSelectors"), SpecialSelectors));
     AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("Processor"),
-				 SchedulerAssociationPointer));
+				 SchedulerAssociationPointer)); 
     AddSelectorToDictionary(SmalltalkPointer,
 	create_association(internString("initSourceFile"),
 				 create_new_object(ArrayClass, 3)));
