@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Parser.
  *
- * $Log: $
+ * $Log: parse.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: parse.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -36,6 +39,7 @@ static char        *rcsid =
 #include "symbols.h"
 #include "code.h"
 #include "parse.h"
+#include "dump.h"
 
 Token		    tstate;
 Namenode	    nstate;
@@ -71,13 +75,12 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     Objptr	aSelector;
     Objptr	methinfo;
     Objptr	dict;
+    Objptr	catdict;
+    Objptr	catset;
 
-    aSelector =	internString(selector);
-    rootObjects[TEMP2] = aSelector;
+    rootObjects[TEMP2] = aSelector = internString(selector);
 
-    dict = get_pointer(aClass, METHOD_DICT);
-
-    if (dict == NilPtr) {
+    if ((dict = get_pointer(aClass, METHOD_DICT)) == NilPtr) {
 	dict = new_IDictionary();
 	Set_object(aClass, METHOD_DICT, dict);
     }
@@ -85,14 +88,27 @@ AddSelectorToClass(Objptr aClass, char *selector, Objptr aCatagory,
     /* Add it to class dictionary */
     AddSelectorToIDictionary(dict, aSelector, aMethod);
 
-    /* Add Catogory */
-    methinfo = create_new_object(MethodInfoClass, 0);
-    rootObjects[TEMP2] = methinfo;
+    /* Add Category */
+    rootObjects[TEMP2] = methinfo = create_new_object(MethodInfoClass, 0);
     Set_object(aMethod, METH_DESCRIPTION, methinfo);
-    Set_integer(methinfo, METHINFO_SOURCE, 0);
+    Set_integer(methinfo, METHINFO_SOURCE, 1);
     Set_integer(methinfo, METHINFO_POS, pos);
     Set_object(methinfo, METHINFO_CAT, aCatagory);
     rootObjects[TEMP2] = NilPtr;
+
+    if ((catdict = get_pointer(aClass, CLASS_METHCAT)) == NilPtr) {
+	catdict = new_Dictionary();
+	Set_object(aClass, CLASS_METHCAT, catdict);
+    }
+
+    /* Place Category into dictionary */
+    if ((catset = FindSelectorInDictionary(catdict, aCatagory)) == NilPtr) {
+        rootObjects[TEMP2] = catset = new_Set();
+        rootObjects[TEMP2] = catset = create_association(aCatagory, catset);
+	AddSelectorToDictionary(catdict, catset);
+        rootObjects[TEMP2] = NilPtr;
+    }
+    AddSelectorToSet(get_pointer(catset, ASSOC_VALUE), aSelector);
 
 }
  
@@ -124,6 +140,35 @@ CompileForClass(char *text, Objptr class, Objptr aCatagory, int pos)
     done_scan(tstate);
     i =  optimize(cstate);
     sort_literals(nstate, i, get_pointer(class, SUPERCLASS));
+    /* Check if we can shortcut this method */
+    if (nstate->tempcount == 0 && nstate->litcount == 0) {
+	/* No point to check if it can't possibly be shortcircuit */
+	if ((i = isGetInst(cstate)) >= 0) {
+            header = (METH_NUMTEMPS & (i << 9)) + (METH_RETURN);
+	    method = create_new_object(CompiledMethodClass, 0);
+ 	    rootObjects[TEMP1] = method;
+	    /* Build header */
+	    Set_object(method, METH_HEADER, as_oop(header));
+    	    freeCode(cstate);
+    	    freename(nstate);
+    	    AddSelectorToClass(class, sel, aCatagory, method, pos);
+    	    rootObjects[TEMP1] = NilPtr;
+    	    noreclaim = savereclaim;
+	    return TRUE;
+  	} else if ((i = isSetInst(cstate)) >= 0) {
+            header = (METH_NUMTEMPS & (i << 9)) + (METH_SETINST);
+	    method = create_new_object(CompiledMethodClass, 0);
+ 	    rootObjects[TEMP1] = method;
+	    /* Build header */
+	    Set_object(method, METH_HEADER, as_oop(header));
+    	    freeCode(cstate);
+    	    freename(nstate);
+    	    AddSelectorToClass(class, sel, aCatagory, method, pos);
+    	    rootObjects[TEMP1] = NilPtr;
+    	    noreclaim = savereclaim;
+	    return TRUE;
+	}
+    }
     genblock(cstate);
     litsize = nstate->litcount;
     numargs = nstate->argcount;
@@ -158,6 +203,7 @@ CompileForClass(char *text, Objptr class, Objptr aCatagory, int pos)
     freeCode(cstate);
     freename(nstate);
     AddSelectorToClass(class, sel, aCatagory, method, pos);
+    show_method(method);
     rootObjects[TEMP1] = NilPtr;
     noreclaim = savereclaim;
     return TRUE;
@@ -218,6 +264,7 @@ CompileForExecute(char *text)
     freeCode(cstate);
     freename(nstate);
     noreclaim = savereclaim;
+    show_exec(method);
     return method;
 }
 
@@ -240,7 +287,11 @@ messagePattern()
     case KeySpecial:
 	sel = strsave(get_token_spec(tstate));
 	if (get_token(tstate) == KeyName) {
-	    add_symbol(nstate, get_token_string(tstate), Arg);
+	    if (!add_symbol(nstate, get_token_string(tstate), Arg)) {
+	        parseError(tstate, "Failed to add symbol ",
+				 get_token_string(tstate));
+		break;
+	    }
 	    get_token(tstate);
 	} else {
 	   parseError(tstate, "Binary not followed by name", NULL);
@@ -266,7 +317,11 @@ keyMessage()
 	    parseError(tstate, "Keyword message pattern not followed by a name", NULL);
 	    return;
 	}
-	add_symbol(nstate, get_token_string(tstate), Arg);
+	if (!add_symbol(nstate, get_token_string(tstate), Arg)) {
+	    parseError(tstate, "Failed to add symbol ",
+				 get_token_string(tstate));
+	    return;
+	}
 	tok = get_token(tstate);
 	if (tok != KeyKeyword)
 	    return;
@@ -283,8 +338,13 @@ doTemps()
     int                 tok;
 
     if (isVarSep()) {
-	while ((tok = get_token(tstate)) == KeyName) 
-	    add_symbol(nstate, get_token_string(tstate), Temp);
+	while ((tok = get_token(tstate)) == KeyName) {
+	    if (!add_symbol(nstate, get_token_string(tstate), Temp)) {
+	         parseError(tstate, "Failed to add symbol ",
+				 get_token_string(tstate));
+	         return;
+	    }
+	}
 	if (isVarSep())
 	    tok = get_token(tstate);
 	else {
@@ -318,46 +378,39 @@ void
 doBody()
 {
     int                 tok;
-    int			retFlag;
 
-    if ((inBlock || optimBlk) && get_cur_token(tstate) == KeyRBrack) {
-	if (optimBlk)
-	    genPushNil(cstate);
-	else
-	    genReturnNil(cstate);
+    if (get_cur_token(tstate) == KeyEOS)
 	return;
+
+    if (get_cur_token(tstate) == KeyRBrack) {
+        genPushNil(cstate);
+	if (!inBlock) 
+            parseError(tstate, "Mismatched ]", NULL);
+        return;
     }
     while (TRUE) {
         if (get_cur_token(tstate) == KeyReturn) {
 	    get_token(tstate);
 	    doExpression();
-	    genReturnTOS(cstate);
-	    retFlag = TRUE;
-        } if (get_cur_token(tstate) != KeyEOS) {
+            genReturnTOS(cstate);
+        }  else 
 	    doExpression();
-	    retFlag = FALSE;
-        }
+
 	if ((tok = get_cur_token(tstate)) == KeyEOS) {
-	    if (!retFlag)
-		genPopTOS(cstate);
+  	    genPopTOS(cstate);
 	    return;
 	} else if (tok == KeyPeriod) {
+       	    genPopTOS(cstate);		/* Remove value of last stat. */
 	    tok = get_token(tstate);
 	    if (tok == KeyRBrack) {		/* End of block */
-	        if (retFlag && optimBlk)
-		    genPushNil(cstate);		/* For optimizer */
+		genPushNil(cstate);		/* For optimizer */
 		return;
 	    } else if (tok == KeyEOS) {
-	        if (retFlag && optimBlk)
-		    genPopTOS(cstate);		/* Remove last value */
 		return;
-	    } else {
-	        if (!retFlag)
-		    genPopTOS(cstate);		/* Remove value of last stat. */
 	    }
 	} else if (tok == KeyRBrack) {
-            if (retFlag && optimBlk)
-	        genPushNil(cstate);		/* For optimizer */
+	    if (inBlock && !optimBlk)
+	       genDupTOS(cstate); 
 	    return;
 	} else {
 	    parseError(tstate, "Invalid statement ending", NULL);
@@ -488,9 +541,7 @@ doContinue(int superFlag)
     superFlag = keyContinue(superFlag);
     while (superFlag != -1 && get_cur_token(tstate) == KeyCascade) {
 	get_token(tstate); 
-/*	genDupTOS(cstate); */
 	superFlag = keyContinue(superFlag);
-/*	genPopTOS(cstate); */
     }
     return superFlag;
 }
@@ -506,7 +557,7 @@ keyContinue(int superFlag)
     char               *pat;
     Literalnode         lit;
 
-    doBinaryContinue(superFlag);
+    superFlag = doBinaryContinue(superFlag);
     if (get_cur_token(tstate) != KeyKeyword)
 	return 0;
 
@@ -534,7 +585,7 @@ keyContinue(int superFlag)
 	argc++;
 	get_token(tstate);
 	sTerm = doTerm();
-	doBinaryContinue(sTerm);
+	(void)doBinaryContinue(sTerm);
     }
     lit = add_literal(nstate, internString(pat));
     genSend(cstate, lit, argc, superFlag);
@@ -544,26 +595,27 @@ keyContinue(int superFlag)
 /*
  * Handle binary continuation
  */
-void
+int
 doBinaryContinue(int superFlag)
 {
     int                 sTerm;
     Literalnode         lit;
 
-    doUnaryContinue(superFlag);
+    superFlag = doUnaryContinue(superFlag);
     while (get_cur_token(tstate) == KeySpecial) {
 	lit = add_literal(nstate, internString(get_token_spec(tstate)));
 	(void) get_token(tstate);
 	sTerm = doTerm();
-	doUnaryContinue(sTerm);
+	superFlag = doUnaryContinue(sTerm);
         genSend(cstate, lit, 1, superFlag);
     }
+    return superFlag;
 }
 
 /*
  * Handle unary continuations.
  */
-void
+int
 doUnaryContinue(int superFlag)
 {
     Literalnode         lit;
@@ -571,9 +623,10 @@ doUnaryContinue(int superFlag)
     while (get_cur_token(tstate) == KeyName) {
 	lit = add_literal(nstate, internString(get_token_string(tstate)));
 	genSend(cstate, lit, 0, superFlag);
+	superFlag = FALSE;
 	get_token(tstate);
     }
-    return;
+    return superFlag;
 }
 
 /*
@@ -590,7 +643,10 @@ doBlock()
     Codenode            block;
 
     while ((tok = get_token(tstate)) == KeyVariable) {
-	add_symbol(nstate, get_token_string(tstate), Temp);
+	if (!add_symbol(nstate, get_token_string(tstate), Temp)) {
+	   parseError(tstate, "Failed to add symbol ", get_token_string(tstate));
+	   return FALSE;
+	}
 	argc++;
     }
 
@@ -614,8 +670,14 @@ doBlock()
     optimBlk = FALSE;
 
    /* Store arguments from stack into temps. */
-    for (i = argc; i > 0; i--) 
-	genStore(cstate, find_symbol_offset(nstate, i + savetemps - 1));
+    for (i = argc; i > 0; i--) {
+	Symbolnode sym = find_symbol_offset(nstate, i + savetemps - 1);
+	if (sym == NULL) {
+	    parseError(tstate, "Could not find block temp", NULL);
+	    return -1;
+	}
+	genStore(cstate, sym);
+    }
 
    /* Do body of block */
     doBody();
@@ -627,7 +689,7 @@ doBlock()
 
     genCode(cstate, Return, Block, -1);
 
-    setJumpTarget(cstate, block);
+    setJumpTarget(cstate, block, 0);
     inBlock = saveInblock;
     optimBlk = saveOptimBlk;
     clean_symbol(nstate, savetemps);
@@ -675,7 +737,7 @@ optimBlock()
 int
 doIfTrue()
 {
-    Codenode            block, eblock = NULL;
+    Codenode            block;
     int                 flag;
 
     block = genJumpFForw(cstate);	/* Jump forward to end of block. */
@@ -683,15 +745,12 @@ doIfTrue()
 
     if (get_cur_token(tstate) == KeyKeyword &&
 	strcmp(get_token_string(tstate), "ifFalse:") == 0) {
-	eblock = genJumpForw(cstate);	/* Skip around else block */
-	setJumpTarget(cstate, block);
-	block = eblock;
+        genPopTOS(cstate);
+	setJumpTarget(cstate, block, 1);
+	block = genJumpForw(cstate);	/* Skip around else block */
 	flag = optimBlock();		/* Do else part */
     } 
-    setJumpTarget(cstate, block);
-    genNop(cstate);
-    if (eblock != NULL)			/* Make sure stack gets cleaned up */
-        genNop(cstate);
+    setJumpTarget(cstate, block, 1);
     return flag;
 }
 
@@ -709,15 +768,13 @@ doIfFalse()
 
     if (get_cur_token(tstate) == KeyKeyword &&
 	strcmp(get_token_string(tstate), "ifTrue:") == 0) {
+        genPopTOS(cstate);
+	setJumpTarget(cstate, block, 1);
 	eblock = genJumpForw(cstate);	/* Skip around else block */
-	setJumpTarget(cstate, block);
 	block = eblock;
 	flag = optimBlock();	/* Do else part */
     } 
-    setJumpTarget(cstate, block);
-    genNop(cstate);
-    if (eblock != NULL)			/* Make sure stack gets cleaned up */
-        genNop(cstate);
+    setJumpTarget(cstate, block, 1);
     return flag;
 }
 
@@ -730,14 +787,14 @@ doWhileTrue()
     Codenode            loop, block;
     int                 flag;
 
-    genDupTOS(cstate);
     loop = getCodeLabel(cstate);
+    genDupTOS(cstate);
     genSend(cstate, add_literal(nstate, internString("value")), 0, FALSE);
     block = genJumpFForw(cstate);	/* Jump forward to end of block. */
     flag = optimBlock();		/* Block body */
     genPopTOS(cstate);			/* Remove result of block */
+    setJumpTarget(cstate, block, 1);
     genJump(cstate, loop);		/* Jump to start of block */
-    setJumpTarget(cstate, block);
     return flag;
 }
 
@@ -750,14 +807,14 @@ doWhileFalse()
     Codenode            loop, block;
     int                 flag;
 
-    genDupTOS(cstate);
     loop = getCodeLabel(cstate);
+    genDupTOS(cstate);
     genSend(cstate, add_literal(nstate, internString("value")), 0, FALSE);
     block = genJumpTForw(cstate);	/* Jump forward to end of block. */
     flag = optimBlock();		/* Block body */
     genPopTOS(cstate);			/* Remove result of block */
+    setJumpTarget(cstate, block, 1);
     genJump(cstate, loop);		/* Jump to start of block */
-    setJumpTarget(cstate, block);
     return flag;
 }
 
@@ -780,9 +837,9 @@ doAnd()
 
     genDupTOS(cstate);
     block = genJumpFForw(cstate);	/* Jump forward to end of block. */
-    genPopTOS(cstate);
+    genPopTOS(cstate); 
     flag = optimBlock();
-    setJumpTarget(cstate, block);
+    setJumpTarget(cstate, block, 0);
 
     /* Keep grabing if we got another builtin */
     if (get_cur_token(tstate) == KeyKeyword) {
@@ -809,9 +866,9 @@ doOr()
 
     genDupTOS(cstate);
     block = genJumpTForw(cstate);	/* Jump forward to end of block. */
-    genPopTOS(cstate);
+    genPopTOS(cstate); 
     flag = optimBlock();
-    setJumpTarget(cstate, block);
+    setJumpTarget(cstate, block, 0);
 
     /* Keep grabing if we got another builtin */
     if (get_cur_token(tstate) == KeyKeyword) {
