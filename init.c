@@ -3,6 +3,11 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.6  2001/07/31 14:09:48  rich
+ * Fixed spelling error "reciever"
+ * Added classes for Magnitude and Integer and Number
+ * Fixed flags on classes so that they are defined correctly.
+ *
  * Revision 1.5  2001/01/07 18:00:48  rich
  * Changed flags on Float class.
  * Changed value of SchedulerAssociationPointer.
@@ -28,7 +33,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.5 2001/01/07 18:00:48 rich Exp rich $";
+	"$Id: init.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
 
 #endif
 
@@ -489,7 +494,7 @@ parsefile(char *str)
         newContext = create_new_object(MethodContextClass, stacksize);
 	object_incr_ref(newContext);
     	rootObjects[CURCONT] = newContext;
-        Set_object(newContext, BLOCK_SENDER, newContext);
+        Set_object(newContext, BLOCK_SENDER, NilPtr);
         Set_integer(newContext, BLOCK_IP, 
 		sizeof(Objptr) *(LiteralsOf(header) + METH_LITSTART));
         Set_integer(newContext, BLOCK_SP,
