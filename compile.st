@@ -1,9 +1,14 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.5 2001/07/31 14:09:48 rich Exp rich $ "
+" $Id: compile.st,v 1.6 2001/08/01 16:42:31 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.6  2001/08/01 16:42:31  rich
+ Added Pshint instruction.
+ Moved sendsuper to group 2.
+ Added psh context instruction.
+
  Revision 1.5  2001/07/31 14:09:48  rich
  Total rewrite of parser and code generator.
 
@@ -32,7 +37,12 @@
 Object subclass: 'SmallTalkToken'
        instanceVariableNames: 'token stream value curchar pushback first'
        classVariableNames: 'chartable actiontable arraytable tokentable'
-       poolDictionaries: '' category: nil !
+       poolDictionaries: ''
+       category: 'Compiler' !
+
+SmallTalkToken comment: 
+ 	'I assist in parsing smalltalk methods by breaking Strings into a 
+series of tokens.' !
 
 ! SmallTalkToken class methodsFor: 'creation' !
 
@@ -41,26 +51,6 @@ on: aStream
 ! !
 
 ! SmallTalkToken methodsFor: 'testing' !
-
-isKeyString
-	^ #KeyString = token
-!
-
-isKeyDollar
-	^ #KeyDollar = token
-!
-
-isKeyDigit
-	^ #KeyDigit = token
-!
-
-isKeySpace
-	^ #KeySpace = token
-!
-
-isKeyComment
-	^ #KeyComment = token
-!
 
 isKeyEOS
 	^ #KeyEOS = token
@@ -568,6 +558,10 @@ first
 	^ first
 !
 
+position
+	^ stream position
+!
+
 " Print out a token "
 print
 	| str |
@@ -603,13 +597,33 @@ next
     ^ self
 ! !
 
+! SmallTalkToken methodsFor: 'error handling' !
+
+errorDumpOn: aStream
+    | start finish i |
+    start <- first.
+    finish <- stream position.
+    stream reset.
+    i <- 1.
+    [ stream atEnd ] whileFalse: [
+	 i == start ifTrue: [ aStream nextPutAll: ' **> ' ].
+	 aStream nextPut: (stream next).
+	 i == finish ifTrue: [ aStream nextPutAll: ' <** ' ].
+	 i <- i + 1.
+    ].
+    stream position: finish.
+! !
+
 SmallTalkToken initialize !
 
 Object subclass: 'SmallTalkParseStack'
        instanceVariableNames: 'position top'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
+
+SmallTalkParseStack comment:
+	'I compute the size of the stack required to evaluate a method'. !
 
 ! SmallTalkParseStack class methodsFor: 'creation' !
 
@@ -651,7 +665,7 @@ Object subclass: 'SmallTalkParseNode'
        instanceVariableNames: 'symbols node'
        classVariableNames: 'ptmp rtmp stmp parg plit pins pint sins jpt jpf jmp sdspc sdsup snd blk rets ret rett retf retn retb pop pvar pself dup pt pf pn pc svar specs'
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkParseNode class methodsFor: 'creation' !
 
@@ -852,7 +866,7 @@ SmallTalkParseNode subclass: 'SmallTalkAssignNode'
        instanceVariableNames: 'expr'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkAssignNode class methodsFor: 'creation' !
 
@@ -916,7 +930,7 @@ SmallTalkParseNode subclass: 'SmallTalkBlockNode'
        instanceVariableNames: 'args hasreturn'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkBlockNode class methodsFor: 'creation' !
 
@@ -1027,10 +1041,9 @@ emitOn: aStream forEffect: result
 		 	    ifFalse: [ flag <- true].
 		  (node at: i) emitOn: aStream forEffect: flag.
 		    (c == i and: [ hasreturn not ]) ifTrue:
-		 			[ aStream nextPut: retb]
+		 			[ aStream nextPut: retb].
 		].
 ! !
-
 
 ! SmallTalkBlockNode methodsFor: 'printing' !
 
@@ -1070,7 +1083,7 @@ SmallTalkParseNode subclass: 'SmallTalkLeafNode'
        instanceVariableNames: 'offset'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkLeafNode class methodsFor: 'creation' !
 
@@ -1119,7 +1132,7 @@ SmallTalkLeafNode subclass: 'SmallTalkLiteralNode'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkLiteralNode methodsFor: 'generation' !
 
@@ -1142,7 +1155,7 @@ SmallTalkLeafNode subclass: 'SmallTalkConstantNode'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkConstantNode methodsFor: 'generation' !
 
@@ -1181,7 +1194,7 @@ SmallTalkLeafNode subclass: 'SmallTalkVariableNode'
        instanceVariableNames: 'type name'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkVariableNode class methodsFor: 'creation' !
 
@@ -1280,7 +1293,7 @@ SmallTalkLeafNode subclass: 'SmallTalkBuiltinNode'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkBuiltinNode methodsFor: 'testing' !
 
@@ -1330,7 +1343,7 @@ SmallTalkBlockNode subclass: 'SmallTalkValueNode'
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
-	category: nil !
+	category: 'Compiler' !
 
 ! SmallTalkValueNode class methodsFor: 'creation' !
 
@@ -1381,7 +1394,7 @@ SmallTalkParseNode subclass: 'SmallTalkCondNode'
 	instanceVariableNames: 'trueClause falseClause'
 	classVariableNames: ''
 	poolDictionaries: ''
-	category: nil !
+	category: 'Compiler' !
 
 ! SmallTalkCondNode class methodsFor: 'creation' !
 
@@ -1406,6 +1419,14 @@ init: aExpr trueClause: aTBlock falseClause: aFBlock table: aTable
 
 stack: stack forEffect: result
 	node stack: stack forEffect: result.
+	" If we are going for results, make sure both clauses have values"
+	(result not and: [ (trueClause isNil or: [ falseClause isNil])])
+		ifTrue: [
+			trueClause isNil ifTrue: [
+						trueClause <- symbols nilnode ].
+			falseClause isNil ifTrue: [
+						falseClause <- symbols nilnode ]
+		].
 	trueClause isNil ifFalse:
 		 [ trueClause stack: stack  forEffect: true].
 	falseClause isNil ifFalse:
@@ -1493,7 +1514,7 @@ SmallTalkParseNode subclass: 'SmallTalkLoopNode'
 	instanceVariableNames: 'type body'
 	classVariableNames: ''
 	poolDictionaries: ''
-	category: nil !
+	category: 'Compiler' !
 
 ! SmallTalkLoopNode class methodsFor: 'creation' !
 
@@ -1568,7 +1589,7 @@ SmallTalkParseNode subclass: 'SmallTalkAndOrNode'
 	instanceVariableNames: 'second type'
 	classVariableNames: ''
 	poolDictionaries: ''
-	category: nil !
+	category: 'Compiler' !
 
 ! SmallTalkAndOrNode class methodsFor: 'creation' !
 
@@ -1629,7 +1650,7 @@ SmallTalkParseNode subclass: 'SmallTalkMessageNode'
        instanceVariableNames: 'selector args type'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkMessageNode class methodsFor: 'creation' !
 
@@ -1830,7 +1851,7 @@ SmallTalkMessageNode subclass: 'SmallTalkCascadeNode'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkCascadeNode methodsFor: 'generation' !
 
@@ -1888,7 +1909,7 @@ SmallTalkParseNode subclass: 'SmallTalkMethodNode'
        instanceVariableNames: 'hasreturn'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkMethodNode class methodsFor: 'creation' !
 
@@ -1993,7 +2014,7 @@ SmallTalkParseNode subclass: 'SmallTalkReturnNode'
        instanceVariableNames: ''
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkReturnNode methodsFor: 'accessing' !
 
@@ -2044,7 +2065,7 @@ Object subclass: 'SmallTalkSymbolTable'
        instanceVariableNames: 'syms tempcount argcount litcount class nilnode lits parser superSeen'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkSymbolTable class methodsFor: 'creation' !
 
@@ -2223,7 +2244,7 @@ Object subclass: 'SmallTalkParser'
        instanceVariableNames: 'table token class primitive pattern inBlock method error'
        classVariableNames: ''
        poolDictionaries: ''
-       category: nil !
+       category: 'Compiler' !
 
 ! SmallTalkParser class methodsFor: 'creation' !
 
@@ -2310,8 +2331,14 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
 !
 
 parseError: aMessage
+    | pos |
+    pos <- token first.
     error <- aMessage. 
     error printOn: stderr.
+    stderr nextPutAll: ' at Offset: '.
+    pos printOn: stderr.
+    stderr nl.
+    token errorDumpOn: stderr.
     stderr nl.
     ^ nil
 ! !
@@ -2390,7 +2417,8 @@ parsePrimitive
 " Parse body of definition. "
 doBody:	nodes
     | result sawperiod |
-    [ true ] whileTrue: [
+    result <- true.
+    [ result isNil ] whileFalse: [
         sawperiod <- false.
 	token isKeyReturn ifTrue: [
 		token next.
@@ -2401,18 +2429,19 @@ doBody:	nodes
 		nodes returned
 	] ifFalse: [
 		result <- self doExpression.
-		result isNil ifFalse: [ nodes add: result]
+		result isNil ifFalse: [ nodes add: result ]
 	].
 
         token isKeyPeriod ifTrue: [ 
 		sawperiod <- true.
 		token next
 	].
+
 	token isKeyEOS ifTrue: [ ^ nodes ].
 	token isKeyRBrack ifTrue: [
 	        inBlock ifFalse: [ ^ self parseError: 'Extra ]' ].
 		sawperiod ifTrue: [ nodes add: table nilnode ].
-   	       ^ nodes
+   	       ^ nodes 
         ].
    ].
    ^ self parseError: 'Invalid statement ending'. 
@@ -2423,7 +2452,11 @@ doExpression
     | asgname node |
 
     token isKeyName ifTrue: [
+	node <- token value.
 	asgname <- table findSymbol: token valueNext.
+	asgname isNil ifTrue: [
+		^ self parseError: 'Invalid name before ', node.
+	].
 	token isKeyAssign ifTrue: [
 	    asgname canStore ifFalse: [
             	^ self parseError: 'Invalid assignment name ' ,
@@ -2584,12 +2617,16 @@ doBlock
 
 Object subclass: 'Compiler'
        instanceVariableNames: ''
-       classVariableNames: '' poolDictionaries: '' category: nil !
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Compiler' !
 
 ! Compiler class methodsFor: 'creation'!
 
 evaluate: aString
     | comp |
+    stderr nextPutAll: aString.
+    stderr nl.
     comp <- SmallTalkParser on: aString
 			 forClass: Object
 			 msgpattern: false
@@ -2642,21 +2679,21 @@ compile: aString forClass: aClass classified: aCategory notify: aBlock
     ]
 ! !
 
-! CompiledMethod methodsFor: 'Evaluation' !
+! CompiledMethod methodsFor: 'evaluation' !
 
 evaluate
 	<primitive 100>
 	^ self primitiveFailed
 ! !
 
-! CompiledMethod class methodsFor: 'Creation' !
+! CompiledMethod class methodsFor: 'creation' !
 
 newMethod: size header: aHeader
 	<primitive 64>
 	^ self primitiveFailed
 ! !
 
-! CompiledMethod methodsFor: 'Accessing' !
+! CompiledMethod methodsFor: 'accessing' !
 
 objectAt: aIndex
 	<primitive 53>
@@ -2721,7 +2758,7 @@ getSource
 	^ description sourceCode
 ! !
 
-! CompiledMethod methodsFor: 'Modifying' !
+! CompiledMethod methodsFor: 'modifying' !
 
 objectAt: aIndex put: aValue
 	<primitive 54>
@@ -2737,7 +2774,7 @@ description: aMethInfo
 	^ description <- aMethInfo
 ! !
 
-! CompiledMethod methodsFor: 'Printing' !
+! CompiledMethod methodsFor: 'printing' !
 
 printOn: aStream
 	| lits byte done basic op opr len temp |
