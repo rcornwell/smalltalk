@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.3  2000/02/02 16:11:08  rich
+ * Changed order of includes.
+ *
  * Revision 1.2  2000/02/01 18:09:52  rich
  * Added stack checking code.
  * Changed class variables to an Array.
@@ -16,7 +19,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.2 2000/02/01 18:09:52 rich Exp rich $";
+	"$Id: init.c,v 1.3 2000/02/02 16:11:08 rich Exp rich $";
 
 #endif
 
@@ -211,19 +214,22 @@ instvar_classes()
 	ct = &class_template[i];
 	op = ct->object;
 
-	/* Make a copy of instance names so we can modify them */
-        if (ct->instvars == NULL) 
+	/* Create array to old instance variable names */
+	sup = get_pointer(op, SUPERCLASS);
+	count = ct->size - (get_integer(sup, CLASS_FLAGS) / 8);
+        array = create_new_object(ArrayClass, count);
+        Set_object(op, CLASS_VARS, array);
+
+	/* Continue on if there are no variables */
+        if (ct->instvars == NULL || count == 0)
 	    continue;
+	
+	/* Make a copy of instance names so we can modify them */
 	if ((str = strsave(ct->instvars)) == NULL)
 	   /* Should error here, but just punt, error will show up real soon */
 	    continue;
 
-	sup = get_pointer(op, SUPERCLASS);
-	count = ct->size - (get_integer(sup, CLASS_FLAGS) / 8);
-        array = create_new_object(ArrayClass, count * sizeof(Objptr));
-        Set_object(op, CLASS_VARS, array);
-	if (count == 0)
-	   continue;
+	/* Split them out and make each it's own string */
         ptr2 = ptr = str;
 	count = 0;
         do {
@@ -345,6 +351,11 @@ smallinit(int otsize)
 
    /* Rebuild free list */
     rebuild_free();
+
+   /*
+    * Basic object memory is not installed and we can continue on using
+    * the virtual memory system now to create and allocate objects.
+    */
 
    /* Fill in class names */
     name_classes();
