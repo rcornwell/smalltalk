@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Object memory system.
  *
- * $Id: object.h,v 1.3 2000/02/01 18:09:58 rich Exp rich $
+ * $Id: object.h,v 1.4 2000/08/19 17:40:30 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.4  2000/08/19 17:40:30  rich
+ * Make sure bytes are returned unsigned.
+ *
  * Revision 1.3  2000/02/01 18:09:58  rich
  * Increased size of root objects.
  *
@@ -22,7 +25,9 @@
 
 #define FALSE	0
 #define TRUE 	1
-#define INLINE	inline
+#ifndef INLINE
+#define INLINE
+#endif
 
 /* Root object indexies */
 #define	CURCONT		0
@@ -189,32 +194,24 @@ void		    reclaimSpace();
 	 (sizeof(Objptr) * (get_integer(class_of(op), CLASS_FLAGS) / 8)))
 
 
-static INLINE void
-object_incr_ref(Objptr op) {
-    if (is_object(op)) {
-	int ncnt;
-        if ((ncnt = get_object_refcnt(op)) != MAXREFCNT)
-            set_object_refcnt(op, ncnt + 1);
-    }
-}
+#define object_incr_ref(op) \
+    if (is_object(op)) { \
+	int ncnt; \
+        if ((ncnt = get_object_refcnt(op)) != MAXREFCNT) \
+            set_object_refcnt(op, ncnt + 1); \
+    } 
 
-static INLINE void
-object_decr_ref(Objptr op)
-{
-    if (is_object(op)) {
-	int ncnt;
-       /* Don't change objects at max count */
-        if ((ncnt = get_object_refcnt(op)) != MAXREFCNT) {
-           /* If count is zero, remove object */
-            if (ncnt == 1) {
-                set_object_refcnt(op, 0);
-                free_all_other_objects(op);
-            } else {
-                set_object_refcnt(op, ncnt - 1);
-	    }
-        }
-    }
-}
+#define object_decr_ref(op) \
+    if (is_object(op)) { \
+	int ncnt; \
+       /* Don't change objects at max count */ \
+        if ((ncnt = get_object_refcnt(op)) != MAXREFCNT) { \
+           /* If count is zero, remove object */ \
+            if (ncnt == 1) \
+                free_all_other_objects(op); \
+            set_object_refcnt(op, ncnt - 1); \
+        } \
+    } 
 
 #else
 
