@@ -1,9 +1,12 @@
 " Bootstrap methods to define classes"
 
-" $Id: $ "
+" $Id: basic.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
         
 "
- $Log: $
+ $Log: basic.st,v $
+ Revision 1.1  1999/09/02 15:57:59  rich
+ Initial revision
+
 "
 Object comment:
 	'I am the root class of all Smalltalk classes.' !
@@ -158,10 +161,16 @@ instVarAt: index put: value
 	^ self primitiveFailed
 !
 
+someInstance
+	"Return first instance of an object, nil if none"
+	<primitive 62>
+	^ nil
+!
+
 nextInstance
 	"Return next instance of object, nil if no more"
 	<primitive 63>
-	^ self primitiveFailed
+	^ nil
 ! !
 
 ! Object methodsFor: 'Message Handling'!
@@ -256,6 +265,89 @@ valueWithArguments: anArray
 	"Sends the reciever the selector aSymbol"
 	<primitive 66>
 	^ self primitiveFailed
+! !
+
+! CompiledMethod methodsFor: 'Evaluation' !
+
+evaluate
+	<primitive 100>
+	^ self primitiveFailed
+! !
+
+! CompiledMethod class methodsFor: 'Creation' !
+
+newMethod: size header: aHeader
+	<primitive 64>
+	^ self primitiveFailed
+! !
+
+! CompiledMethod methodsFor: 'Accessing' !
+
+objectAt: aIndex
+	<primitive 53>
+	^ self primitiveFailed
+!
+
+byteAt: aIndex
+	<primitive 103>
+	^ self primitiveFailed
+!
+
+header
+	^ self objectAt: 1
+!
+
+literals
+	^ self header bitAnd: 16rFF
+!
+
+temporaries
+	^ (self header bitShift: -8) bitAnd: 16rFF
+!
+
+stacksize
+	^ (self header bitShift: -16) bitAnd: 16r7FF
+!
+
+flags
+	^ (self header bitShift: -27) bitAnd: 16rF
+!
+
+primitiveOf
+	self flags = 16rF
+	     ifTrue: [ ^ (self objectAt: (self literals)) bitAnd: 16r1FF ]
+	     ifFalse: [ ^ 0 ]
+!
+	
+argcount
+	| temp |
+	temp <- self flags.
+	temp < 16rD ifTrue: [ ^ temp ].
+	temp = 16rF 
+	     ifTrue: [ ^ ((self objectAt: (self literals)) 
+			bitShift: -15) bitAnd: 16rFF ].
+	temp = 16rE ifTrue: [ ^ 1 ].
+	^ 0
+!
+
+description
+	^ description
+! !
+
+! CompiledMethod methodsFor: 'Modifying' !
+
+objectAt: aIndex put: aValue
+	<primitive 54>
+	^ self primitiveFailed
+!
+
+byteAt: aIndex put: aValue
+	<primitive 104>
+	^ self primitiveFailed
+!
+
+description: aMethInfo
+	^ description <- aMethInfo
 ! !
 
 ! Boolean methodsFor: 'Copying'!
@@ -451,8 +543,8 @@ error: aString
 !
 
 doesNotUnderstand: aMessage
-	self error:  (self class name) , ' does not understand $',
-		aMessage selector asString
+	self error:  (self class name) , ' does not understand #',
+		aMessage selector asString.
 !
 
 primitiveFailed
@@ -465,6 +557,14 @@ shouldNotImpliment
 
 subclassResonsibility
 	self error: 'Subclass Responsablity'
+!
+
+interpStackFault
+	self error: 'Attempt to access outside stack'
+!
+
+mustBeBoolean
+	self error: 'ifTrue: or ifFalse: require boolean value'
 ! !
 
 ! Undefined methodsFor: 'Testing'!
@@ -677,7 +777,7 @@ add: newObject
 
 remove: anObject 
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ nil ].
+	index <- self findIndexOrNil: anObject ifAbsent: [ nil ].
 	index notNil ifTrue: [ 
 		tally <- tally - 1.
 		self rehashAfterIndex: index
@@ -687,8 +787,7 @@ remove: anObject
 
 remove: anObject ifAbsent: aBlock
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ nil ].
-	index isNil ifTrue: [ ^ aBlock value ].
+	index <- self findIndexOrNil: anObject ifAbsent: [ ^ aBlock value ].
 	tally <- tally - 1.
 	self rehashAfterIndex: index.
 	^ anObject
@@ -702,8 +801,7 @@ size
 
 includes: anObject
 	| index |
-	index <- self findIndexOrNil: anObject ifAbsent: [ ^ nil ].
-	index isNil ifTrue: [ ^ false ].
+	index <- self findIndexOrNil: anObject ifAbsent: [ ^ false ].
 	^ (self basicAt: index) notNil
 !
 
@@ -746,11 +844,12 @@ findIndexOrNil: anObject ifFull: aBlock
 	[ true ] whileTrue: [
 		key <- self basicAt: index.
 		(key isNil  or: [key = anObject ] ) ifTrue: [ ^ index ].
-		index = size ifTrue: [
+ 		index <- index + 1.
+		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
 			index <- 1.
 			wrap <- true.
-		] ifFalse: [ index <- index + 1 ].
+		]
 	]
 !
 
@@ -799,7 +898,7 @@ at: key
 at: key ifAbsent: aBlock
 	| index temp |
 	index <- self findIndexOrNil: key ifFull: [ nil ].
-	index isNil ifTrue: [ ^ aBlock value ].
+	index isNil ifTrue: [ ^ aBlock value ]. 
 	temp <- self basicAt: index.
 	temp isNil ifTrue: [ ^ aBlock value ].
 	^ temp value 
@@ -875,11 +974,12 @@ findIndexOrNil: aKey ifFull: aBlock
 	[ true ] whileTrue: [
 		assoc <- self basicAt: index.
 		assoc isNil or: [assoc key = aKey ] ifTrue: [ ^ index ].
-		index = size ifTrue: [
+		index <- index + 1.
+		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
 			index <- 1.
 			wrap <- true.
-		] ifFalse: [ index <- index + 1 ]
+		]
 	]
 !
 
@@ -986,73 +1086,14 @@ superclass
 	^superclass
 ! !
 
-! Class methodsFor: 'Accessing'!
+! Behavior methodsFor: 'Testing the form of instances'!
 
 instSize
-	^ flags / 8
-!
-
-instVarNames
-	^ vars
-!
-
-instVarNames: newVars
-	| len i j |
-	" Compute number of variable and update flags field "
-	vars <- newVars.
-	len <- vars size.
-	" Count number of variables "
-	i <- 1.
-	len > 0 ifTrue: [ j <- 1 ] ifFalse: [ j <- 0 ].
-	[ i < len ] whileTrue: [
-		(vars at: i) = $   ifTrue: [ j <- j + 1 ].
-		i <- i + 1
-	].
-	self instFlags: self isVariable
-		words: self isWords
-		pointers: self isPointer
-		instCount: j.
-	^ vars 
-!
-
-comment
-	^ comment
-!
-
-comment: aString
-	^ comment <- aString
-!
-
-category
-	^ category
-!
-
-category: aString
-	^ category <- aString
-!
-
-name
-	^ name
-!
-
-name: aString
-	^ name <- aString
-!
-
-instFlags: variableBoolean
-	words: wordBoolean
-	pointers: pointerBoolean
-	instCount: numVars
-	| temp |
-	temp <- numVars * 8 .
-	pointerBoolean ifTrue: [ temp <- temp bitOr: 1 ].
-	wordBoolean ifFalse: [ temp <- temp bitOr: 2 ].
-	variableBoolean ifTrue: [ temp <- temp bitOr: 4 ].
-	^ flags <- temp
+	^ flags // 8
 !
 
 isPointer
-	^ ( flags bitAnd: 1 ) == 1
+	^ ( flags bitAnd: 1 ) ~= 0
 !
 
 isBits
@@ -1060,7 +1101,7 @@ isBits
 !
 
 isBytes
-	^ ( flags bitAnd: 2) == 1
+	^ ( flags bitAnd: 2) ~= 0
 !
 
 isWords
@@ -1072,7 +1113,95 @@ isFixed
 !
 
 isVariable
-	^ ( flags bitAnd: 4) == 1
+	^ ( flags bitAnd: 4) ~= 0
+! !
+
+! Class methodsFor: 'Accessing'!
+
+name
+	^ name
+!
+
+instVarNames
+        vars isNil ifTrue: [ ^ vars <- Array new: 0. ].
+	^ vars
+!
+
+allInstVarNames
+    | svars index index2 newarray |
+    svars <- superclass allInstVarNames.
+    newarray <- (vars size) + (svars size).
+    index <- 1.
+    [ index < (svars size) ] whileTrue:
+	[ newarray at: index put: (svars at: index).
+	  index <- index + 1. ].
+    index2 <- 1.
+    [ index2 < (vars size) ] whileTrue:
+	[ newarray at: index put: (vars at: index2).
+	  index <- index + 1. index2 <- index2 + 1. ].
+    ^ newarray
+!
+
+comment
+	^ comment
+!
+
+category
+	^ category
+! !
+
+! Class methodsFor: 'Modification' !
+
+instVarNames: aString
+    | isize cl |
+    vars <- self StringasArray: aString.
+    isize <- vars size.
+    cl <- self superclass.
+    cl notNil ifTrue: [ isize <- cl instSize + isize ].
+    flags isNil ifTrue: [ flags <- isize * 8 ]
+                ifFalse: [ flags <- (isize * 8) + (flags bitAnd: 7)].
+    ^ vars
+!
+
+classVarNames: aString
+    | names newdict index n |
+    newdict <- Dictionary new.
+    classvars isNil ifTrue: [ classvars <- newdict ].
+    names <- self StringasArray: aString.
+    index <- 1.
+    [ index <= (names size) ] whileTrue: [
+	n <- names at: index.
+        newdict add: (classvars at: (n asSymbol) ifAbsent:
+                        [ Association key: (n asSymbol) value: nil ]).
+	index <- index + 1].
+    classvars <- newdict.
+    ^ newdict
+!
+
+comment: aString
+	^ comment <- aString
+!
+
+category: aString
+	^ category <- aString
+!
+
+name: aString
+	^ name <- aString
+!
+
+instFlags: variableBoolean
+	words: wordBoolean
+	pointers: pointerBoolean
+	| temp |
+	flags isNil ifTrue: [ temp <- 0 ]
+		    ifFalse: [ temp <- flags bitAnd: ( 7 negated)].
+	pointerBoolean
+	  ifTrue: [ temp <- temp bitOr: 1 ]
+	  ifFalse: [
+	     wordBoolean ifFalse: [ temp <- temp bitOr: 2 ]].
+	variableBoolean ifTrue: [ temp <- temp bitOr: 4 ].
+	^ flags <- temp
 ! !
 
 ! Class methodsFor: 'Instance Creation'!
@@ -1205,6 +1334,61 @@ metaclassFor: classNameString
 	aClass isNil ifTrue:
 		[ ^ MetaClass subclassOf: self class ].
 	^ aClass class
+!
+
+StringasArray: aString
+    | len str index index1 index2 c offset array |
+    len <- aString size.
+    len = 0 ifTrue: [ ^ Array new: 0.  ].
+    index <- 1.
+    index1 <- 1.
+    offset <- 0.
+    [ index <= len ] whileTrue: [
+	c <- aString at: index.
+	c = $  ifTrue: [
+	           index1 ~= index ifTrue: [ offset <- offset + 1. ].
+		   index <- index + 1.
+                   index1 <- index ]
+               ifFalse: [ index <- index + 1]
+    ].
+    index1 ~= index ifTrue: [ offset <- offset + 1. ].
+    array <- Array new: offset.
+    offset = 0 ifTrue: [ ^ array ].
+    offset <- 1.
+    index <- 1.
+    index1 <- 1.
+    [ index <= len ] whileTrue: [
+	c <- aString at: index.
+	c = $  ifTrue: [
+	           index1 ~= index ifTrue: [
+			" Build a new string "
+			str <- String new: (index - index1).
+			index2 <- 1.
+			[ index1 < index ] whileTrue: [
+				str at: index2 put: ( aString at: index1).
+				index2 <- index2 + 1.
+				index1 <- index1 + 1
+			].
+			array at: offset put: str.
+			offset <- offset + 1
+		   ].
+		   index <- index + 1.
+                   index1 <- index ]
+               ifFalse: [ index <- index + 1]
+    ].
+    index1 <= len ifTrue: [
+	" Build a new string "
+	str <- String new: (index - index1).
+	index2 <- 1.
+	[ index1 < index ] whileTrue: [
+		str at: index2 put: ( aString at: index1).
+		index2 <- index2 + 1.
+		index1 <- index1 + 1
+	 ].
+	 array at: offset put: str.
+	 offset <- offset + 1
+    ].
+    ^array
 ! !
 
 ! MetaClass class methodsFor: 'Creation'!
@@ -1240,7 +1424,7 @@ name: newName
 	category: categoryName
 	comment: commentString
 	changed: changed
-	| aClass var className |
+	| aClass className |
 
 	className <- newName asSymbol.
 	aClass <- aSystemDictionary at: className ifAbsent: [ nil ].
@@ -1271,13 +1455,10 @@ name: newName
 	superClass notNil
 	    ifTrue: [ aClass class superclass: superClass class ].
 	aClass name: newName.
-        var <- superClass instVarNames.
-	var size ~= 0 and: [ stringOfInstVarNames size ~= 0 ] ifTrue:
-			[ var <- var , ' ' ].
-	var <- var , stringOfInstVarNames.
 	aClass instFlags: variableBoolean words: wordsBoolean
-		pointers: pointersBoolean instCount: 0 .
-	aClass instVarNames: var.
+		pointers: pointersBoolean.
+	aClass instVarNames: stringOfInstVarNames.
+        classvars <- aClass classVarNames: stringOfClassVarNames.
 	aClass category: categoryName.
 	aClass comment: commentString.
 	^ aClass
@@ -1295,26 +1476,26 @@ newMeta: newName
 	category: categoryName
 	comment: commentString
 	changed: changed
-	| aClass var className |
-	self instFlags: false words: true pointers: true
-			 instCount: Class instSize .
+	| aClass |
+	" Fill in the metaclass first "
+	vars <- Class instVarNames.
+	" Set instance size before we go too far "
+        flags <- (Class instSize * 8) + 1.
 	name <- newName.
-	className <- newName asSymbol.
 	aClass <- self new.
 	instanceClass <- aClass.
-	aSystemDictionary at: className put: aClass.
+	" Now fill in the class "
 	aClass superclass: superClass.
 	aClass name: newName.
 	aClass instFlags: variableBoolean words: wordsBoolean
-		pointers: pointersBoolean instCount: 0 .
-        var <- superClass instVarNames.
-	var size ~= 0 and: [ stringOfInstVarNames size ~= 0 ] ifTrue:
-			[ var <- var , ' ' ].
-	var <- var , stringOfInstVarNames.
-	aClass instVarNames: var.
+		pointers: pointersBoolean.
+	aClass instVarNames: stringOfInstVarNames.
+        classvars <- aClass classVarNames: stringOfClassVarNames.
 	superClass addSubclass: aClass.
 	aClass category: categoryName.
 	aClass comment: commentString.
+	" Lastly add it into the system symbol table"
+	aSystemDictionary at: (newName asSymbol) put: aClass.
 	^ aClass
 ! !
 
@@ -1334,6 +1515,16 @@ open: aName mode: aMode ifFail: aBlock
 	file <- self new setName: aName mode: aMode.
 	file open ifFalse: [ ^ aBlock value ].
 	^ file
+!
+
+fromArray: aArray
+	| n m pos nFile |
+	n <- aArray at: 1.
+	m <- aArray at: 2.
+	pos <- aArray at: 3.
+	nFile <- self new setName: n mode: m.
+	nFile position: pos.
+	^ nFile
 ! !
 
 !File methodsFor: 'basic' !
@@ -1373,6 +1564,7 @@ open
 
 close
 	<primitive 81>
+
 ! !
 
 !File methodsFor: 'accesss'!
@@ -1397,8 +1589,3 @@ size
 	<primitive 88>
 ! !
 
-!String methodsFor: 'System'!
-
-snapShot
-	<primitive 79>
-! !
