@@ -3,6 +3,9 @@
  * Smalltalk interpreter: Initialize basic Known and builtin objects.
  *
  * $Log: init.c,v $
+ * Revision 1.7  2001/08/01 16:42:31  rich
+ * Make sure top of message chain has a nil sender.
+ *
  * Revision 1.6  2001/07/31 14:09:48  rich
  * Fixed spelling error "reciever"
  * Added classes for Magnitude and Integer and Number
@@ -33,7 +36,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: init.c,v 1.6 2001/07/31 14:09:48 rich Exp rich $";
+	"$Id: init.c,v 1.7 2001/08/01 16:42:31 rich Exp rich $";
 
 #endif
 
@@ -44,11 +47,13 @@ static char        *rcsid =
 #include "interp.h"
 #include "primitive.h"
 #include "fileio.h"
+#include "graphic.h"
 #include "dump.h"
 #include "lex.h"
 #include "symbols.h"
 #include "parse.h"
 #include "image.h"
+#include "system.h"
 
 struct _class_template {
 	    Objptr              object;
@@ -85,8 +90,13 @@ struct _class_template {
     { MagnitudeClass, CLASS_PTRS, 0, ObjectClass, "Magnitude", NULL },
     { NumberClass, CLASS_PTRS, 0, MagnitudeClass, "Number", NULL },
     { IntegerClass, CLASS_PTRS, 0, NumberClass, "Integer", NULL },
+    { SmallIntegerClass, 0, 0, IntegerClass, "SmallInteger", NULL },
     { CharacterClass, CLASS_PTRS, 1, MagnitudeClass, "Character", "value" },
-    { FloatClass, CLASS_INDEX|CLASS_BYTE, 0, NumberClass, "Float", NULL },
+    { FloatClass, CLASS_INDEX | CLASS_BYTE, 0, NumberClass, "Float", NULL },
+    { LargePosIntegerClass, CLASS_INDEX | CLASS_BYTE, 0, IntegerClass, 
+		"LargePositiveInteger", NULL },
+    { LargeNegIntegerClass, CLASS_INDEX | CLASS_BYTE, 0, IntegerClass, 
+		"LargeNegativeInteger", NULL },
     { UndefinedClass, CLASS_PTRS, 0, ObjectClass, "Undefined", NULL },
     { TrueClass, CLASS_PTRS, 0, BooleanClass, "True", NULL },
     { FalseClass, CLASS_PTRS, 0, BooleanClass, "False", NULL },
@@ -108,7 +118,6 @@ struct _class_template {
     { AssociationClass, CLASS_PTRS, 2, ObjectClass, "Association",
 		 "key value" },
     { SSetClass, CLASS_PTRS | CLASS_INDEX, 1, ObjectClass, "Set", "tally" },
-    { SmallIntegerClass, 0, 0, IntegerClass, "SmallInteger", NULL }
 };
 
 char               *specialSelector[32] =
@@ -404,6 +413,14 @@ smallinit(int otsize)
 	    Set_object(SpecialSelectors, i,
 		       internString(specialSelector[i]));
 
+    /* Create list for console waiting */
+    /*
+     * Class is not important since it is not accessable, needs to look like
+     * a linked list head.
+     */
+    init_console(create_new_object(PointClass, 0));
+    rootObjects[CONSOLELIST] = console.file_oop;
+
     /* Install class instance variable names now */
     instvar_classes();
     loadPrimitives();
@@ -435,6 +452,18 @@ load_file(char *str)
     rootObjects[SELECT3] = UnknownClassVar;
     rootObjects[SELECT4] = InterpStackFault;
     rootObjects[CURCONT] = current_context;
+    rootObjects[DISPOBJ] = display_object;
+    rootObjects[CURSOBJ] = cursor_object;
+    rootObjects[TICKSEMA] = tick_semaphore;
+    rootObjects[INPUTSEMA] = input_semaphore;
+    rootObjects[CONSOLELIST] = console.file_oop;
+    init_console(console.file_oop);
+
+   /* Initialize the display and cursor */
+    display_object = NilPtr;
+    cursor_object = NilPtr;
+    BeDisplay(rootObjects[DISPOBJ]);
+    BeCursor(rootObjects[CURSOBJ]);
     newContextFlag = 1;
 
    /* Inlined return of False. */
