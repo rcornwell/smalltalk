@@ -1,9 +1,12 @@
 /*
  * Smalltalk interpreter: Windows Resource file.
  *
- * $Id: smalltalk.rc,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: smalltalk.rc,v 1.2 2001/07/31 14:09:49 rich Exp rich $
  *
  * $Log: smalltalk.rc,v $
+ * Revision 1.2  2001/07/31 14:09:49  rich
+ * Removed CRs.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -17,6 +20,7 @@
 SMALLTALK ICON smalltalk.ico
 SMALLIMAGE ICON smallImage.ico
 SMALLFILE ICON smallfile.ico
+SMALLCHANGE ICON smallchange.ico
 
 VS_VERSION_INFO	VERSIONINFO
 	FILEVERSION	1,0,2,0
