@@ -1,9 +1,13 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: stream.st,v 1.5 2001/07/31 14:09:49 rich Exp rich $ "
+" $Id: stream.st,v 1.6 2001/08/18 16:17:02 rich Exp rich $ "
 
 "
  $Log: stream.st,v $
+ Revision 1.6  2001/08/18 16:17:02  rich
+ Changed classes and methods to correct categories.
+ Finished directory management primitives.
+
  Revision 1.5  2001/07/31 14:09:49  rich
  Code cleanup
  Moved File class from basic.st
@@ -481,8 +485,19 @@ upTo: anObject
     stream's contents if anObject is not present."
     | newStream |
     newStream <- WriteStream on: (contents species new: 0).
-    [ self atEnd or: [ self peek ~= anObject ] ] whileFalse:
+    [ self atEnd or: [ self peek == anObject ] ] whileFalse:
         [ newStream nextPut: (self next) ].
+    ^newStream contents
+!
+
+upToAny: aCollection 
+    "Answer a subcollection from position to the occurrence (if any, not  
+    inclusive) of any element in aCollection. If not there, answer everything."
+
+    | newStream element |
+    newStream <- WriteStream on: (contents species new: 0).
+    [self atEnd or: [aCollection includes: (element <- self next)]]
+    	whileFalse: [ newStream nextPut: element].
     ^newStream contents
 ! !
 
@@ -644,6 +659,7 @@ open: fileName mode: fileMode
 !
 
 open: fileName mode: fileMode ifFail: aBlock
+    contents <- String new: 0.
     file <- File open: fileName mode: fileMode ifFail: aBlock.
     position <- file position.
 !
