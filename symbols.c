@@ -2,6 +2,10 @@
  * Smalltalk interpreter: Parser.
  *
  * $Log: symbols.c,v $
+ * Revision 1.2  2000/02/01 18:10:05  rich
+ * Class instance variables now stored in a Array.
+ * Fixed some errors in Literal table generation.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -10,7 +14,7 @@
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: symbols.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
+	"$Id: symbols.c,v 1.2 2000/02/01 18:10:05 rich Exp rich $";
 
 #endif
 
@@ -32,8 +36,6 @@ static char        *rcsid =
 
 #include "object.h"
 #include "smallobjs.h"
-#include "primitive.h"
-#include "interp.h"
 #include "lex.h"
 #include "symbols.h"
 
