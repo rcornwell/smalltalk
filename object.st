@@ -1,9 +1,14 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: object.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: object.st,v 1.2 2000/02/01 18:09:58 rich Exp rich $ "
 
 "
  $Log: object.st,v $
+ Revision 1.2  2000/02/01 18:09:58  rich
+ Changed print to use CharStream class.
+ Fixed bugs.
+ Added System class.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -24,7 +29,7 @@ printOn: aStream
 	"Print the objects class name."
 	| name first |
 	name <- self classNameString.
-	first <- name first isVowel ifTrue: [ 'an ' ] ifFalse: [ 'a ' ]. 
+	first <- (name at: 1) isVowel ifTrue: [ 'an ' ] ifFalse: [ 'a ' ]. 
 	aStream nextPutAll: first.
 	aStream	nextPutAll: name
 !
@@ -152,21 +157,25 @@ fileIn
 
 executeLoop
 	| aString |
-	stdout nextPutAll: 'Smalltalk Loaded'.
-	stdout nl.
-	[ self atEnd] whileFalse: [
-	    stdout nextPutAll: 'Ready'.
-	    stdout nl.
-	    aString <- self nextChunk.
-	    stderr nextPutAll: 'Executing: '.
-	    stderr nextPutAll: aString.
-	    stderr nextPutAll: ':'.
+	stderr nextPutAll: 'Smalltalk Loaded'.
+	stderr nl.
+	[ stdin atEnd] whileFalse: [
+	    stderr nextPutAll: 'Ready'.
 	    stderr nl.
+	    aString <- self nextChunk.
 	    Compiler evaluate: aString.
 	]
 ! !
 
+!Class methodsFor: 'compiler' !
+methodsFor: aCategory
+      ^ ClassCategoryReader for: self category: aCategory
+! !  
+
+stderr nextPutAll: 'Saving image'.
+stderr nl.
 (System snapShot: 'smalltalk.sti') .
  stdin executeLoop 
 !
 
+!
