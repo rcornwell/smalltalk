@@ -1,9 +1,12 @@
 " Methods for Class collection and all it's subclasses"
 
-" $Id: $ "
+" $Id: collection.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: collection.st,v $
+ Revision 1.1  1999/09/02 15:57:59  rich
+ Initial revision
+
 "
 
 Object variableSubclass: 'Collection' instanceVariableNames: ''
@@ -1423,7 +1426,7 @@ add: newObject
 
 add: newObject withOccurrences: anInteger
     contents at: newObject
-             put: (self occurrencesOf: newObject) + anInteger.
+             put: ((self occurrencesOf: newObject) + anInteger).
     ^newObject
 ! !
 
@@ -1480,7 +1483,8 @@ hash
 !Bag methodsFor: 'enumerating'!
 
 do: aBlock
-      [ :assoc |  assoc value timesRepeat: [ aBlock value: assoc key ]]
+     contents associationsDo: 
+         [ :assoc | assoc value timesRepeat: [ aBlock value: assoc key ]]
 ! !
 
 !Bag methodsFor: 'storing'!
@@ -1637,7 +1641,7 @@ findIndexOrNil: anObject ifFull: aBlock
 		key <- self basicAt: index.
 		(key isNil  or: [key = anObject ] ) ifTrue: [ ^ index ].
 		index <- index + 1.
-		index = size ifTrue: [
+		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
 			index <- 1.
 			wrap <- true.
@@ -1684,7 +1688,7 @@ growSize
 ! Dictionary methodsFor: 'Accessing' !
 
 at: key
-	^ self at: key ifAbsent: [ self errorKeyNotFound ]
+	^ self at: key ifAbsent: [ self errorKeyNotFound: key ]
 !
 
 at: key ifAbsent: aBlock
@@ -1710,7 +1714,6 @@ at: key put: value
 	^ value
 !
 
-
 add: anAssociation
 	| index element |
 	index <- self findObjectIndex: anAssociation key.
@@ -1721,13 +1724,14 @@ add: anAssociation
 	    ifFalse: [ element value: anAssociation value].
 	^anAssociation
 !
+
 associationAt: key
-    ^self associationAt: key ifAbsent: [ ^self error: 'key not found' ]
+    ^self associationAt: key ifAbsent: [ ^self errorKeyNotFound: key ]
 !
 
 associationAt: key ifAbsent: aBlock
     | index assoc|
-    index <- self findKeyIndex: key.
+    index <- self findObjectIndex: key.
     assoc <- self basicAt: index.
     assoc isNil ifTrue: [ ^aBlock value ]
                 ifFalse: [ ^assoc ]
@@ -1791,7 +1795,7 @@ removeAssociation: anAssociation
 !
 
 removeKey: key
-    ^self removeKey: key ifAbsent: [ ^self error: 'key not found' ]
+    ^self removeKey: key ifAbsent: [ ^self errorKeyNotFound: key ]
 !
 
 removeKey: key ifAbsent: aBlock
@@ -1923,16 +1927,6 @@ removeKey: aKey ifAbsent: aBlock
 	^ assoc value
 ! !
 
-! Dictionary methodsFor: 'Enumeration' !
-
-associationsDo: aBlock
-	super do: [ :assoc | aBlock value: assoc ]
-!
-
-do: aBlock
-	self associationsDo: [ :assoc | aBlock value: assoc value ]
-! !
-
 ! Dictionary methodsFor: 'private' !
 
 findIndexOrNil: aKey ifFull: aBlock
@@ -1945,7 +1939,7 @@ findIndexOrNil: aKey ifFull: aBlock
 		assoc <- self basicAt: index.
 		assoc isNil or: [assoc key = aKey ] ifTrue: [ ^ index ].
 		index <- index + 1.
-		index = size ifTrue: [
+		index > size ifTrue: [
 			wrap ifTrue: [ ^ aBlock value ].
 			index <- 1.
 			wrap <- true.
@@ -1983,6 +1977,10 @@ grow
 	newDict <- self species new: self basicSize + self growSize.
 	self associationsDo: [ :element | newDict add: element ].
 	^ self become: newDict
+!
+
+errorKeyNotFound: aKey
+    self error: ('Key "', aKey asString , '" not found: ')
 ! !
 
 IdentityDictionary comment:
@@ -2187,14 +2185,15 @@ findKeyIndex: aKey ifFull: aBlock
     not to be found, aBlock is evaluated and it's value is returned."
     | index count size key |
     size <- self basicSize.
-    index <- aKey hash \\ size + 1.
+    index <- 1 + (aKey hash \\ (size - 1)).
     count <- size.
     [ count > 0 ]
         whileTrue:
             [ key <- self basicAt: index.
               (key isNil or: [ key == aKey ])
                 ifTrue: [ ^index ].
-              index <- index \\ size + 1.
+	      index <- index + 1.
+	      index > size ifTrue: [index <- 1 ].
               count <- count - 1. ].
     ^aBlock value
 !
