@@ -1,9 +1,13 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: behavior.st,v 1.2 2000/02/01 18:09:45 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.2  2000/02/01 18:09:45  rich
+ Completed missing routines.
+ Hooks to native compiler.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -293,19 +297,13 @@ instVarNames
 !
 
 allInstVarNames
-    | svars index index2 newarray |
+    | svars newarray |
     superclass isNil ifTrue: [ ^ Array new: 0 ].
     svars <- superclass allInstVarNames.
-    newarray <- (vars size) + (svars size).
-    index <- 1.
-    [ index < (svars size) ] whileTrue:
-	[ newarray at: index put: (svars at: index).
-	  index <- index + 1. ].
-    index2 <- 1.
-    [ index2 < (vars size) ] whileTrue:
-	[ newarray at: index put: (vars at: index2).
-	  index <- index + 1. index2 <- index2 + 1. ].
-    ^ newarray
+    newarray <- WriteStream on: (Array new: 0).
+    newarray nextPutAll: svars.
+    newarray nextPutAll: vars.
+    ^ newarray contents
 !
 
 classVarNames
@@ -499,11 +497,12 @@ inheritsFrom: aClass
 
 kindOfSubclass
 	| string |
-	self isVariable ifTrue: [ string <- 'variable' ]
-	                ifFalse: [ string <- '' ].
-	self isBytes ifTrue: [ string <- string , 'Byte' ]
-	  ifFalse: [ self isWords ifTrue: [ string <- string , 'Word' ]].
-	string <- string , 'SubClass:'.
+	string <- WriteStream on: (String new: 0).
+	self isVariable ifTrue: [ string nextPutAll: 'Variable' ].
+	self isBytes ifTrue: [ string nextPutAll: 'Byte' ]
+	  ifFalse: [ self isWords ifTrue: [ string nextPutAll: 'Word' ]].
+	string nextPutAll: 'SubClass:'.
+	string <- string contents.
 	string at: 1 put: ((string at: 1) asLowercase ).
 	^ string
 ! !
