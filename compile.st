@@ -1,9 +1,13 @@
 " Methods for Class stream and all it's subclasses"
 
-" $Id: compile.st,v 1.7 2001/08/18 16:17:01 rich Exp rich $ "
+" $Id: compile.st,v 1.8 2001/08/29 20:16:34 rich Exp rich $ "
 
 "
  $Log: compile.st,v $
+ Revision 1.8  2001/08/29 20:16:34  rich
+ Added class definitions
+ Fixed bug with floating point numbers.
+
  Revision 1.7  2001/08/18 16:17:01  rich
  Placed classes and methods in correct categories.
  Added compiler error dump.
@@ -39,6 +43,28 @@
 
 
 "
+
+Object subclass: 'SyntaxError'
+       instanceVariableNames: ''
+       classVariableNames: ''
+       poolDictionaries: ''
+       category: 'Compiler'. !
+
+! SyntaxError class methodsFor: 'messages' !
+
+error: aMessage at: aPosition on: aString
+    | start stream i |
+    start <- aPosition.
+    stream <- ReadStream on: aString.
+    i <- 1.
+    [ stream atEnd ] whileFalse: [
+	 i == start ifTrue: [ stderr nextPutAll: ' **> '.
+			      stderr nextPutAll: aMessage.
+			      stderr nextPutAll: ' <** ' ].
+	 stderr nextPut: (stream next).
+	 i <- i + 1.
+    ].
+! !
 
 Object subclass: 'SmallTalkToken'
        instanceVariableNames: 'token stream value curchar pushback first'
@@ -2247,7 +2273,7 @@ literals
 ! !
 
 Object subclass: 'SmallTalkParser'
-       instanceVariableNames: 'table token class primitive pattern inBlock method error'
+       instanceVariableNames: 'table token class primitive pattern inBlock method error notifier compileString'
        classVariableNames: ''
        poolDictionaries: ''
        category: 'Compiler' !
@@ -2266,10 +2292,12 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
 on: aString forClass: aClass msgpattern: patFlag notify: aBlock
     | tree bytecodes header eheader litcount stack lits |
     table <- SmallTalkSymbolTable new: aClass using: self.
+    compileString <- aString.
     pattern <- nil.
     inBlock <- false.
     method <- nil.
     primitive <- 0.
+    notifier <- aBlock.
 
     " Initialize token stream "
     token <- SmallTalkToken on: aString.
@@ -2278,18 +2306,18 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
     " Collect the message pattern if we should "
     patFlag ifTrue: [
 	 pattern <- self messagePattern.
-	 pattern isNil ifTrue: [ aBlock. ^ self ]
+	 pattern isNil ifTrue: [  ^ self ]
     ].
 
     " Collect any temporiaries "
-    self temporiaries ifFalse: [ aBlock. ^ self ].
+    self temporiaries ifFalse: [  ^ self ].
 
     " Check if primitive method. "
-    self parsePrimitive ifFalse: [ aBlock. ^ self ].
+    self parsePrimitive ifFalse: [  ^ self ].
 
     " Compile the rest of method "
     tree <- SmallTalkMethodNode new: table.
-    (self doBody: tree) isNil ifTrue: [ aBlock. ^ self ].
+    (self doBody: tree) isNil ifTrue: [  ^ self ].
     token <- nil.
 
     " Check if we can shortcut this method "
@@ -2338,14 +2366,8 @@ on: aString forClass: aClass msgpattern: patFlag notify: aBlock
 
 parseError: aMessage
     | pos |
-    pos <- token first.
-    error <- aMessage. 
-    error printOn: stderr.
-    stderr nextPutAll: ' at Offset: '.
-    pos printOn: stderr.
-    stderr nl.
-    token errorDumpOn: stderr.
-    stderr nl.
+    notifier isNil ifTrue: [ notifier <- SyntaxError ].
+    notifier error: aMessage at: token first on: compileString.
     ^ nil
 ! !
 
@@ -2636,17 +2658,27 @@ evaluate: aString
     comp <- SmallTalkParser on: aString
 			 forClass: Object
 			 msgpattern: false
-			 notify: [].
+			 notify: nil.
+    comp method isNil ifFalse: [ ^ comp method evaluate  ]
+	       ifTrue: [ ^ nil ].
+!
+
+evaluate: aString forClass: aClass notify: aBlock
+    | comp |
+    comp <- SmallTalkParser on: aString
+			 forClass: aClass
+			 msgpattern: false
+			 notify: aBlock
     comp method isNil ifFalse: [ ^ comp method evaluate  ]
 	       ifTrue: [ ^ nil ].
 !
 
 compile: aString forClass: aClass
-    ^ self compile: aString forClass: aClass classified: nil notify: []
+    ^ self compile: aString forClass: aClass classified: nil notify: nil
 !
 
 compile: aString forClass: aClass classified: aCategory
-    ^ self compile: aString forClass: aClass classified: aCategory notify: []
+    ^ self compile: aString forClass: aClass classified: aCategory notify: nil
 !
 
 compile: aString forClass: aClass classified: aCategory notify: aBlock
