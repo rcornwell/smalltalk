@@ -1,9 +1,12 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: $ "
+" $Id: object.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
 
 "
- $Log: $
+ $Log: object.st,v $
+ Revision 1.1  1999/09/02 15:57:59  rich
+ Initial revision
+
 "
 
 !
@@ -22,14 +25,14 @@ printOn: aStream
 	| name first |
 	name <- self classNameString.
 	first <- name first isVowel ifTrue: [ 'an ' ] ifFalse: [ 'a ' ]. 
-	aStream nextPutAll: first ;
-		nextPutAll: name
+	aStream nextPutAll: first.
+	aStream	nextPutAll: name
 !
 
 print
-	| str |
-	str <- self printString.
-	str DumpObject
+	stdout nextPutAll: (self printString).
+	stdout nl.
+	^ self
 !
 
 storeString
@@ -72,18 +75,98 @@ storeOn: aStream
 		   
 ! ! 
 
+! Undefined methodsFor: 'Printing' !
+
+printString
+	"Return a string representation of self"
+	^ 'nil'
+!
+
+printOn: aStream
+	"Print the objects class name."
+	aStream nextPutAll: 'nil'
+!
+
+storeString
+	"Return a string representation of self"
+	^ 'nil'
+!
+
+storeOn: aStream
+	"Store the object onto the stream."
+	aStream put: 'nil'.
+! ! 
+
 !Object methodsFor: 'Shortcut' !
 
 -> anObject
 	^ Association key: self value: anObject
 ! !
 
-!String methodsFor: 'System'!
+Object subclass: 'System' instanceVariableNames: ''
+       classVariableNames: '' poolDictionaries: '' category: nil
+!
 
-snapShot
-        <primitive 79>
+System comment: 'I handle system specific actions.' !
+
+!System class methodsFor: 'System' !
+
+coreUsed
+	<primitive 75>
+!
+
+freeCore
+	<primitive 76>
+!
+
+oopsLeft
+	<primitive 77>
+!
+
+quit
+	<primitive 78>
+!
+
+DoSnapShot: aName
+	<primitive 79>
+!
+
+snapShot: aName
+	^ self DoSnapShot: aName
+!
+
+stackTrace
+	<primitive 99>
 ! !
 
-'smalltalk.sti' snapShot !
+!Stream methodsFor: 'file I/O' !
+fileIn
+	| aString sawExclaim |
+	[ self atEnd] whileFalse: [
+	    sawExclaim <- self peekFor: $!!.
+	    aString <- self nextChunk.
+	    sawExclaim
+	       ifFalse: [ Compiler evaluate: aString]
+	       ifTrue: [ (Compiler evaluate: aString) fileInFrom: self]]
+!
 
-(3 + 4) print !
+executeLoop
+	| aString |
+	stdout nextPutAll: 'Smalltalk Loaded'.
+	stdout nl.
+	[ self atEnd] whileFalse: [
+	    stdout nextPutAll: 'Ready'.
+	    stdout nl.
+	    aString <- self nextChunk.
+	    stderr nextPutAll: 'Executing: '.
+	    stderr nextPutAll: aString.
+	    stderr nextPutAll: ':'.
+	    stderr nl.
+	    Compiler evaluate: aString.
+	]
+! !
+
+(System snapShot: 'smalltalk.sti') .
+ stdin executeLoop 
+!
+
