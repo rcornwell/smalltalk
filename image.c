@@ -1,13 +1,16 @@
 /*
  * Smalltalk interpreter: Image reader/writer.
  *
- * $Log: $
+ * $Log: image.c,v $
+ * Revision 1.1  1999/09/02 15:57:59  rich
+ * Initial revision
+ *
  *
  */
 
 #ifndef lint
 static char        *rcsid =
-	"$Id: $";
+	"$Id: image.c,v 1.1 1999/09/02 15:57:59 rich Exp rich $";
 
 #endif
 
@@ -193,9 +196,9 @@ load_image(char *name)
 	for (; size > 0; size--)
 	    *ip++ = next_int();
     }
+    for (; numfiles > 0; numfiles--) 
+	open_buffer(next_int());
     file_close(file_id);
-   /* Rebuild free list and update reference counts */
-    rebuild_free();
     return TRUE;
 }
 
@@ -207,9 +210,11 @@ save_image(char *name, char *process)
 {
     int                 temp;
     int                 numobjs;
+    int			numfiles;
     Objptr              op, class;
     int                 size, flags;
     int                *ip;
+    struct file_buffer *fp;
 
     if ((file_id = file_open(name, "w", &temp)) == -1)
 	return FALSE;
@@ -240,12 +245,14 @@ save_image(char *name, char *process)
     put_int(growsize);
     put_int(newProcess);
     put_int(current_context);
-    put_int(numobjs = as_integer(usedOops()));
-    put_int(0);
+    put_int(numobjs = as_integer(usedOops()) - 1);
+    for(fp = files, numfiles = 0; fp != NULL; fp = fp->file_next) 
+	numfiles++;
+    put_int(numfiles);
 
    /* Load in object data */
     for (op = NilPtr; numobjs > 0; numobjs--) {
-	if ((ip = next_object(&op, &flags, &class, &size)) == NULL)
+	if ((ip = next_object(&op, &flags, &class, &size)) == NULL) 
 	    break;
 	put_int(op);
 	put_int(flags);
@@ -256,6 +263,8 @@ save_image(char *name, char *process)
 	for (; size > 0; size--)
 	    put_int(*ip++);
     }
+    for(fp = files; fp != NULL; fp = fp->file_next) 
+	put_int(fp->file_oop);
     flush_buf();
     file_close(file_id);
     return TRUE;
