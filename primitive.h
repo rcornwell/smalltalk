@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: primitive.h,v 1.3 2000/02/02 00:33:47 rich Exp rich $
+ * $Id: primitive.h,v 1.4 2000/08/20 00:10:12 rich Exp rich $
  *
  * $Log: primitive.h,v $
+ * Revision 1.4  2000/08/20 00:10:12  rich
+ * Added primitive to return number of bytecodes in method.
+ *
  * Revision 1.3  2000/02/02 00:33:47  rich
  * Moved assitent functions to smallobjs.c
  *
@@ -124,6 +127,8 @@
 #define primitiveByteAt			103
 #define primitiveByteAtPut		104
 #define primitiveByteCodes		105
+#define primitiveFlushCacheSelect	106
+#define primitiveFlushCache		107
  
 
 int                 arrayAt(Objptr, int, Objptr *);
