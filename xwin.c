@@ -2,6 +2,11 @@
  * Smalltalk interpreter: X Windows interface.
  *
  * $Log: xwin.c,v $
+ * Revision 1.2  2001/08/29 20:16:35  rich
+ * Added graphics support.
+ * Added timer support.
+ * Added signal blocking around system calls.
+ *
  * Revision 1.1  2001/08/18 16:23:10  rich
  * Initial revision
  *
@@ -11,7 +16,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: xwin.c,v 1.1 2001/08/18 16:23:10 rich Exp rich $";
+    "$Id: xwin.c,v 1.2 2001/08/29 20:16:35 rich Exp rich $";
 #endif
 
 #ifndef WIN32
@@ -46,6 +51,7 @@ static char        *rcsid =
 #include "fileio.h"
 #include "graphic.h"
 
+static void         process_time();
 static void         processX();
 static Display     *display;
 static Cursor       cursor = -1;
@@ -78,23 +84,21 @@ initSystem()
     sa.sa_handler = timer_handler;
     sa.sa_flags = SA_NOMASK;
     sigaction(SIGALRM, &sa, &osa);
-    tv.it_interval.tv_usec = 20000;
+    tv.it_interval.tv_usec = 50000;
     tv.it_interval.tv_sec = 0;
-    tv.it_value.tv_usec = 20000;
+    tv.it_value.tv_usec = 50000;
     tv.it_value.tv_sec = 0;
 
     setitimer(ITIMER_REAL, &tv, &otv);
     return 1;
 }
 
+static int	time_events = 0;
 /* Handle the alarm timer */
 void
 timer_handler(int sig)
 {
-    int                 i;
-
-    for (i = 0; i < 20; i++)
-	PostEvent(EVENT_TIMER, 0);
+    time_events += 20;
 }
 
 /* Shutdown the system. */
@@ -384,7 +388,9 @@ WaitEvent(int suspend)
     }
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
+    process_time();
     if (select(high + 1, &chk_bits, NULL, NULL, &timeout) > 0) {
+	process_time();
 	if (FD_ISSET(0, &chk_bits))
 	    fill_buffer();
 	if (xconn >= 0 && FD_ISSET(xconn, &chk_bits))
@@ -393,6 +399,21 @@ WaitEvent(int suspend)
     return 1;
 }
 
+static void process_time()
+{
+    sigset_t            hold, old;
+
+    /* Prevent signals while processing events */
+    sigemptyset(&hold);
+    sigaddset(&hold, SIGALRM);
+    sigprocmask(SIG_BLOCK, &hold, &old);
+
+    while(time_events-- > 0)
+       PostEvent(EVENT_TIMER, 0);
+
+    sigprocmask(SIG_UNBLOCK, &hold, &old);
+}
+ 
 /* Process X events */
 static void
 processX()
