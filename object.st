@@ -1,9 +1,13 @@
 " Last bits and peices of smalltalk system "
 
-" $Id: object.st,v 1.7 2001/08/18 16:17:02 rich Exp rich $ "
+" $Id: object.st,v 1.8 2001/08/29 20:16:35 rich Exp rich $ "
 
 "
  $Log: object.st,v $
+ Revision 1.8  2001/08/29 20:16:35  rich
+ Added class definitions.
+ Moved System class to it's own file.
+
  Revision 1.7  2001/08/18 16:17:02  rich
  Changed classes and methods to correct categories.
  Added methods to generate a new source file.
@@ -381,6 +385,71 @@ storeOn: aStream
 
 -> anObject
 	^ Association key: self value: anObject
+! !
+
+! Object methodsFor: 'dependents access'  !
+
+addDependent: anObject
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies isNil ifTrue:
+    	[ dependencies <- Set new.
+	  (Smalltalk at: #Dependencies) at: self put: dependencies ].
+    dependencies add: anObject
+!
+
+removeDependent: anObject
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies notNil ifTrue:
+    	[ dependencies remove: anObject ifAbsent: [] ]
+!
+
+dependents
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies isNil ifTrue: [ dependencies <- Set new ].
+    ^dependencies asOrderedCollection
+!
+
+release
+    " +++ I'm not sure that this is the right thing to do here; the book is
+      so vague... "
+    (Smalltalk at: #Dependencies) removeKey: self
+! !
+
+! Object methodsFor: 'change and update' !
+
+changed
+    self changed: self
+!
+
+changed: aParameter
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies notNil ifTrue:
+    	[ dependencies do:
+	    [ :dependent | dependent update: aParameter ] ]
+!
+
+update: aParameter
+    "Default behavior is to do nothing"
+!
+
+broadcast: aSymbol
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies notNil ifTrue:
+    	[ dependencies do:
+	    [ :dependent | dependent perform: aSymbol ] ]
+!
+
+broadcast: aSymbol with: anObject
+    | dependencies |
+    dependencies <- System dependenciesAt: self.
+    dependencies notNil ifTrue:
+    	[ dependencies do:
+	    [ :dependent | dependent perform: aSymbol with: anObject ] ]
 ! !
 
 Object subclass: 'Message'
