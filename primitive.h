@@ -2,9 +2,14 @@
 /*
  * Smalltalk interpreter: Primitive Methods.
  *
- * $Id: primitive.h,v 1.1 1999/09/02 15:57:59 rich Exp rich $
+ * $Id: primitive.h,v 1.2 2000/02/01 18:10:02 rich Exp rich $
  *
  * $Log: primitive.h,v $
+ * Revision 1.2  2000/02/01 18:10:02  rich
+ * Added code to display stack trace on error.
+ * Added support for CompiledMethod class.
+ * Added support for CharStream class.
+ *
  * Revision 1.1  1999/09/02 15:57:59  rich
  * Initial revision
  *
@@ -119,21 +124,6 @@
 
 int                 arrayAt(Objptr, int, Objptr *);
 int                 arrayPutAt(Objptr, int, Objptr);
-Objptr              MakeString(char *);
-char               *Cstring(Objptr);
-int                 doSnapShot(Objptr);
-Objptr              internString(char *);
-void                AddSelectorToIDictionary(Objptr, Objptr, Objptr);
-Objptr              FindSelectorInIDictionary(Objptr, Objptr);
-Objptr              FindKeyInIDictionary(Objptr, Objptr);
-Objptr              new_IDictionary();
-void                AddSelectorToDictionary(Objptr, Objptr);
-Objptr              FindSelectorInDictionary(Objptr, Objptr);
-Objptr              create_association(Objptr, Objptr);
-Objptr              new_Dictionary();
-void                AddSelectorToSet(Objptr, Objptr);
-Objptr              FindSelectorInSet(Objptr, Objptr);
-Objptr              new_Set();
 int                 primitive(int, Objptr, Objptr, int, int *);
 
 extern Objptr	    compClass;
