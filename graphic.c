@@ -2,6 +2,9 @@
  * Smalltalk graphics: Routines for doing graphics primitive.
  *
  * $Log: graphic.c,v $
+ * Revision 1.3  2001/09/17 20:19:55  rich
+ * Fixed bug in update range calculation.
+ *
  * Revision 1.2  2001/08/29 20:16:34  rich
  * Make sure bit order is correct.
  * Fixed bugs in doblit and drawloop.
@@ -17,7 +20,7 @@
 #ifndef lint
 static char        *rcsid =
 
-    "$Id: graphic.c,v 1.2 2001/08/29 20:16:34 rich Exp rich $";
+    "$Id: graphic.c,v 1.3 2001/09/17 20:19:55 rich Exp rich $";
 
 #endif
 
@@ -28,6 +31,7 @@ static char        *rcsid =
 #include "primitive.h"
 #include "graphic.h"
 #include "system.h"
+
 
 Objptr              display_object = NilPtr;
 Objptr              cursor_object = NilPtr;
@@ -372,7 +376,6 @@ doblit(Copy_bits blit_data)
 	mask1 = mask1 & mask2;
 	mask2 = 0;
     }
-    /* Interloop */
 
     /* Check for overlap */
     hDir = 1;
@@ -395,8 +398,9 @@ doblit(Copy_bits blit_data)
 	}
     }
 
-    /* Calculate offsets */
-    if (blit_data->source_bits != NULL && skew != 0 && skew <= (sx & 0x1f))
+    /* Do we need to preload first word of source? */
+    if (blit_data->source_bits != NULL && skew != 0 
+			&& skew >= (32 - (sx & 0x1f)))
 	preload = 1;
     else
 	preload = 0;
@@ -447,7 +451,10 @@ doblit(Copy_bits blit_data)
 		unsigned long       thisword;
 
 		thisword = *source_ptr;
-		skewWord = (thisword << skew) | (prevword >> (32 - skew));
+		if (skew == 0)
+		    skewWord = thisword;
+		else
+		    skewWord = (thisword << skew) | (prevword >> (32 - skew));
 		prevword = thisword;
 		skewWord &= halftone;
 		source_ptr += hDir;
@@ -537,8 +544,8 @@ copybits(Objptr blitOp)
 /*
  * Primitive to scan a character array and display it.
  */
-Objptr
-character_scanword(Objptr op, Objptr arg)
+int
+character_scanword(Objptr op, Objptr arg, Objptr *e)
 {
     Objptr              text;
     Objptr              except;
@@ -549,7 +556,6 @@ character_scanword(Objptr op, Objptr arg)
     int                 stopx;
     Objptr              ci;
     int                 c;
-    Objptr              e;
     int                 sx = 0;
     int                 dx;
     int                 odx;
@@ -590,21 +596,21 @@ character_scanword(Objptr op, Objptr arg)
 	}
     }
 
-    e = NilPtr;
+    *e = NilPtr;
     cxw = blit_data.cx + blit_data.cw;
     IntValue(op, DEST_X, dx);
     odx = dx;
-    while (textpos < endrun) {
+    while (textpos <= endrun) {
 	Objptr              off;
 	Objptr              wid;
 
 	/* Get the character */
 	if (!arrayAt(text, textpos, &ci) || !is_integer(ci))
 	    return FALSE;
-	c = as_integer(ci);
+	c = as_integer(ci) + 1;
 
 	/* Check if we should stop on this one */
-	if (arrayAt(except, c, &e) && e != NilPtr)
+	if (arrayAt(except, c, e) && *e != NilPtr)
 	    break;
 
 	/* Get offset and next offset */
@@ -646,7 +652,7 @@ character_scanword(Objptr op, Objptr arg)
 	}
 	dx += w;
 	if (dx > stopx) {
-	    if (!arrayAt(except, 256, &e))
+	    if (!arrayAt(except, 257, e))
 		return FALSE;
 	    break;
 	}
@@ -654,8 +660,8 @@ character_scanword(Objptr op, Objptr arg)
     }
 
     /* If no exception we must have hit end of run, return it's code */
-    if (e == NilPtr)
-	if (!arrayAt(except, 257, &e))
+    if (*e == NilPtr)
+	if (!arrayAt(except, 258, e))
 	    return FALSE;
 
     /* Ok, now we can update display if we need too */
@@ -671,7 +677,7 @@ character_scanword(Objptr op, Objptr arg)
     Set_integer(op, DEST_X, dx);
     Set_integer(op, CHAR_TEXT_POS, textpos);
 
-    return e;
+    return TRUE;
 }
 
 /*
