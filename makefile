@@ -5,7 +5,7 @@
 
 O=obj
 PROJ = smalltalk
-SDK=//c/platform
+SDK=//e/sdk
 INCLUDE=$(SDK)/include
 CC = gcc 
 RC = windres -I rc -O coff --include-dir $(INCLUDE)
@@ -22,7 +22,7 @@ OBJS = $(PROJ).$(O) about.$(O) image.$(O) object.$(O) interp.$(O) \
 	     primitive.$(O) fileio.$(O) init.$(O) dump.$(O) lex.$(O) \
 	     code.$(O) symbols.$(O) parse.$(O) smallobjs.$(O) $(PROJ).res
 
-SMALLSRC = basic.st stream.st magnitude.st collection.st misc.st compile.st \
+SMALLSRC = basic.st stream.st collection.st magnitude.st misc.st compile.st \
 	   behavior.st object.st
 
 all:	$(PROJ).sti 
