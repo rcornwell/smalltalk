@@ -2,9 +2,12 @@
 /*
  * Smalltalk interpreter: Interface to system
  *
- * $Id: system.h,v 1.1 2001/08/18 16:22:13 rich Exp rich $
+ * $Id: system.h,v 1.2 2001/08/29 20:16:35 rich Exp rich $
  *
  * $Log: system.h,v $
+ * Revision 1.2  2001/08/29 20:16:35  rich
+ * Added endSystem method to shut graphics system down.
+ *
  * Revision 1.1  2001/08/18 16:22:13  rich
  * Initial revision
  *
@@ -37,6 +40,7 @@ int		    file_checkdirect(char *);
 Objptr		    file_direct(Objptr);
 int		    file_delete(Objptr);
 int		    file_rename(Objptr, Objptr);
+void		    file_cwd(char *);
 int		    write_console(int, char *);
 unsigned long	    current_time();
 int		    current_mtime();
