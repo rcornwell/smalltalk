@@ -1,9 +1,14 @@
 " Methods for Behavior and Class"
 
-" $Id: behavior.st,v 1.5 2001/01/17 01:45:41 rich Exp rich $ "
+" $Id: behavior.st,v 1.6 2001/07/31 14:09:47 rich Exp rich $ "
         
 "
  $Log: behavior.st,v $
+ Revision 1.6  2001/07/31 14:09:47  rich
+ Code cleanup
+ Redid change source saving.
+ Made sure fileOut: produces correct class type.
+
  Revision 1.5  2001/01/17 01:45:41  rich
  Code cleanup.
  Remember to flush method cache after adding a selector.
@@ -155,12 +160,14 @@ methodDictionary: aDictionary
 
 addSelector: selector withMethod: compiledMethod
 	"Adds the selector with compiled method to the class dictionary."
+	methoddict isNil ifTrue: [ methoddict <- IdentityDictionary new ].
 	methoddict at: selector put: compiledMethod.
 	selector flushCache
 !
 
 removeSelector: selector
 	"Removes the selector from the method."
+	methoddict isNil ifTrue: [ ^ self ].
 	methoddict remove: selector.
 	selector flushCache
 ! !
@@ -188,7 +195,9 @@ removeSubclass: aClass
 selectors
 	| sels |
 	sels <- Set new.
-	methoddict keysDo: [ :key | sels add: key ].
+	methoddict isNil ifFalse: [
+		methoddict keysDo: [ :key | sels add: key ]
+	].
 	^ sels
 !
 
@@ -197,18 +206,20 @@ allSelectors
 	sels <- self selectors.
 	cl <- self superclass.
 	[ cl notNil ] whileTrue: [
-		(self selectors) keysDo: [ :key | sels add: key ].
+		(self selectors) do: [ :key | sels add: key ].
 		cl <- cl superclass ].
 	^ sels
 !
 
 compiledMethodAt: selector
+	methoddict isNil ifTrue: [ ^ nil ].
 	^ methoddict at: selector ifAbsent: [ nil ]
 ! !
 
 ! Behavior methodsFor: 'testing method dictionary' !
 
 hasMethods
+	methoddict isNil ifTrue: [ ^ false ].
 	^ methoddict size ~= 0
 !
 
