@@ -1,9 +1,12 @@
 " Methods for Class misc extra classes"
 
-" $Id: misc.st,v 1.1 1999/09/02 15:57:59 rich Exp rich $ "
+" $Id: misc.st,v 1.2 2000/02/01 18:09:56 rich Exp rich $ "
 
 "
  $Log: misc.st,v $
+ Revision 1.2  2000/02/01 18:09:56  rich
+ Moved Date and Time collection to magnitude.
+
  Revision 1.1  1999/09/02 15:57:59  rich
  Initial revision
 
@@ -82,3 +85,4 @@ nextMatchFor: aNumber
 setSeed
     seed <- Time secondClock
 ! !
+
