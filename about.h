@@ -1,30 +1,38 @@
-
 /*
  *
  *  Quick Installer.
  *
  *  About dialog box.
  *
- * Copyright 1999 Richard P. Cornwell All Rights Reserved,
+ * Copyright 1999-2017 Richard P. Cornwell.
  *
- * The software is provided "as is", without warranty of any kind, express
- * or implied, including but not limited to the warranties of
- * merchantability, fitness for a particular purpose and non-infringement.
- * In no event shall Richard Cornwell be liable for any claim, damages
- * or other liability, whether in an action of contract, tort or otherwise,
- * arising from, out of or in connection with the software or the use or other
- * dealings in the software.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the the Artistic License (2.0). You may obtain a copy
+ * of the full license at:
  *
- * Permission to use, copy, and distribute this software and its
- * documentation for non commercial use is hereby granted,
- * provided that the above copyright notice appear in all copies and that
- * both that copyright notice and this permission notice appear in
- * supporting documentation.
+ * http://www.perlfoundation.org/artistic_license_2_0
  *
- * The sale, resale, or use of quick installer for profit without the
- * express written consent of the author Richard Cornwell is forbidden.
- * Please see attached License file for information about using this
- * package in commercial applications, or for commercial software distribution.
+ * Any use, modification, and distribution of the Standard or Modified
+ * Versions is governed by this Artistic License. By using, modifying or
+ * distributing the Package, you accept this license. Do not use, modify, or
+ * distribute the Package, if you do not accept this license.
+ *
+ * If your Modified Version has been derived from a Modified Version made by
+ * someone other than you, you are nevertheless required to ensure that your
+ * Modified Version complies with the requirements of this license.
+ *
+ * This license does not grant you the right to use any trademark, service
+ * mark, tradename, or logo of the Copyright Holder.
+ *
+ * Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER
+ * AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES.
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+ * PURPOSE, OR NON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY
+ * YOUR LOCAL LAW.  UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
+ * CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
+ * CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  *
  */
 
