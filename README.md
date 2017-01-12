@@ -48,61 +48,61 @@ The virtual machine I have implemented:
    0x5 Push Literal n.
    0x6 Push Instance Variable n.
    0x7 Store Instance Variable n.
-   0x8 Jump if top of stack true to n. (relative -127 to 128).
-   0x9 Jump if top of stack false to n. (relative -127 to 128).
-   0xA Jump to n. (relative -127 to 128).
+   0x8 Jump if top of stack true to n. (relative -127 to 128).  
+   0x9 Jump if top of stack false to n. (relative -127 to 128).  
+   0xA Jump to n. (relative -127 to 128).  
    0xB&0xC Send special selector n (0-32), argument count c.  
-          see init.c for list of selectors.  
+          see init.c for list of selectors.    
    0xD Push interger object n. (-7 to 8) or (-127 to 128).
-   0xE Send Literal n with argument count c.
+   0xE Send Literal n with argument count c.  
 
    0x00 is special long jump, which takes next two bytes as 15 bit
-     signed offset to branch to.
+     signed offset to branch to.  
 
-   0x0F is Block Copy, explained below.
+   0x0F is Block Copy, explained below.  
 
-   0xF0 Return self.
-   0xF1 Return top of stack.
-   0xF2 Return #true.
-   0xF3 Return #false.
-   0xF4 Return #nil.
-   0xF5 Return block.
-   0xF6 Pop top of stack.
+   0xF0 Return self.  
+   0xF1 Return top of stack.  
+   0xF2 Return #true.  
+   0xF3 Return #false.  
+   0xF4 Return #nil.  
+   0xF5 Return block.  
+   0xF6 Pop top of stack.  
    0xF7 Push Global variable given by literal n.  
-   0xF8 Push self.
-   0xF9 Duplicate top of stack.
-   0xFA Push #true.
-   0xFB Push #false.
-   0xFC Push #nil.
-   0xFD Send Superclass message n argcount c..
-   0xFE Push #thisContext.
-   0xFF Store Global variable given by literal n.
+   0xF8 Push self.  
+   0xF9 Duplicate top of stack.  
+   0xFA Push #true.  
+   0xFB Push #false.  
+   0xFC Push #nil.  
+   0xFD Send Superclass message n argcount c.  
+   0xFE Push #thisContext.  
+   0xFF Store Global variable given by literal n.  
 
 Block copy expects the instruction stream to be in a specific
 format. Failure to do this will result in crashing system.
 
-   0X0F <Block Copy>
-   <Argument Count>  
+   0X0F <Block Copy>  
+   <Argument Count>   
    Either <0xAn> or <0x0A n> or <0x00 n n> Jump instrution to 
-end of block.  
-   Block of code.  
-<n:> Points here.  
+end of block.    
+   Block of code.    
+<n:> Points here.   
 
    The jump instructions is never executed, but the program counter is
 changed by the BlockCopy Instruction.  
 
   Note the Bytecode compiler will translate the following structures:
 
-   [ blockc ] whileTrue: [ block ]
-   [ blockc ] whileFalse: [ block ]  
+   [ blockc ] whileTrue: [ block ]  
+   [ blockc ] whileFalse: [ block ]   
 
-   expr ifTrue: [ block ]
-   expr ifFalse: [ block ]
-   expr ifTrue: [ block ] ifFalse: [ block ]
-   expr ifFalse: [ block ] ifTrue: [ block ]
+   expr ifTrue: [ block ]  
+   expr ifFalse: [ block ]  
+   expr ifTrue: [ block ] ifFalse: [ block ]  
+   expr ifFalse: [ block ] ifTrue: [ block ]  
 
-   expr and: [ block ]
-   expr or: [ block ]
+   expr and: [ block ]  
+   expr or: [ block ]  
 
    If the block can't be skipped with 8 bytes, a full conditional branch
 is generated. If the block can't be skip in 128 bytes, the condition is
