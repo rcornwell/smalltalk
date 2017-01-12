@@ -1,7 +1,10 @@
+	       The Artistic License 2.0
 
-			 The "Artistic License"
+	    Copyright (c) 1999-2017, Richard Cornwell.
 
-				Preamble
+     Everyone is permitted to copy and distribute verbatim copies
+      of this license document, but changing it is not allowed.
+
 
 The intent of this document is to state the conditions under which a
 Package may be copied, such that the Copyright Holder maintains some
