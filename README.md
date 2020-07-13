@@ -41,39 +41,40 @@ The virtual machine I have implemented:
    the <Lower half> gives the opcode and the next byte gives the operand.
    0xF are for instructions that don't require an operand.
 
-   Opcode | Action 
-     0x00 | is special long jump, which takes next two bytes as 15 bit signed offset to branch to.  
-     0x#1 | Push Temp n onto stack.  
-     0x#2 | Return with Temp n.  
-     0x#3 | Store Temp n.
-     0x#4 | Push Argument n.  
-     0x#5 | Push Literal n.
-     0x#6 | Push Instance Variable n.
-     0x#7 | Store Instance Variable n.
-     0x#8 | Jump if top of stack true to n. (relative -127 to 128).  
-     0x#9 | Jump if top of stack false to n. (relative -127 to 128).  
-     0x#A | Jump to n. (relative -127 to 128).  
-     0x#B | Send special selector n (0-32), argument count c.  
-     0x#C |  
-     0x#D | Push interger object n. (-7 to 8) or (-127 to 128).
-     0x#E | Send Literal n with argument count c.  
-     0x0F | is Block Copy, explained below.  
-     0xF0 | Return self.  
-     0xF1 | Return top of stack.  
-     0xF2 | Return #true.  
-     0xF3 | Return #false.  
-     0xF4 | Return #nil.  
-     0xF5 | Return block.  
-     0xF6 | Pop top of stack.  
-     0xF7 | Push Global variable given by literal n.  
-     0xF8 | Push self.  
-     0xF9 | Duplicate top of stack.  
-     0xFA | Push #true.  
-     0xFB | Push #false.  
-     0xFC | Push #nil.  
-     0xFD | Send Superclass message n argcount c.  
-     0xFE | Push #thisContext.  
-     0xFF | Store Global variable given by literal n.  
+Opcode | Action  
+-------|-----------------------------------------   
+0x00   | is special long jump, which takes next two bytes as 15 bit signed offset to branch to.  
+0x#1   | Push Temp n onto stack.   
+0x#2   | Return with Temp n.  
+0x#3   | Store Temp n.  
+0x#4   | Push Argument n.  
+0x#5   | Push Literal n.  
+0x#6   | Push Instance Variable n.  
+0x#7   | Store Instance Variable n.  
+0x#8   | Jump if top of stack true to n. (relative -127 to 128).  
+0x#9   | Jump if top of stack false to n. (relative -127 to 128).  
+0x#A   | Jump to n. (relative -127 to 128).  
+0x#B   | Send special selector n (0-32), argument count c.  
+0x#C   |    
+0x#D   | Push interger object n. (-7 to 8) or (-127 to 128).  
+0x#E   | Send Literal n with argument count c.  
+0x0F   | is Block Copy, explained below.  
+0xF0   | Return self.  
+0xF1   | Return top of stack.  
+0xF2   | Return #true.  
+0xF3   | Return #false.  
+0xF4   | Return #nil.  
+0xF5   | Return block.  
+0xF6   | Pop top of stack.  
+0xF7   | Push Global variable given by literal n.  
+0xF8   | Push self.  
+0xF9   | Duplicate top of stack.  
+0xFA   | Push #true.  
+0xFB   | Push #false.  
+0xFC   | Push #nil.  
+0xFD   | Send Superclass message n argcount c.  
+0xFE   | Push #thisContext.  
+0xFF   | Store Global variable given by literal n.  
 
 Block copy expects the instruction stream to be in a specific
 format. Failure to do this will result in crashing system.
