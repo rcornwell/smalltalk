@@ -33,6 +33,12 @@
  * $Id: object.h,v 1.7 2001/08/29 20:16:35 rich Exp rich $
  *
  * $Log: object.h,v $
+ * Revision 1.8  2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * No longer store pointers in class word.
+ * Store offset into region.
+ * Coverity cleanup.
+ *
  * Revision 1.7  2001/08/29 20:16:35  rich
  * Moved region definition to object.c
  *
@@ -95,17 +101,15 @@
 #define CONSOLELIST	25	/* Suspended console linked list */
 #define ROOTSIZE	26
 
-typedef unsigned int Objptr;
+typedef uint32_t Objptr;
 
 /*
  * Information placed at head of object to indicate clase and size.
  */
 typedef struct _objhdr {
     unsigned int            size;	/* Size of object */
-    union {				/* Second word */
-	Objptr              class;	/* Class of in use object */
-	struct _objhdr     *next;	/* Next free object in chain */
-    } u;
+    Objptr     	            oclass;	/* Class of in use object */
+				/* Also holds offset to next free entry */
 } objhdr           , *Objhdr;
 
 typedef struct _otentry {
@@ -179,7 +183,7 @@ void		    reclaimSpace();
 
 #define get_object_pointer(op) (objmem[(op) / 2])
 
-#define get_object_base(op) ((char *)(get_object_pointer(op) + 1))
+#define get_object_base(op) ((unsigned char *)(get_object_pointer(op) + 1))
 
 #define get_object_refcnt(op) (otable[(op) / 2].refcnt)
 
@@ -209,7 +213,7 @@ void		    reclaimSpace();
 
 /* Get class of object */
 #define class_of(op)  \
-    ((is_object(op)) ? (get_object_pointer(op)->u.class) : (SmallIntegerClass))
+    ((is_object(op)) ? (get_object_pointer(op)->oclass) : (SmallIntegerClass))
 
 /* Size of an object in bytes. */
 #define size_of(op) (get_object_pointer(op)->size)
@@ -263,13 +267,13 @@ int                 set_word(Objptr, int, int);
 int                 get_byte(Objptr, int);
 int                 set_byte(Objptr, int, char);
 void                set_pointer(Objptr, int, int);
-char               *get_object_base(Objptr);
+unsigned char      *get_object_base(Objptr);
 int                 get_object_refcnt(Objptr);
 void                set_object_pointer(Objptr, Objhdr);
 void                set_object_refcnt(Objptr, int);
 Objptr              class_of(Objptr);
-int                 size_of(Objptr);
-int                 fixed_size(Objptr);
+unsigned int        size_of(Objptr);
+unsigned int        fixed_size(Objptr);
 int                 get_integer(Objptr, int);
 Objptr              get_pointer(Objptr, int);
 void                object_incr_ref(Objptr);

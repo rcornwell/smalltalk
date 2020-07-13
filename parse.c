@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: parse.c,v $
+ * Revision 1.9  2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ *
  * Revision 1.8  2002/01/29 16:40:38  rich
  * Removed dead code.
  *
@@ -66,12 +69,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: parse.c,v 1.8 2002/01/29 16:40:38 rich Exp rich $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "interp.h"

@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: dump.c,v $
+ * Revision 1.9  2020/07/12 16:00:00  rich
+ * Limit string print to 512 chars.
+ * Coverity cleanup.
+ *
  * Revision 1.8  2001/08/18 16:17:01  rich
  * Moved system error routines to system.h
  *
@@ -64,13 +68,9 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-"$Id: dump.c,v 1.8 2001/08/18 16:17:01 rich Exp rich $";
-
-#endif
 
 /* System stuff */
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -136,6 +136,7 @@ dump_object_value(Objptr op)
     case StringClass:
 	strcat(buffer, "String '");
 	len = length_of(op);
+        len = (len > 512)? 512: len;
 	base = fixed_size(op);
 	sz = strlen(buffer);
 	for (i = 0; i < len; i++)
@@ -324,7 +325,7 @@ dump_method(Objptr op)
     lits = LiteralsOf(header);
     bytes = size_of(op) - ((lits + METH_LITSTART) * sizeof(Objptr));
     sprintf(buffer, "%08x Flag %d, Lits %d Stack %d Temps %d",
-    header, 0xf & FlagOf(header), lits, StackOf(header), TempsOf(header));
+            header, ArgsOf(header), lits, StackOf(header), TempsOf(header));
     dump_string(buffer);
     if (FlagOf(header) == METH_EXTEND) {
 	ehdr = get_pointer(op, METH_HEADER + lits);
@@ -432,6 +433,8 @@ dump_method(Objptr op)
 
 	case SNDSPC2:
 	    operand += 16;
+            /* Fall Through */
+
 	case SNDSPC1:
 	    sprintf(opc, "snd spc(%d, %d)", operand,
 		     0xff & get_byte(op, lits + i + 1));
@@ -718,10 +721,10 @@ dump_inst(Objptr meth, int ip, int opcode, int oprand, Objptr op, int oprand2)
 	}
     }
     if (dumpflag)
-	sprintf(buffer, "#%d Exec: %d %02x %s %s", meth, ip, opcode, opc,
-		 dump_object_value(op));
+	sprintf(buffer, "#%d Exec: %d %02x %s %s %x:%s", meth, ip, opcode, opc,
+		 dump_object_value(op), objmem[current_context/2], dump_class_name(current_context));
     else
-	sprintf(buffer, "#%d Exec: %d %02x %s", meth, ip, opcode, opc);
+	sprintf(buffer, "#%d Exec: %d %02x %s %x:%s", meth, ip, opcode, opc, objmem[current_context/2], dump_class_name(current_context));
     dump_string(buffer);
 }
 /*

@@ -44,10 +44,6 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid = "$Id: win32.c,v 1.3 2002/02/07 04:21:05 rich Exp rich $";
-#endif
-
 #ifdef WIN32
 /* System stuff */
 #include <time.h>
@@ -70,10 +66,10 @@ static HBITMAP      dispmap = NULL;
 static HCURSOR	    cursor = NULL;
 static int	    bmsize;
 static int	    foundevents;
-unsigned long      *display_bits = NULL;
+uint32_t           *display_bits = NULL;
 static int	    display_rows;
 static int	    display_cols;
-static unsigned long *display_image = NULL;
+static uint32_t    *display_image = NULL;
 static int	    needconsole = 1;
 
 static unsigned char reverse_map[256] = {
@@ -506,7 +502,7 @@ WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 	if (row != 0 && col != 0) {
 	    int                 crow, ccol;
 	    int                 roundcol;
-	    unsigned long	*temp;
+	    uint32_t      	*temp;
 
 	    crow = get_integer(display_object, FORM_HEIGHT);
 	    ccol = get_integer(display_object, FORM_WIDTH);
@@ -518,13 +514,13 @@ WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		DeleteObject(dispmap);
 	    bmsize = (roundcol / 8) * row;
 	    dispmap = CreateBitmap(roundcol, row, 1, 1, NULL);
-	    if ((temp = (unsigned long *)malloc(bmsize)) == NULL)
+	    if ((temp = (uint32_t *)malloc(bmsize)) == NULL)
 		break;
 	    if (display_bits != NULL)
 	        free(display_bits);
 	    display_bits = temp;
 
-	    if ((temp = (unsigned long *)malloc(bmsize)) == NULL)
+	    if ((temp = (uint32_t *)malloc(bmsize)) == NULL)
 		break;
 	    if (display_image != NULL)
 	        free(display_image);
@@ -655,7 +651,7 @@ DoWinCommand(HINSTANCE hInst, HWND hwnd, WPARAM wParam)
     }
 }
 
-long 
+uint32 
 file_open(char *name, char *mode, int *flags)
 {
     HANDLE              id;
@@ -689,14 +685,14 @@ file_open(char *name, char *mode, int *flags)
     return (int) id;
 }
 
-long 
-file_seek(long id, long pos)
+void 
+file_seek(int32_t id, int32_t pos)
 {
-    return SetFilePointer((HANDLE) id, pos, NULL, FILE_BEGIN);
+    (void)SetFilePointer((HANDLE) id, pos, NULL, FILE_BEGIN);
 }
 
 int 
-file_write(long id, char *buffer, long size)
+file_write(int32_t id, char *buffer, int32_t size)
 {
     DWORD               did;
 
@@ -709,7 +705,7 @@ file_write(long id, char *buffer, long size)
 }
 
 int 
-file_read(long id, char *buffer, long size)
+file_read(int32_t id, char *buffer, int32_t size)
 {
     DWORD               did;
     DWORD		position;
@@ -727,13 +723,13 @@ file_read(long id, char *buffer, long size)
 }
 
 int 
-file_close(long id)
+file_close(int32_t id)
 {
     return CloseHandle((HANDLE) id);
 }
 
-long 
-file_size(long id)
+int32_t 
+file_size(int32_t id)
 {
     DWORD               lsize;
 
@@ -1004,7 +1000,7 @@ write_console(int stream, char *string)
     return TRUE;
 }
 
-unsigned long
+uint32_t
 current_time()
 {
     struct tm		tm;
@@ -1018,7 +1014,7 @@ current_time()
     tm.tm_min = st.wMinute; 
     tm.tm_sec = st.wSecond; 
     tm.tm_isdst = -1;
-    return (unsigned long)mktime(&tm);
+    return (uint32_t)mktime(&tm);
 }
 
 int

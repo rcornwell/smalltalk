@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: primitive.c,v $
+ * Revision 1.10 2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * Coverity cleanup.
+ *
  * Revision 1.9  2002/01/16 19:11:51  rich
  * character_scanword now returns exception in place holder.
  *
@@ -69,14 +73,10 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: primitive.c,v 1.9 2002/01/16 19:11:51 rich Exp rich $";
-
-#endif
 
 #include "smalltalk.h"
 #include <math.h>
+#include <stdint.h>
 #include "image.h"
 #include "object.h"
 #include "interp.h"
@@ -95,14 +95,14 @@ static char        *rcsid =
 /* Cases to check and build short long integer */
 #define IsLargeInt(x)	((class_of((x)) == LargeNegIntegerClass || \
 			  class_of((x)) == LargePosIntegerClass ) && \
-				length_of((x)) == sizeof(long))
+				length_of((x)) == sizeof(int32_t))
 #define intValue(x)	(((class_of((x)) == LargeNegIntegerClass)?-1:1) *  \
-			    (*((long *)get_object_base((x)))))
+			    (*((int32_t *)get_object_base((x)))))
 #define newLargeInt(x)	res = create_new_object( \
 			    ((x) >= 0)? LargePosIntegerClass: \
 				        LargeNegIntegerClass, \
-					 sizeof(long)); \
-			*((long *)get_object_base(res))=((x)>=0)?(x):(-x);
+					 sizeof(int32_t)); \
+			*((int32_t *)get_object_base(res))=((x)>=0)?(x):(-x);
 
 /* Cases to check and build float */
 #define IsFloat(x)	(class_of((x)) == FloatClass)
@@ -137,7 +137,7 @@ static char        *rcsid =
 	}
 
 #define ReturnInteger(value) { \
-	    long  _temp_ = (value); \
+	    int32_t  _temp_ = (value); \
 	    if (canbe_integer(_temp_)) \
 		res = as_integer_object(_temp_); \
 	    else { newLargeInt(_temp_); } \
@@ -421,7 +421,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveFloatTruncate:
 	if (IsFloat(reciever)) {
-	    result = (long) floatValue(reciever);
+	    result = (int32_t) floatValue(reciever);
 	    ReturnInteger(result);
 	}
 	break;
@@ -476,12 +476,12 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveFloatCeil:
 	if (IsFloat(reciever))
-	    ReturnInteger((long)(ceil(floatValue(reciever))));
+	    ReturnInteger((int32_t)(ceil(floatValue(reciever))));
 	break;
 
     case primitiveFloatFloor:
 	if (IsFloat(reciever))
-	    ReturnInteger((long)(floor(floatValue(reciever))));
+	    ReturnInteger((int32_t)(floor(floatValue(reciever))));
 	break;
 
     case primitiveFloatSin:
@@ -708,13 +708,13 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 
     case primitiveInstVarAt:
 	IsInteger(argument, index);
-	if (index > 0 && index <= (fixed_size(reciever) / sizeof(Objptr))) 
+	if (index > 0 && index <= (int)(fixed_size(reciever) / sizeof(Objptr))) 
 	    ReturnObject(get_pointer(reciever, index - 1));
 	break;
 
     case primitiveInstVarPutAt:
 	IsInteger(argument, index);
-	if (index > 0 && index <= (fixed_size(reciever) / sizeof(Objptr))) {
+	if (index > 0 && index <= (int)(fixed_size(reciever) / sizeof(Objptr))) {
 	    Set_object(reciever, index - 1, otemp);
 	    ReturnObject(otemp);
 	}
@@ -1088,7 +1088,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	temp = (LiteralsOf(temp) * sizeof(Objptr));
 	index--;
 	if (index >= 0 &&
-		 index < ((length_of(reciever) * sizeof(Objptr)) - temp)) {
+		 index < (int)((length_of(reciever) * sizeof(Objptr)) - temp)) {
 	    temp += fixed_size(reciever);
 	    ReturnInteger(get_byte(reciever, index + temp));
 	}
@@ -1101,7 +1101,7 @@ primitive(int primnum, Objptr reciever, Objptr newClass, int args,
 	temp = (LiteralsOf(temp) * sizeof(Objptr));
 	index--;
 	if (index >= 0 &&
-		 index <= (1 + (length_of(reciever) * sizeof(Objptr)) - temp)) {
+		 index <= (int)(1 + (length_of(reciever) * sizeof(Objptr)) - temp)) {
 	    temp += fixed_size(reciever);
 	    res = otemp;
 	    set_byte(reciever, index + temp, iarg);

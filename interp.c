@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: interp.c,v $
+ * Revision 1.8  2020/07/12 16:00:00  rich
+ * Coverity cleanup.
+ *
  * Revision 1.8  2001/08/29 20:16:35  rich
  * Initialize async event queue in InitSystem
  *
@@ -71,12 +74,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-"$Id: interp.c,v 1.8 2001/08/29 20:16:35 rich Exp rich $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -169,7 +167,7 @@ recurseError(Objptr class, Objptr selector)
     strcpy(buf, dump_class_name(class));
     strcat(buf, ":");
     strcat(buf, dump_object_value(selector));
-    strcat(buf, " Recurisive not understood error encountered");
+    strcat(buf, " Recursive not understood error encountered");
     error(buf);
 }
 
@@ -423,7 +421,6 @@ execute(Objptr meth, Objptr rec)
     Objptr		newContext;
     int			header;
     int			stacksize;
-//    int			oldrunning = running;
 
     header = get_pointer(meth, METH_HEADER);
     stacksize = StackOf(header) + TempsOf(header);
@@ -448,7 +445,6 @@ execute(Objptr meth, Objptr rec)
     /* Break cycle */
     Set_object(newContext, BLOCK_SENDER, NilPtr);
     object_decr_ref(newContext);
- //   running = oldrunning;
 }
 
 /*
@@ -481,6 +477,7 @@ interp()
    /* Force a load */
     newContextFlag = 1;
     old_context = NilPtr;
+    methodPointer = get_object_base(get_pointer(current_context, BLOCK_METHOD));
     while (running) {
 	if (old_context != current_context) {
 
@@ -535,7 +532,6 @@ interp()
 	    Set_integer(temp, BLOCK_SP, size_of(temp) / sizeof(Objptr));
 	    Set_object(temp, BLOCK_HOME, home);
 	    Set_integer(temp, BLOCK_IIP, instruct_pointer);
-	/*    Set_object(temp, BLOCK_REC, reciever); */
 	    Set_integer(temp, BLOCK_ARGCNT, argc);
 	    Push(temp);
 	    trace_inst(meth, instruct_pointer, BLKCPY, argc, temp, 0);
@@ -1022,7 +1018,8 @@ interp()
 
 	case DUPTOS:
 	    trace_inst(meth, instruct_pointer, opcode, oprand, TopStack(), stack_pointer);
-	    Push(TopStack());
+            temp = TopStack();
+	    Push(temp);
 	    break;
 
 	case POPSTK:

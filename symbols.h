@@ -33,6 +33,10 @@
  * $Id: symbols.h,v 1.3 2001/08/01 16:44:08 rich Exp $
  *
  * $Log: symbols.h,v $
+ * Revision 1.4  2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * Coverity cleanup.
+ *
  * Revision 1.3  2001/08/01 16:44:08  rich
  * Added thisContext variable.
  *

@@ -82,6 +82,7 @@
 #include <unistd.h>
 #include <malloc.h>
 #include <memory.h>
+#include <alloca.h>
 #endif
 
 #ifndef RC_INVOKED

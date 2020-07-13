@@ -31,6 +31,12 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: object.c,v $
+ * Revision 1.10 2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * No longer store pointers in class word.
+ * Store offset into region.
+ * Coverity cleanup.
+ *
  * Revision 1.9  2001/08/29 20:16:35  rich
  * Moved region definition from object.h.
  *
@@ -68,12 +74,8 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: object.c,v 1.9 2001/08/29 20:16:35 rich Exp rich $";
 
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -90,9 +92,9 @@ typedef struct _region {
     struct _region     *next;			/* Pointer to next region */
     unsigned int        freespace;		/* Space available */
     unsigned int        totalspace;		/* Size of region */
-    Objhdr              base;			/* Pointer to first word */
-    Objhdr              limit;			/* Pointer to last word */
-    Objhdr              freeptrs[ALLOCSIZE + 1]; /* Free pointers. */
+    unsigned char      *base;			/* Pointer to first word */
+    unsigned char      *limit;			/* Pointer to last word */
+    unsigned int        freeptrs[ALLOCSIZE + 1]; /* Index into region */
 } region           , *Region;
 
 int                 growsize = 512;		/* Region grow rate */
@@ -100,7 +102,8 @@ Region              regions = NULL;		/* Memory regions */
 Region              curregion = NULL;		/* Pointer to current region */
 Otentry             otable = NULL;		/* Pointer to object info */
 Objhdr		   *objmem = NULL;		/* Pointer to objects */
-Objptr              freeobj;			/* Next free object pointer */
+unsigned int       *olist = NULL;               /* Holds list of free objects */
+unsigned int        freeobj;			/* Next free object pointer */
 int                 otsize;			/* Size of object table */
 int		    noreclaim = TRUE;		/* Don't allow reclaimes */
     
@@ -207,10 +210,10 @@ get_object_pointer(Objptr op)
     return objmem[op / 2];
 }
 
-INLINE char        *
+INLINE unsigned char    *
 get_object_base(Objptr op)
 {
-    return (char *) (get_object_pointer(op) + 1);
+    return (unsigned char *) (get_object_pointer(op) + 1);
 }
 
 INLINE int
@@ -282,7 +285,7 @@ class_of(Objptr op)
     if (is_object(op) && !notFree(op)) {
 	error("Attempt to get class of free object");
     }
-    return is_object(op)? get_object_pointer(op)->u.class :
+    return is_object(op)? get_object_pointer(op)->oclass :
 				SmallIntegerClass;
 }
 
@@ -342,25 +345,25 @@ object_decr_ref(Objptr op)
  * Create a new object of class class and size additional words.
  */
 Objptr
-create_new_object(Objptr class, int size)
+create_new_object(Objptr nclass, int size)
 {
     Objhdr              new_ptr;
     Objptr              new_obj;
     Objptr              obj_flag;
-    int                *addr;
+    char               *addr;
     int                 allocsize;
-    int                 i;
+    int                 fixed_size;
     int                 ptrs;
     int                 indexable;
     int                 byte;
 
    /* Get type of object */
-    obj_flag = get_pointer(class, CLASS_FLAGS);
+    obj_flag = get_pointer(nclass, CLASS_FLAGS);
     ptrs = (obj_flag & CLASS_PTRS) != 0;
     byte = (obj_flag & CLASS_BYTE) != 0;
     indexable = (obj_flag & CLASS_INDEX) != 0;
    /* Need to inline this since otherwise we get size of Class */
-    i = (obj_flag / 16) * sizeof(Objptr);
+    fixed_size = (obj_flag >> 4) * sizeof(Objptr);
 
    /* Don't create a non indexable object larger than it's fixed size */
     if ((!indexable) && size > 0) 
@@ -374,7 +377,7 @@ create_new_object(Objptr class, int size)
     allocsize = wordsize(size);
 
    /* Add on fixed class size */
-    allocsize += i;
+    allocsize += fixed_size;
 
    /* Try to grab space for object */
     if ((new_ptr = allocate_chunk(allocsize)) == NULL) 
@@ -386,13 +389,13 @@ create_new_object(Objptr class, int size)
 	add_to_free(new_ptr);
 	return NilPtr;
     }
+
    /* Initialize object */
-    new_ptr->u.class = class;
-    new_ptr->size = size + i;
-    object_incr_ref(class);
-    addr = (int *) (new_ptr + 1);
-    for (allocsize /= sizeof(int); allocsize > 0; allocsize--)
-	*addr++ = 0;
+    addr = (char *) (new_ptr + 1);
+    memset(addr, 0, allocsize);
+    new_ptr->oclass = nclass;
+    new_ptr->size = size + fixed_size;
+    object_incr_ref(nclass);
     return new_obj;
 }
 
@@ -400,16 +403,14 @@ create_new_object(Objptr class, int size)
  * Install a new object.
  */
 int                *
-create_object(Objptr op, int flags, Objptr class, int size)
+create_object(Objptr op, int flags, Objptr nclass, int size)
 {
     Objhdr              new_ptr;
-    int                *addr;
+    char               *addr;
     int                 allocsize;
 
    /* Round to integer size */
     allocsize = wordsize(size);
-
-   /* Add on fixed class size */
 
    /* Try to grab space for object */
     if ((new_ptr = attempt_to_allocate(allocsize)) == NULL) {
@@ -434,13 +435,11 @@ create_object(Objptr op, int flags, Objptr class, int size)
     otable[op].byte = (flags & CLASS_BYTE) != 0;
 
    /* Initialize object */
-    new_ptr->u.class = class;
+    addr = (char *) (new_ptr + 1);
+    memset(addr, 0, allocsize);
+    new_ptr->oclass = nclass;
     new_ptr->size = size;
-    addr = (int *) (new_ptr + 1);
-    object_incr_ref(class);		/* Reference count Class */
-    for (allocsize /= sizeof(int); allocsize > 0; allocsize--)
-	*addr++ = 0;
-
+    object_incr_ref(nclass);		/* Reference count Class */
     return (int *) (new_ptr + 1);
 }
 
@@ -451,13 +450,13 @@ create_object(Objptr op, int flags, Objptr class, int size)
 void
 rebuild_free()
 {
-    int                 i;
+    unsigned int        i;
 
     freeobj = NilPtr;
    /* Add all free objects into free list */
     for (i = otsize - 1; i > 0; i--) {
 	if (otable[i].free) {
-	    objmem[i] = (Objhdr) freeobj;
+	    olist[i] = freeobj;
 	    freeobj = i;
 	}
     }
@@ -479,6 +478,8 @@ new_objectable(int number)
 	free(otable);
     if (objmem != NULL)
 	free(objmem);
+    if (olist != NULL)
+	free(olist);
 
     while (regions != NULL) {
 	Region              reg = regions->next;
@@ -492,23 +493,30 @@ new_objectable(int number)
 	return FALSE;
 
     if ((objmem = (Objhdr *) malloc(sizeof(Objhdr) * otsize)) == NULL) {
-	otable = NULL;
 	free(otable);
+	otable = NULL;
 	return FALSE;
     }
 
-    freeobj = NilPtr;
+    if ((olist = (unsigned int *) malloc(sizeof(Objptr) * otsize)) == NULL) {
+        free(objmem);
+	free(otable);
+        objmem = NULL;
+	otable = NULL;
+	return FALSE;
+    }
+
    /* Clear and free all objects. */
     for (i = otsize - 1, ptr = &otable[i], optr = &objmem[i];
 	 i > ((int) NilPtr);
 	 i--, ptr--, optr--) {
-	*optr = (Objhdr) freeobj;
+	*optr = &nilhdr;
 	ptr->refcnt = 0;
 	ptr->free = 1;
 	ptr->ptrs = 0;
 	ptr->indexable = 0;
 	ptr->byte = 0;
-	freeobj = i;
+        olist[i] = 0;
     }
 
    /* Intialize the null object. */
@@ -519,7 +527,7 @@ new_objectable(int number)
     otable[((int) NilPtr) / 2].byte = 0;
     otable[((int) NilPtr) / 2].ptrs = 0;
 
-    nilhdr.u.class = UndefinedClass;	/* For now */
+    nilhdr.oclass = UndefinedClass;	/* For now */
     nilhdr.size = 0;
 
     for (i = 0; i < (sizeof(rootObjects) / sizeof(Objptr)); i++)
@@ -534,7 +542,7 @@ void
 Set_object(Objptr op, int offset, Objptr newvalue)
 {
     if ((unsigned int)offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
-	void dump_stack(Objptr);
+	extern void dump_stack(Objptr);
 
 	dump_stack(NilPtr);
 	error("Out of bounds set");
@@ -549,7 +557,7 @@ void
 Set_integer(Objptr op, int offset, int value)
 {
     if ((unsigned int)offset > (size_of(op)/sizeof(Objptr)) || offset < 0) {
-	void dump_stack(Objptr);
+	extern void dump_stack(Objptr);
 
 	dump_stack(NilPtr);
 	error("Out of bounds set");
@@ -565,7 +573,7 @@ set_class_of(Objptr op, Objptr newClass)
     if (is_object(op)) {
 	object_incr_ref(newClass);
 	object_decr_ref(class_of(op));
-	get_object_pointer(op)->u.class = newClass;
+	get_object_pointer(op)->oclass = newClass;
     }
 }
 
@@ -636,7 +644,7 @@ initialInstance(Objptr class)
     Otentry             ptr;
 
     for (i = 0, ptr = &otable[i]; i < otsize; i++, ptr++) {
-	if (ptr->free == 0 && objmem[i]->u.class == class)
+	if (ptr->free == 0 && objmem[i]->oclass == class)
 	    return (i * 2);
     }
     return NilPtr;
@@ -653,9 +661,9 @@ nextInstance(Objptr op)
 
     if (op == NilPtr || !is_object(op))
 	return NilPtr;
-    class = objmem[i]->u.class;
+    class = objmem[i]->oclass;
     for (i++; i < otsize; i++) {
-	if (otable[i].free == 0 && objmem[i]->u.class == class)
+	if (otable[i].free == 0 && objmem[i]->oclass == class)
 	    return (i * 2);
     }
     return NilPtr;
@@ -669,7 +677,6 @@ next_object(Objptr * op, int *flags, Objptr * class, int *size)
 {
     int                 i;
     Otentry             ptr;
-    Objhdr              optr;
 
     if (!is_object(*op)) 
 	return NULL;
@@ -680,8 +687,7 @@ next_object(Objptr * op, int *flags, Objptr * class, int *size)
 	    *flags = (ptr->ptrs) ? CLASS_PTRS : 0;
 	    *flags |= (ptr->indexable) ? CLASS_INDEX : 0;
 	    *flags |= (ptr->byte) ? CLASS_BYTE : 0;
-	    optr = objmem[i];
-	    *class = objmem[i]->u.class;
+	    *class = objmem[i]->oclass;
 	    *size = objmem[i]->size;
 	    *op = i * 2;
 	    return (int *) (objmem[i] + 1);
@@ -769,10 +775,10 @@ freeSpace()
 static INLINE       Objptr
 new_object_pointer(int ptrs, int indexable, int byte, Objhdr addr)
 {
-    Objptr              new_ptr = freeobj;
+    Objptr          new_ptr = (Objptr)freeobj;
 
     if (new_ptr != NilPtr) {
-	freeobj = (Objptr) objmem[new_ptr];
+	freeobj = olist[new_ptr];
 	objmem[new_ptr] = addr;
 	otable[new_ptr].refcnt = 0;
 	otable[new_ptr].free = 0;
@@ -800,13 +806,13 @@ free_object_pointer(Objptr op)
 	op /= 2;
     	optr = &otable[op];			/* Convert to index */
 	add_to_free(objmem[op]);		/* Free space used by object */
-	objmem[op] = (Objhdr) freeobj;		/* Append to free list */
+	olist[op] = freeobj;		        /* Append to free list */
+	freeobj = op;
 	optr->refcnt = 0;
 	optr->free = 1;
 	optr->ptrs = 0;
 	optr->indexable = 0;
 	optr->byte = 0;
-	freeobj = op;
     }
 }
 
@@ -818,18 +824,19 @@ add_to_free(Objhdr optr)
 {
     int                 lp;
     Region              r;
-    int                 size;
 
-    size = wordsize(optr->size);
-    optr->size = size;		/* Make sure size is rounded correctly */
-    lp = freebin(size);
-    for (r = regions; r != NULL; r = r->next)
-	if (optr >= r->base && optr <= r->limit) {
-	    optr->u.next = r->freeptrs[lp];
-	    r->freeptrs[lp] = optr;
-            r->freespace += size + sizeof(objhdr);
+    optr->size = wordsize(optr->size); /* Make sure size is rounded correctly */
+    lp = freebin(optr->size);
+    optr->size += sizeof(objhdr);
+    for (r = regions; r != NULL; r = r->next) {
+	if ((unsigned char *)optr >= r->base &&
+                  (unsigned char *)optr < r->limit) {
+            optr->oclass = r->freeptrs[lp];
+            r->freeptrs[lp] = ((unsigned char *)optr) - ((unsigned char *)r);
+            r->freespace += optr->size;
 	    return;
 	}
+    }
     error("Chunk lost");
 }
 
@@ -858,8 +865,10 @@ static              Objhdr
 attempt_to_allocate_incurrent(int size)
 {
     int                 lp, left;
+    Objhdr              obj;
     Objhdr              prior;
-    Objhdr              cur;
+    unsigned char      *reg;
+    unsigned int        head;
 
     if (curregion == NULL)
 	curregion = regions;
@@ -867,61 +876,77 @@ attempt_to_allocate_incurrent(int size)
     if (curregion == NULL)
 	return NULL;
 
+   reg = (unsigned char *)curregion;
    /* See if below size of large object */
     if ((lp = freebin(size)) < ALLOCSIZE) {
        /* Try small object list first */
-	if ((cur = curregion->freeptrs[lp]) != NULL) {
+	if ((head = curregion->freeptrs[lp]) != 0) {
 	   /* Exact match found, remove it from list */
-	    curregion->freeptrs[lp] = cur->u.next;
-	    curregion->freespace -= size + sizeof(objhdr);
-	    cur->u.next = NULL;
-	    return cur;
+            obj = (Objhdr)&reg[head];
+	    curregion->freeptrs[lp] = obj->oclass;
+	    curregion->freespace -= obj->size;
+
+	    /* Fix current new object up */
+	    obj->oclass = 0;
+            obj->size -= sizeof(objhdr);
+	    return obj;
 	}
     }
    /* Did not find it, pull off large object list */
     prior = NULL;
-    for (cur = curregion->freeptrs[ALLOCSIZE]; cur != NULL; cur = cur->u.next) {
-	left = cur->size - size;
+    head = curregion->freeptrs[ALLOCSIZE];
+    while (head != 0) {
+        obj = (Objhdr)&reg[head];
+	left = obj->size - (size + (int)sizeof(objhdr));
        /* Check for exact match */
 	if (left == 0) {
 	    /* Remove from free list */
 	    if (prior == NULL)
-		curregion->freeptrs[ALLOCSIZE] = cur->u.next;
+		curregion->freeptrs[ALLOCSIZE] = obj->oclass;
 	    else
-		prior->u.next = cur->u.next;
+		prior->oclass = obj->oclass;
 	   /* Update amount of space avail for use */
-	    curregion->freespace -= size + sizeof(objhdr);
-	    cur->u.next = NULL;
-	    return cur;
+	    curregion->freespace -= obj->size;
+
+	    /* Fix current new object up */
+	    obj->oclass = 0;
+            obj->size -= sizeof(objhdr);
+	    return obj;
 	}
-       /* Can we split this object */
-	if (left >= (int)(sizeof(objhdr))) {
-	    Objhdr              other;
+       /* Can we split this into two? */
+       /* Must be able to hold at least object with no instance variables */
+	if (left >= (int)sizeof(objhdr)) {
+            unsigned int   next;
+	    Objhdr         other;
 
 	    /* Remove from free list */
 	    if (prior == NULL)
-		curregion->freeptrs[ALLOCSIZE] = cur->u.next;
+		curregion->freeptrs[ALLOCSIZE] = obj->oclass;
 	    else
-		prior->u.next = cur->u.next;
+		prior->oclass = obj->oclass;
+
+	    /* Append left over chunk to correct list */
+	    lp = freebin(left - sizeof(objhdr));
 
 	    /* Build new free element at end of current chunk */
-	    other = (Objhdr) (((char *) (cur + 1)) + size);
-	    other->size = left - sizeof(objhdr);
+            next = head + size + sizeof(objhdr);
+	    other = (Objhdr) (&reg[next]);
+	    other->size = left;
 
-	    /* Append to correct list */
-	    lp = freebin(other->size);
-	    other->u.next = curregion->freeptrs[lp];
-	    curregion->freeptrs[lp] = other;
+            /* Link into current list */
+	    other->oclass = curregion->freeptrs[lp];
+            curregion->freeptrs[lp] = next;
 	
 	    /* Update amount of space availaible */
 	    curregion->freespace -= size + sizeof(objhdr);
 
-	    /* Fix current junk up */
-	    cur->size = size;
-	    cur->u.next = NULL;
-	    return cur;
+	    /* Fix current new object up */
+	    obj->oclass = 0;
+            obj->size = size;
+	    return obj;
 	}
-	prior = cur;
+        prior = obj;
+        head = obj->oclass;
     }
     return NULL;
 }
@@ -941,26 +966,26 @@ new_region(int size)
     if ((size = (size / (growsize * 1024))) == 0)
 	size = 1;
     size *= growsize * 1024;
-    size += sizeof(region) + sizeof(objhdr);
+    size += sizeof(objhdr);  /* At least one Object */
 
    /* Allocate space */
-    if ((new_reg = (Region) malloc(size)) == NULL)
+    if ((new_reg = (Region) malloc(size + sizeof(region))) == NULL)
 	return FALSE;
 
    /* Fill in header */
-    new_reg->freespace = size - sizeof(region);
+    new_reg->freespace = size;
     new_reg->totalspace = new_reg->freespace;
-    new_reg->base = (Objhdr) (sizeof(region) + ((char *) new_reg));
-    new_reg->limit = (Objhdr) (((char *) new_reg->base) + new_reg->freespace);
+    new_reg->base = (sizeof(region) + ((unsigned char *) new_reg));
+    new_reg->limit = new_reg->base + size;
     for (i = 0; i < ALLOCSIZE; i++)
-	new_reg->freeptrs[i] = NULL;
+	new_reg->freeptrs[i] = 0;
 
    /* Create one big object */
     ptr = (Objhdr) new_reg->base;
-    ptr->size = new_reg->freespace - sizeof(objhdr);
-    ptr->u.next = NULL;
+    ptr->size = new_reg->freespace;
+    ptr->oclass = 0;
 
-    new_reg->freeptrs[ALLOCSIZE] = ptr;
+    new_reg->freeptrs[ALLOCSIZE] = sizeof(region);
 
    /* Add to head of region list */
     new_reg->next = regions;
@@ -1028,129 +1053,96 @@ attempt_to_allocate(int size)
 static void
 compact_region()
 {
-    Objhdr              lowWater, highWater;
-    int                 i, size;
-    Objhdr              next;
-    Objhdr              ptr;
-    int                *src, *dst;
+    unsigned char      *lowWater, *r;
+    unsigned int        wsize;
+    unsigned int        next;
+    unsigned int        ptr;
+    unsigned int       *src, *dst;
+    int                 op, lp;
+    Objptr              oclass;
 
    /* No point in compating if there is no free space */
     if (curregion->freespace == 0)
 	return;
 
-#if 0
-    {
-        char		buffer[100];
-        sprintf(buffer, "Compacting %x %d bytes %d free", curregion, 
-		curregion->totalspace, curregion->freespace);
-        dump_string(buffer);
-    };
-#endif
-
    /* 
     * Find lowest free area, also clear out freelist.
     * Flag all free areas with a class of -1.
     */
+    r = (unsigned char *)curregion;
     lowWater = curregion->limit;
-    for (i = 0; i <= ALLOCSIZE; i++) {
-	ptr = curregion->freeptrs[i];
-	while (ptr != NULL) {
-#if 0
-    {
-        char		buffer[100];
-        sprintf(buffer, "Free area %x bytes %d [%x], next %x", ptr, ptr->size,
-			ptr + (sizeof(objhdr) + ptr->size) / sizeof(objhdr),
-			 ptr->u.next);
-     dump_string(buffer);
-	}
-#endif
-		    if (ptr < lowWater)
-		lowWater = ptr;
-	    next = ptr->u.next;
-	    ptr->u.class = -1;
+    for (lp = 0; lp <= ALLOCSIZE; lp++) {
+	ptr = curregion->freeptrs[lp];
+	while (ptr != 0) {
+	    if (&r[ptr] < lowWater)
+		lowWater = &r[ptr];
+	    next = ((Objhdr)&r[ptr])->oclass;
+	    ((Objhdr)&r[ptr])->oclass = -1;
 	    ptr = next;
 	}
-	curregion->freeptrs[i] = NULL;
+	curregion->freeptrs[lp] = 0;
+    }
+
+    src = (unsigned int *)lowWater;
+    while (src < (unsigned int *)curregion->limit) {
+	if (((Objhdr) src)->oclass == -1) {
+	     src += (((Objhdr) src)->size) / sizeof(unsigned int);
+        } else {
+	     src += (wordsize(((Objhdr) src)->size) + sizeof(objhdr)) / sizeof(unsigned int);
+        }
     }
 
    /* Reverse all pointers in range to store size in location */
-    highWater = curregion->limit;
-    for (i = 0; i < otsize; i++) {
-	if (otable[i].free == 0) {
-	    ptr = objmem[i];
-	    if (ptr > lowWater && ptr < highWater) {
+    for (op = 0; op < otsize; op++) {
+	if (otable[op].free == 0) {
+	    unsigned char *o = (unsigned char *)objmem[op];
+	    if (o >= lowWater && o < curregion->limit) {
 	       /*
-	        * Put object number into size field, and squirel away
-	        * size in objects address pointer.
+	        * Put object number into class field, and squirel away
+	        * class in free list.
 	        */
-#if 0
-    {
-        char		buffer[100];
-        sprintf(buffer, "Moving %d bytes %d", i, ptr->size);
-        dump_string(buffer);
-	};
-#endif
-		objmem[i] = (Objhdr) ptr->size;
-		ptr->size = i;
+		olist[op] = objmem[op]->oclass;
+		objmem[op]->oclass = op;
 	    }
 	}
     }
 
    /* Move all objects to head of region */
-    src = dst = (int *) lowWater;
-    while (src < (int *) highWater) {
+    src = dst = (unsigned int *)lowWater;
+    while (src < (unsigned int *)curregion->limit) {
        /* Check if free or allocated object. */
-	if (((Objhdr) src)->u.class == -1) {
-#if 0
-    {
-        char		buffer[100];
-        sprintf(buffer, "Skip area %x, bytes %d", src, ((Objhdr) src)->size);
-        dump_string(buffer);
-	};
-#endif
-
+	if (((Objhdr) src)->oclass == -1) {
 	    /* Free area, skip it */
-	    src += (sizeof(objhdr) + ((Objhdr) src)->size) / sizeof(int);
+	    src += (((Objhdr) src)->size) / sizeof(unsigned int);
 	} else {
 	   /* Rebuild object */
-	    i = (int) (((Objhdr) src)->size);
-	    size = (int) objmem[i];
+	    op = ((Objhdr) src)->oclass;
+	    oclass = olist[op];
+            wsize = wordsize(((Objhdr) src)->size);
 
-#if 0
-    {
-        char		buffer[100];
-        sprintf(buffer, "Copying %x, %d bytes %d, next %x", src, i, size,
-		src + size );
-        dump_string(buffer);
-	};
-#endif
-
-	    if ((src + (wordsize(size)/sizeof(int))) > (int *)highWater)
+	    if (((unsigned char *)src + wsize) > curregion->limit)
 		error("Compact out of range");
-	    objmem[i] = (Objhdr) dst;	/* Where it will land */
+	    objmem[op] = (Objhdr) dst;	/* Where it will land */
 
-	   /* Build new header */
-	    ((Objhdr) dst)->size = size;
-	    ((Objhdr) dst)->u.class = ((Objhdr) src)->u.class;
-	    src++;		/* Skip  over object header */
-	    src++;
-	    dst++;
-	    dst++;
+            /* Rebuild header */
+            *dst++ = *src++;
+            *dst++ = oclass;
+            src++;
+
 	   /* Round size */
-	    size = wordsize(size) / sizeof(int);
+	    wsize = wsize / sizeof(unsigned int);
 
 	   /* Copy rest of object */
-	    for (; size > 0; size--)
+	    for (; wsize > 0; wsize--)
 		*dst++ = *src++;
 	}
     }
 
    /* Adjust free list */
-    ((Objhdr) dst)->size = (int)((char *)curregion->limit - (char *)dst)
-			 - sizeof(objhdr);
-    ((Objhdr) dst)->u.next = 0;
-    i = freebin(((Objhdr) dst)->size);
-    curregion->freeptrs[i] = (Objhdr) dst;
+    ((Objhdr) dst)->size = curregion->limit - (unsigned char *)dst;
+    ((Objhdr) dst)->oclass = 0;
+    lp = freebin(((Objhdr) dst)->size - sizeof(objhdr));
+    curregion->freeptrs[lp] = ((unsigned char *)dst) - r;
 }
 
 /*
@@ -1282,7 +1274,7 @@ free_all_other_objects(Objptr op)
 	    if (prior == (Objptr) -1)
 		return;
 	   /* Otherwise pop object stack */
-	    next = current;
+	   /* next = current; */
 	    current = prior;
 	   /* Reload work pointers */
 	    offset = get_object_refcnt(current);
@@ -1327,8 +1319,8 @@ reclaimSpace()
    /* go through list of known objects */
     for (i = 0; i < (sizeof(rootObjects) / sizeof(Objptr)); i++) {
 	op = rootObjects[i];
-	if (op != NilPtr && notFree(op) && get_object_refcnt(op) == 0) {
-	    set_object_refcnt(op, 1);
+	if (op != NilPtr && notFree(op)) {
+	    set_object_refcnt(op, MAXREFCNT);
 	    mark_all_other_objects(op);
 	}
     }
@@ -1341,9 +1333,9 @@ reclaimSpace()
 
    /* Free all unreferenced objects now */
     for (i = 1; i < otsize; i++) {
-	if ((cnt = get_object_refcnt(i*2)) == 0)
+	if ((cnt = get_object_refcnt(i*2)) == 0) 
 	    free_object_pointer(i*2);
-	else {
+	else if (notFree(i*2)) {
 	    set_object_refcnt(i*2, cnt - 1);
 	    j = last_pointer_of(i*2) + 2;
 	    while( --j >= 1)
@@ -1352,9 +1344,10 @@ reclaimSpace()
     }
 
    /* go through list of known objects */
-    for (i = 0; i < (sizeof(rootObjects) / sizeof(Objptr)); i++)
+    for (i = 0; i < (sizeof(rootObjects) / sizeof(Objptr)); i++) {
 	if (rootObjects[i] != NilPtr)
 	    object_incr_ref(rootObjects[i]);
+    }
 
    /* Make sure null never gets freed */
     set_object_refcnt(NilPtr, MAXREFCNT);

@@ -33,6 +33,9 @@
  * $Id: interp.h,v 1.8 2002/01/29 16:40:38 rich Exp rich $
  *
  * $Log: interp.h,v $
+ * Revision 1.9  2020/07/12 16:00:00  rich
+ * Compiler cleanup
+ *
  * Revision 1.8  2002/01/29 16:40:38  rich
  * Increased size of event queue.
  *
@@ -119,8 +122,9 @@ typedef struct _queue {
 			int tstack = stack_pointer;		  \
 			SendError(InterpStackFault, &tstack);     \
 			stack_pointer = tstack;			  \
-		    } else  					  \
+		    } else {  					  \
 		        Set_object(current_context, --stack_pointer, obj); \
+		    }						  \
 		  }
 
 #define TopStack() get_pointer(current_context, stack_pointer)
@@ -133,8 +137,9 @@ typedef struct _queue {
 			int tstack = stack_pointer;		  \
 			SendError(InterpStackFault, &tstack);     \
 			stack_pointer = tstack;			  \
-		      } else  					  \
+		      } else {					  \
 			Set_object(current_context, stack_pointer++, NilPtr); \
+		      }						  \
 		    }
 
 #define SendMethod(selector, stack, args) \

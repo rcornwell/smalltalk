@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: graphic.c,v $
+ * Revision 1.6  2020/07/12 16:00:00  rich
+ * Fix for 64 bit compiler support.
+ * Coverity cleanup.
+ *
  * Revision 1.5  2002/01/29 16:40:38  rich
  * Fixed bugs in sizing cliping rectangle.
  *
@@ -55,13 +59,8 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
 
-    "$Id: graphic.c,v 1.5 2002/01/29 16:40:38 rich Exp rich $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "interp.h"
@@ -77,7 +76,7 @@ Objptr              tick_semaphore = NilPtr;
 Objptr              input_semaphore = NilPtr;
 event_queue         input_queue;
 
-static unsigned long low_mask[] = {
+static uint32_t      low_mask[] = {
     0x00000000, 0x00000001, 0x00000003, 0x00000007,
     0x0000000f, 0x0000001f, 0x0000003f, 0x0000007f,
     0x000000ff, 0x000001ff, 0x000003ff, 0x000007ff,
@@ -113,7 +112,7 @@ static unsigned long low_mask[] = {
 	}
 
 void
-PostEvent(int type, unsigned long value)
+PostEvent(int type, uint32_t value)
 {
 
     if (type == EVENT_TIMER) {
@@ -141,10 +140,10 @@ Objptr
 BitAt(Objptr form, Objptr point)
 {
     Objptr              op;
-    unsigned long      *bits;
+    uint32_t           *bits;
     int                 x, y;
     int                 w, h;
-    unsigned long       word;
+    uint32_t            word;
 
     /* Make sure point is of correct class */
     if (class_of(point) != PointClass)
@@ -167,7 +166,7 @@ BitAt(Objptr form, Objptr point)
     if (form == display_object)
 	bits = display_bits;
     else
-	bits = (unsigned long *) (get_object_base(op) +
+	bits = (uint32_t *) (get_object_base(op) +
 				  (fixed_size(op) * sizeof(Objptr)));
     if (bits == NULL)
 	return NilPtr;
@@ -183,10 +182,10 @@ Objptr
 BitAtPut(Objptr form, Objptr point, Objptr bitCode)
 {
     Objptr              op;
-    unsigned long      *bits;
+    uint32_t           *bits;
     int                 x, y;
     int                 w, h;
-    unsigned long       mask;
+    uint32_t            mask;
     int                 bit;
 
     /* Make sure point is of correct class */
@@ -217,7 +216,7 @@ BitAtPut(Objptr form, Objptr point, Objptr bitCode)
     if (form == display_object)
 	bits = display_bits;
     else
-	bits = (unsigned long *) (get_object_base(op) +
+	bits = (uint32_t *) (get_object_base(op) +
 				  (fixed_size(op) * sizeof(Objptr)));
     if (bits == NULL)
 	return NilPtr;
@@ -239,6 +238,13 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 {
     Objptr              form;
 
+    /* Copy rest of data, should all be integers */
+    IntValue(blitOp, COMB_RULE, blit_data->comb_rule);
+    IntValue(blitOp, CLIP_X, blit_data->cx);
+    IntValue(blitOp, CLIP_Y, blit_data->cy);
+    IntValue(blitOp, CLIP_WIDTH, blit_data->cw);
+    IntValue(blitOp, CLIP_HEIGHT, blit_data->ch);
+
     /* Extract destination form values */
     form = get_pointer(blitOp, DEST_FORM);
     if (form != NilPtr) {
@@ -247,7 +253,7 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 	if (form == display_object)
 	    blit_data->dest_bits = display_bits;
 	else
-	    blit_data->dest_bits = (unsigned long *) (get_object_base(op) +
+	    blit_data->dest_bits = (uint32_t *) (get_object_base(op) +
 						      (fixed_size(op) *
 						       sizeof(Objptr)));
 	if (blit_data->dest_bits == NULL)
@@ -280,7 +286,7 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 	    blit_data->source_bits = display_bits;
 	else
 	    blit_data->source_bits =
-		(unsigned long *) (get_object_base(op) +
+		(uint32_t *) (get_object_base(op) +
 				   (fixed_size(op) * sizeof(Objptr)));
 	if (blit_data->source_bits == NULL)
 	    return FALSE;
@@ -310,7 +316,7 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 	if (form == display_object)
 	    blit_data->half_bits = display_bits;
 	else
-	    blit_data->half_bits = (unsigned long *) (get_object_base(op) +
+	    blit_data->half_bits = (uint32_t *) (get_object_base(op) +
 						      (fixed_size(op) *
 						       sizeof(Objptr)));
 	if (blit_data->half_bits == NULL)
@@ -329,12 +335,6 @@ load_blit(Objptr blitOp, Copy_bits blit_data)
 	blit_data->hh = 0;
     }
 
-    /* Copy rest of data, should all be integers */
-    IntValue(blitOp, COMB_RULE, blit_data->comb_rule);
-    IntValue(blitOp, CLIP_X, blit_data->cx);
-    IntValue(blitOp, CLIP_Y, blit_data->cy);
-    IntValue(blitOp, CLIP_WIDTH, blit_data->cw);
-    IntValue(blitOp, CLIP_HEIGHT, blit_data->ch);
     return TRUE;
 }
 
@@ -346,11 +346,11 @@ doblit(Copy_bits blit_data)
 {
     int                 skew;
     int                 startBits, endBits;
-    unsigned long       mask1, mask2, skewMask;
+    uint32_t            mask1, mask2, skewMask;
     int                 preload;
     int                 hDir, vDir;
     int                 nWords;
-    unsigned long      *source_ptr, *dest_ptr;
+    uint32_t           *source_ptr, *dest_ptr;
     int                 source_row, source_index, source_delta;
     int                 dest_row, dest_index, dest_delta;
     int                 dx, dy, sx, sy, w, h;
@@ -426,7 +426,7 @@ doblit(Copy_bits blit_data)
 	    sy += h - 1;
 	    dy += h - 1;
 	} else if (dx > sx) {
-	    unsigned long       t;
+	    uint32_t            t;
 
 	    hDir = -1;
 	    sx += w - 1;
@@ -463,9 +463,9 @@ doblit(Copy_bits blit_data)
 
     /* Interloop */
     for (i = 0; i < h; i++) {	/* Vertical loop */
-	unsigned long       halftone;
-	unsigned long       prevword;
-	unsigned long       mergeMask;
+	uint32_t            halftone;
+	uint32_t            prevword;
+	uint32_t            mergeMask;
 	int                 word;
 
 	if (blit_data->half_bits != NULL) {
@@ -483,12 +483,12 @@ doblit(Copy_bits blit_data)
 	}
 	mergeMask = mask1;
 	for (word = nWords; word >= 0; word--) {	/* Horizontal loop */
-	    unsigned long       skewWord;
-	    unsigned long       mergeWord;
-	    unsigned long       dest;
+	    uint32_t            skewWord;
+	    uint32_t            mergeWord;
+	    uint32_t            dest;
 
 	    if (source_ptr != NULL) {
-		unsigned long       thisword;
+		uint32_t            thisword;
 
 		thisword = *source_ptr;
 		if (skew == 0)
@@ -611,10 +611,10 @@ character_scanword(Objptr op, Objptr arg, Objptr *e)
     xtable = get_pointer(op, CHAR_XTABLE);
     except = get_pointer(op, CHAR_EXCEPT);
     printing = FALSE;
+    if (!load_blit(op, &blit_data))
+        return FALSE;
     if (class_of(get_pointer(op, CHAR_PRINTING)) == TrueClass) {
 	printing = TRUE;
-	if (!load_blit(op, &blit_data))
-	    return FALSE;
 	/* Do cliping in y direction */
 	if (blit_data.dy < blit_data.cy) {
 	    blit_data.sy += blit_data.cy - blit_data.dy;

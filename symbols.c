@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: symbols.c,v $
+ * Revision 1.7  2020/07/12 16:00:00  rich
+ * Coverity cleanup.
+ *
  * Revision 1.6  2001/08/01 16:42:31  rich
  * Added thisContext builtin variable.
  *
@@ -53,12 +56,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: symbols.c,v 1.6 2001/08/01 16:42:31 rich Exp $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -407,7 +405,7 @@ sort_literals(Namenode nstate, int superFlag, Objptr superClass)
 	    }
 	    if (lp->usage > nstate->litarray[i]->usage) {
 	       /* Find next empty slot */
-		for (j = i + 1; j <= nstate->litcount; j++) {
+		for (j = i + 1; j < nstate->litcount; j++) {
 		    if (nstate->litarray[j] == NULL) {
 	       		/* Slide the elements down */
 			for (; j > i; j--)

@@ -9,8 +9,8 @@ OPTIM=-O -fomit-frame-pointers -finline-functions -fpeephole \
      -funroll-loops -fcse-follow-jumps -fcse-skip-blocks \
      -frerun-cse-after-loop -fexpensive-optimizions -fschedule-insns \
      -fschedule-insns2
-CFLAGS = -g -O2 -Wall -DINLINE_OBJECT_MEM -DINLINE=inline
-LDFLAGS = -g
+CFLAGS = -Wall -DINLINE=inline -DINLINE_OBJECT_MEM
+LDFLAGS = 
 LIBS=-lm -L/usr/X11/lib -lX11
 
 
@@ -25,8 +25,8 @@ OBJS = $(PROJ).o about.o image.o object.o interp.o primitive.o fileio.o \
 BOOTSRC = basic.st stream.st collection.st magnitude.st compile.st \
 	behavior.st system.st boottail.st
 SMALLSRC = object.st stream.st collection.st magnitude.st misc.st compile.st \
-	behavior.st process.st system.st graphic.st #font.st mvc.st \
-#	guiapps.st switch.st textview.st listview.st browser.st debugger.st
+	behavior.st process.st system.st graphic.st font.st mvc.st \
+	guiapps.st switch.st textview.st listview.st browser.st debugger.st
 
 all:	$(PROJ).sti 
 

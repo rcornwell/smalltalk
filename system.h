@@ -33,6 +33,9 @@
  * $Id: system.h,v 1.3 2002/02/07 04:21:05 rich Exp $
  *
  * $Log: system.h,v $
+ * Revision 1.4 2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ *
  * Revision 1.3  2002/02/07 04:21:05  rich
  * Added function to change directory.
  *
@@ -61,19 +64,19 @@ Objptr              BeDisplay(Objptr);
 Objptr              BeCursor(Objptr);
 
 /* OS Wrapper functions */
-long                file_open(char *, char *, int *);
-long                file_seek(long, long);
-int                 file_write(long, char *, long);
-int                 file_read(long, char *, long);
-int                 file_close(long);
-long                file_size(long);
+int32_t             file_open(char *, char *, int *);
+void                file_seek(int32_t, int32_t);
+int                 file_write(int32_t, char *, int32_t);
+int                 file_read(int32_t, char *, int32_t);
+int                 file_close(int32_t);
+int32_t             file_size(int32_t);
 int		    file_checkdirect(char *);
 Objptr		    file_direct(Objptr);
 int		    file_delete(Objptr);
 int		    file_rename(Objptr, Objptr);
-void		    file_cwd(char *);
+void		    file_cwd(const char *);
 int		    write_console(int, char *);
-unsigned long	    current_time();
+uint32_t     	    current_time();
 int		    current_mtime();
 
 /* Misc functions. */

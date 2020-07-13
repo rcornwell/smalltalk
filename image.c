@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: image.c,v $
+ * Revision 1.7  2020/07/12 16:00:00  rich
+ * Fixed for 64 bit compiler.
+ *
  * Revision 1.6  2002/02/07 04:21:04  rich
  * Extract path on image load and change to it's directory before starting it.
  *
@@ -53,12 +56,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: image.c,v 1.6 2002/02/07 04:21:04 rich Exp $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"

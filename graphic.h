@@ -30,9 +30,12 @@
  * CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: graphic.h,v 1.2 2002/01/16 19:11:51 rich Exp $
+ * $Id: graphic.h,v 1.3 2020/07/12 19:11:51 rich Exp $
  *
  * $Log: graphic.h,v $
+ * Revision 1.3  2020/07/12 16:00:00  rich
+ * Fixed for 64 bit compiler.
+ *
  * Revision 1.2  2002/01/16 19:11:51  rich
  * Return exception code in place holder of scanword.
  *
@@ -49,7 +52,7 @@ typedef struct _cursor_obj
     int                 width, height;	/* Size */
     int                 offx, offy;	/* Offset to image */
     int                 linked;	/* Is image linked */
-    unsigned long       bits[32];	/* copy of image */
+    uint32_t            bits[32];	/* copy of image */
 }
 cursor_obj         , *Cursor_object;
 
@@ -57,11 +60,11 @@ cursor_obj         , *Cursor_object;
 typedef struct _copy_bits
 {
     int                 sx, sy, sw, sh;	/* Source */
-    unsigned long      *source_bits;
+    uint32_t           *source_bits;
     int                 dx, dy, dw, dh;	/* Dest */
-    unsigned long      *dest_bits;
+    uint32_t           *dest_bits;
     int                 hx, hy, hw, hh;	/* Half tone */
-    unsigned long      *half_bits;
+    uint32_t           *half_bits;
     int                 cx, cy, cw, ch;	/* Clip region */
     int                 w, h;
     int                 comb_rule;
@@ -70,7 +73,7 @@ typedef struct _copy_bits
 copy_bits          , *Copy_bits;
 
 extern Objptr       display_object;
-extern unsigned long *display_bits;
+extern uint32_t    *display_bits;
 extern Objptr       cursor_object;
 extern cursor_obj   current_cursor;
 extern Objptr       tick_semaphore;
@@ -98,4 +101,4 @@ Objptr              BitAt(Objptr, Objptr);
 Objptr              BitAtPut(Objptr, Objptr, Objptr);
 
 /* Post an event to the smalltalk system */
-void                PostEvent(int, unsigned long);
+void                PostEvent(int, uint32_t);

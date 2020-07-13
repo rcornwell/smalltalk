@@ -79,9 +79,10 @@
 		 ifTrue: [ System quit ]
 		" When we come back after reload, run execute loop. "
 		 ifFalse: [
-		 "    [ (Smalltalk at: #DisplayScreen) preform: #initSystem
+		    (Smalltalk at: #DisplayScreen) preform: #initSystem.
+		    "[ (Smalltalk at: #DisplayScreen) preform: #initSystem
 		     ] forkAt: Processor userSchedulingPriority."
-		     stdin executeLoop
+		    " stdin executeLoop"
 		     " Not reached. "
 		 ]
 

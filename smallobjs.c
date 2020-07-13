@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: smallobjs.c,v $
+ * Revision 1.3  2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * Coverity cleanup.
+ *
  * Revision 1.2  2001/07/31 14:09:49  rich
  * Fixed to compile under new cygwin.
  *
@@ -41,12 +45,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: smallobjs.c,v 1.2 2001/07/31 14:09:49 rich Exp $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"

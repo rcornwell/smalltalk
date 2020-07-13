@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: xwin.c,v $
+ * Revision 1.10 2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * Coverity cleanup.
+ *
  * Revision 1.5  2002/02/17 13:41:59  rich
  * Added translation of arrow keys into character codes.
  *
@@ -53,11 +57,6 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-
-    "$Id: xwin.c,v 1.5 2002/02/17 13:41:59 rich Exp rich $";
-#endif
 
 #ifndef WIN32
 
@@ -77,6 +76,7 @@ static char        *rcsid =
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <stdint.h>
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -102,14 +102,14 @@ static Window       window;
 static Window       root;
 static XImage      *display_image;
 static GC           gc;
-static unsigned long fg, bg;
+static uint32_t     fg, bg;
 static XColor       blk, wht;
 static int          xconn = -1;
 static int          buttons = 0;
 
 static int          fill_buffer();
 static void         timer_handler(int);
-unsigned long      *display_bits = NULL;
+uint32_t           *display_bits = NULL;
 
 /* Initialize the system. */
 int
@@ -122,6 +122,7 @@ initSystem()
     init_event(&input_queue);
     init_event(&asyncsigs);
 
+    sigemptyset(&sa.sa_mask);
     sa.sa_handler = timer_handler;
     sa.sa_flags = SA_NOMASK;
     sigaction(SIGALRM, &sa, &osa);
@@ -156,6 +157,7 @@ endSystem()
     setitimer(ITIMER_REAL, &tv, &otv);
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = SA_NOMASK;
+    sigemptyset(&sa.sa_mask);
     sigaction(SIGALRM, &sa, &osa);
 
     if (display_image != (XImage *) NULL) {
@@ -175,14 +177,12 @@ BeCursor(Objptr op)
 {
     int                 height, width;
     int                 rwidth;
-    int                 i;
     Objptr              offset;
     int                 hot_x, hot_y;
     Pixmap              main_pix, mask_pix;
-    unsigned long      *main_bits, *mask_bits;
+    uint32_t           *main_bits, *mask_bits;
     XImage             *main_img, *main_subimg;
     XImage             *mask_img, *mask_subimg;
-    char               *bits;
     GC                  main_gc, mask_gc;
     sigset_t            hold, old;
 
@@ -205,14 +205,8 @@ BeCursor(Objptr op)
     hot_x = get_integer(offset, XINDEX);
     hot_y = get_integer(offset, YINDEX);
     offset = get_pointer(op, FORM_BITMAP);
-    main_bits = (unsigned long *) (get_object_base(offset) +
+    main_bits = (uint32_t *) (get_object_base(offset) +
 				   (fixed_size(offset) * sizeof(Objptr)));
-
-    /* Create local pixmaps for cursor */
-    i = length_of(offset) * sizeof(Objptr);
-    if ((bits = (char *) malloc(i)) == NULL)
-	return cursor_object;
-    memcpy(bits, main_bits, i);
 
     /* Prevent signals while processing events */
     sigemptyset(&hold);
@@ -234,13 +228,9 @@ BeCursor(Objptr op)
 
     /* now biuld mask */
     offset = get_pointer(get_pointer(op, FORM_MASK), FORM_BITMAP);
-    mask_bits = (unsigned long *) (get_object_base(offset) +
+    mask_bits = (uint32_t *) (get_object_base(offset) +
 				   (fixed_size(offset) * sizeof(Objptr)));
 
-    i = length_of(offset) * sizeof(Objptr);
-    if ((bits = (char *) malloc(i)) == NULL)
-	return cursor_object;
-    memcpy(bits, mask_bits, i);
     mask_img =
 	XCreateImage(display, visual, 1, XYBitmap, 0, (char *) mask_bits,
 		     rwidth, height, 32, 0);
@@ -308,7 +298,7 @@ BeDisplay(Objptr op)
 
     if (display_object == NilPtr) {
 	XSetWindowAttributes attributes;
-	unsigned long       attr_mask;
+	uint32_t            attr_mask;
 	XSizeHints          sizehints;
 	char               *dispenv;
 	int                 event_mask;
@@ -330,12 +320,13 @@ BeDisplay(Objptr op)
 	/* Set up hints */
 	sizehints.x = 0;
 	sizehints.y = 0;
-	sizehints.width = 512;
-	sizehints.height = 512;
+	sizehints.width = 1024;
+	sizehints.height = 1024;
 	sizehints.flags = USSize;
 
 	if (geometry != NULL) {
-	    int                 x, y, width, height, mask;
+            int              x, y;
+	    unsigned int     width, height, mask;
 
 	    mask = XParseGeometry(geometry, &x, &y, &width, &height);
 	    if (mask & XValue) {
@@ -568,7 +559,7 @@ processX()
 	    if (display_image != (XImage *) NULL)
 		XDestroyImage(display_image);
 	    bmsize = (roundcol / 8) * ev.xconfigure.height;
-	    if ((display_bits = (unsigned long *) malloc(bmsize)) == NULL)
+	    if ((display_bits = (uint32_t *) malloc(bmsize)) == NULL)
 		break;
 	    display_image = XCreateImage(display, visual, 1, XYBitmap,
 					 0, (char *) display_bits,
@@ -597,7 +588,7 @@ processX()
 }
 
 /* Wrapper to local file operations */
-long
+int32_t
 file_open(char *name, char *mode, int *flags)
 {
     int                 fmode = 0;
@@ -630,8 +621,8 @@ file_open(char *name, char *mode, int *flags)
     sigprocmask(SIG_BLOCK, &hold, &old);
 
     if ((id = open(name, fmode, 0660)) < 0) {
-	return -1;
 	sigprocmask(SIG_UNBLOCK, &hold, &old);
+	return -1;
     }
     sigprocmask(SIG_UNBLOCK, &hold, &old);
     if (*mode == 'a') {
@@ -642,10 +633,9 @@ file_open(char *name, char *mode, int *flags)
 
 }
 
-long
-file_seek(long id, long pos)
+void
+file_seek(int32_t id, int32_t pos)
 {
-    int                 ret;
     sigset_t            hold, old;
 
     /* Prevent signals while processing events */
@@ -653,13 +643,12 @@ file_seek(long id, long pos)
     sigaddset(&hold, SIGALRM);
     sigprocmask(SIG_BLOCK, &hold, &old);
 
-    ret = lseek(id, pos, SEEK_SET);
+    (void)lseek(id, pos, SEEK_SET);
     sigprocmask(SIG_UNBLOCK, &hold, &old);
-    return ret;
 }
 
 int
-file_write(long id, char *buffer, long size)
+file_write(int32_t id, char *buffer, int32_t size)
 {
     int                 ret;
     sigset_t            hold, old;
@@ -675,7 +664,7 @@ file_write(long id, char *buffer, long size)
 }
 
 int
-file_read(long id, char *buffer, long size)
+file_read(int32_t id, char *buffer, int32_t size)
 {
     int                 ret;
     sigset_t            hold, old;
@@ -691,13 +680,13 @@ file_read(long id, char *buffer, long size)
 }
 
 int
-file_close(long id)
+file_close(int32_t id)
 {
     return close(id);
 }
 
-long
-file_size(long id)
+int32_t
+file_size(int32_t id)
 {
     struct stat         statbuf;
     sigset_t            hold, old;
@@ -864,9 +853,9 @@ file_rename(Objptr op, Objptr newop)
 }
 
 void
-file_cwd(char *name)
+file_cwd(const char *name)
 {
-    chdir(name);
+    (void)chdir(name);
 }
 
 void
@@ -983,7 +972,7 @@ write_console(int stream, char *string)
     return TRUE;
 }
 
-unsigned long
+uint32_t
 current_time()
 {
     struct timeb        tp;

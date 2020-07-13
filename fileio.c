@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: fileio.c,v $
+ * Revision 1.7  2020/07/12 16:00:00  rich
+ * Coverity cleanup.
+ *
  * Revision 1.6  2001/08/18 16:17:01  rich
  * Moved system specific routines to their own file.
  * Added rest of directory management routines.
@@ -61,18 +64,15 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: fileio.c,v 1.6 2001/08/18 16:17:01 rich Exp rich $";
 
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
 #include "fileio.h"
 #include "system.h"
 #include "interp.h"
+#include "parse.h"
 
 struct file_buffer *files = NULL;
 struct file_buffer console;

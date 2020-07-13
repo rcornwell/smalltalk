@@ -46,10 +46,6 @@
  *
  */
 
-static char
- rcsid[] =
-"$Id: about.c,v 1.2 2001/07/31 14:09:47 rich Exp $";
-
 #ifdef WIN32
 #include "smalltalk.h"
 #include "about.h"

@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: lex.c,v $
+ * Revision 1.6  2020/07/12 16:00:00  rich
+ * Coverity cleanup.
+ *
  * Revision 1.5  2001/08/18 16:17:01  rich
  * Moved error routines to system.h
  *
@@ -53,13 +56,9 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: lex.c,v 1.5 2001/08/18 16:17:01 rich Exp $";
-
-#endif
 
 /* System stuff */
+#include <stdint.h>
 #include "smalltalk.h"
 #include <math.h>
 #include "object.h"
@@ -170,7 +169,7 @@ peekchar(Token tstate)
 void
 parseError(Token tstate, char *msg, char *value)
 {
-    char	       *ptr, *solptr, *wptr, *optr;
+    char	       *ptr, *wptr, *optr;
     char		buffer[1024];
 
     ptr = tstate->str;
@@ -178,13 +177,12 @@ parseError(Token tstate, char *msg, char *value)
 	ptr--;
     optr = buffer;
     /* Dump method up till error */
-    for(solptr = wptr = tstate->buffer; wptr != ptr && *wptr != '\0'; wptr++) {
+    for(wptr = tstate->buffer; wptr != ptr && *wptr != '\0'; wptr++) {
 	if (*wptr == '\r' || *wptr == '\n') {
 	    *optr++ = '\0';
 	    if (*buffer != '\0')
 	        dump_string(buffer);
 	    optr = buffer;
-	    solptr = ptr;
 	} else {
 	    *optr++ = *wptr;
 	}
@@ -380,6 +378,8 @@ scanarray(Token tstate)
 	case 'Y':
 	case 'Z':
 	    pushback(tstate, c);
+            /* Fall Through */
+
 	case '#':
 	    scanliteral(tstate);
 	    break;
@@ -601,8 +601,10 @@ scanstring(Token tstate)
 	*ptr++ = c;
 	left--;
     } while (c != '\0');
-    if (c == '\0')
+    if (c == '\0') {
+        free(buf);
 	return FALSE;
+    }
     *ptr++ = '\0';
     tstate->object = MakeString(buf);
     free(buf);

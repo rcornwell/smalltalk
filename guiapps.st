@@ -107,9 +107,9 @@ message: aString
 
 message: aString
     | aStream contentsList topView subView |
-	stderr nextPutAll: 'Notifier: '.
+"	stderr nextPutAll: 'Notifier: '.
 	stderr nextPutAll: aString.
-	stderr nl.
+	stderr nl."
     theMessage <- aString.
     contentsList <- System newBacktrace.
     aStream <- WriteStream on: (String new: 0).

@@ -31,6 +31,10 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: smalltalk.c,v $
+ * Revision 1.8  2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ * Coverity cleanup.
+ *
  * Revision 1.7  2001/08/29 20:16:35  rich
  * Added support for X.
  * Added endSystem() function to cleanup before exiting.
@@ -57,11 +61,8 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: smalltalk.c,v 1.7 2001/08/29 20:16:35 rich Exp rich $";
-#endif
 
+#include <stdint.h>
 #include "smalltalk.h"
 #include "about.h"
 #include "object.h"

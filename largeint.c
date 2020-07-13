@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: largeint.c,v $
+ * Revision 1.2  2020/07/12 16:00:00  rich
+ * Coverity cleanup.
+ *
  * Revision 1.1  2001/08/18 16:18:12  rich
  * Initial revision
  *
@@ -38,11 +41,8 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid = "$Id: largeint.c,v 1.1 2001/08/18 16:18:12 rich Exp $";
 
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -58,18 +58,18 @@ static char        *rcsid = "$Id: largeint.c,v 1.1 2001/08/18 16:18:12 rich Exp 
 	while((rlen) > 1 && (rval)[(rlen)-1] == 0) \
 		rlen--; \
 	/* Check if it could be a small integer */ \
-	if ((rlen) == 1 && ((long)(*(rval))) >= 0 && \
+	if ((rlen) == 1 && ((int32_t)(*(rval))) >= 0 && \
 				 canbe_integer(sign * (*(rval)))) \
 	        return(as_integer_object(sign * (*(rval)))); \
 	else { \
 		Objptr		res; \
-		unsigned long	*rptr; \
+		uint32_t       *rptr; \
 		int		i; \
 		/* Nope... allocate and copy result */ \
 		res = create_new_object(((sign) > 0)?LargePosIntegerClass: \
 					   	LargeNegIntegerClass, \
-				 	(rlen) * sizeof(unsigned long)); \
-		rptr = (unsigned long *)get_object_base(res); \
+				 	(rlen) * sizeof(uint32_t)); \
+		rptr = (uint32_t *)get_object_base(res); \
 		for(i = 0; i < (rlen); i++)  \
 	    		*rptr++ = *(rval)++; \
 		return res; \
@@ -78,9 +78,9 @@ static char        *rcsid = "$Id: largeint.c,v 1.1 2001/08/18 16:18:12 rich Exp 
 /* Return object as a large integer. */
 Objptr large_int(Objptr a)
 {
-    long int            x;
+    int32_t             x;
     Objptr              res;
-    unsigned long      *rval;
+    uint32_t           *rval;
 
     /* Check class of a */
     switch (class_of(a)) {
@@ -89,7 +89,7 @@ Objptr large_int(Objptr a)
 	return a;
     case FloatClass:
 	/* Handle better later */
-	x = (long) (*(double *) get_object_base(a));
+	x = (uint32_t) (*(double *) get_object_base(a));
 	break;
     case SmallIntegerClass:
 	x = as_integer(a);
@@ -98,9 +98,9 @@ Objptr large_int(Objptr a)
 	return NilPtr;
     }
     res = create_new_object((x >= 0) ? LargePosIntegerClass :
-			    LargeNegIntegerClass, sizeof(unsigned long));
+			    LargeNegIntegerClass, sizeof(uint32_t));
 
-    rval = (unsigned long *) get_object_base(res);
+    rval = (uint32_t *) get_object_base(res);
     *rval = (x >= 0) ? x : -x;
     return res;
 }
@@ -113,8 +113,8 @@ Objptr negate(Objptr a)
     Objptr              res;
     int                 rlen;
     int                 i;
-    unsigned long      *aval;
-    unsigned long      *rval;
+    uint32_t           *aval;
+    uint32_t           *rval;
 
     /* Check sign of a */
     c = class_of(a);
@@ -135,12 +135,12 @@ Objptr negate(Objptr a)
 	return res;
     }
     /* Check if it could be a small integer */
-    rlen = length_of(a) / sizeof(unsigned long);
+    rlen = length_of(a) / sizeof(uint32_t);
 
-    aval = (unsigned long *) get_object_base(a);
-    res = create_new_object(c, rlen * sizeof(unsigned long));
+    aval = (uint32_t *) get_object_base(a);
+    res = create_new_object(c, rlen * sizeof(uint32_t));
 
-    rval = (unsigned long *) get_object_base(res);
+    rval = (uint32_t *) get_object_base(res);
     for (i = 0; i < rlen; i++)
 	*rval++ = *aval++;
     return res;
@@ -149,19 +149,19 @@ Objptr negate(Objptr a)
 /* And two LargeNumbers together */
 Objptr large_and(Objptr a, Objptr b)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 asign, bsign;
     int                 alen, blen, rlen;
-    int                 cya, cyb;
+    unsigned int        cya, cyb;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     asign = 0;
     if (class_of(a) == LargeNegIntegerClass)
@@ -173,7 +173,7 @@ Objptr large_and(Objptr a, Objptr b)
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t       *x;
 
 	x = aval;
 	aval = bval;
@@ -187,7 +187,10 @@ Objptr large_and(Objptr a, Objptr b)
     }
 
     /* Place to put result. */
-    rptr = rval = (unsigned long *) alloca(alen * sizeof(unsigned long));
+    rptr = rval = (uint32_t *) alloca(alen * sizeof(uint32_t));
+
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
 
     cya = 1;
     cyb = 1;
@@ -232,19 +235,19 @@ Objptr large_and(Objptr a, Objptr b)
 /* Or two LargeNumbers together */
 Objptr large_or(Objptr a, Objptr b)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 asign, bsign;
     int                 alen, blen, rlen;
-    int                 cya, cyb;
+    unsigned int        cya, cyb;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     asign = 0;
     if (class_of(a) == LargeNegIntegerClass)
@@ -256,7 +259,7 @@ Objptr large_or(Objptr a, Objptr b)
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t      *x;
 
 	x = aval;
 	aval = bval;
@@ -270,7 +273,10 @@ Objptr large_or(Objptr a, Objptr b)
     }
 
     /* Place to put result. */
-    rptr = rval = (unsigned long *) alloca(alen * sizeof(unsigned long));
+    rptr = rval = (uint32_t *) alloca(alen * sizeof(uint32_t));
+
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
 
     cya = 1;
     cyb = 1;
@@ -315,19 +321,19 @@ Objptr large_or(Objptr a, Objptr b)
 /* Xor two LargeNumbers together */
 Objptr large_xor(Objptr a, Objptr b)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 asign, bsign;
     int                 alen, blen, rlen;
     int                 cya, cyb;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     asign = 0;
     if (class_of(a) == LargeNegIntegerClass)
@@ -339,7 +345,7 @@ Objptr large_xor(Objptr a, Objptr b)
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t       *x;
 
 	x = aval;
 	aval = bval;
@@ -353,7 +359,10 @@ Objptr large_xor(Objptr a, Objptr b)
     }
 
     /* Place to put result. */
-    rptr = rval = (unsigned long *) alloca(alen * sizeof(unsigned long));
+    rptr = rval = (uint32_t *) alloca(alen * sizeof(uint32_t));
+
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
 
     cya = 1;
     cyb = 1;
@@ -395,7 +404,7 @@ Objptr large_xor(Objptr a, Objptr b)
     return_result(rval, rlen, 1);
 }
 
-static unsigned long highmask[] = {
+static uint32_t highmask[] = {
     0x80000000, 0xc0000000, 0xe0000000, 0xf0000000,
     0xf8000000, 0xfc000000, 0xfe000000, 0xff000000,
     0xff800000, 0xffc00000, 0xffe00000, 0xfff00000,
@@ -406,7 +415,7 @@ static unsigned long highmask[] = {
     0xfffffff8, 0xfffffffc, 0xfffffffe, 0xffffffff
 };
 
-static unsigned long lowmask[] = {
+static uint32_t lowmask[] = {
     0x00000001, 0x00000003, 0x00000007, 0x0000000f,
     0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff,
     0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff,
@@ -420,19 +429,19 @@ static unsigned long lowmask[] = {
 /* Xor two LargeNumbers together */
 Objptr large_shift(Objptr a, Objptr b)
 {
-    unsigned long      *aval;
-    unsigned long      *rval;
+    uint32_t           *aval;
+    uint32_t           *rval;
     int                 bval, words;
     int                 alen, rlen;
     Objptr              res;
     int                 i, j;
     int                 bits, nbits;
-    unsigned long       mask, nmask;
-    unsigned long       av;
+    uint32_t            mask, nmask;
+    uint32_t            av;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    alen = length_of(a) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    alen = length_of(a) / sizeof(uint32_t);
 
     /* B must be of type small integer */
     if (class_of(b) != SmallIntegerClass)
@@ -448,7 +457,7 @@ Objptr large_shift(Objptr a, Objptr b)
 
     /* Place to put result. */
     rlen = alen + words;
-    rval = (unsigned long *) alloca(rlen * sizeof(unsigned long));
+    rval = (uint32_t *) alloca(rlen * sizeof(uint32_t));
 
     if (bval > 0) {		/* Shift upwards */
 	/* backwords copy a to result. */
@@ -489,9 +498,9 @@ Objptr large_shift(Objptr a, Objptr b)
 	return (as_integer_object(*rval));
 
     /* Nope... allocate and copy result */
-    res = create_new_object(class_of(a), rlen * sizeof(unsigned long));
+    res = create_new_object(class_of(a), rlen * sizeof(uint32_t));
 
-    aval = (unsigned long *) get_object_base(res);
+    aval = (uint32_t *) get_object_base(res);
     for (i = 0; i < rlen; i++)
 	aval[i] = rval[i];
     return res;
@@ -501,23 +510,23 @@ Objptr large_shift(Objptr a, Objptr b)
 static              Objptr
 large_add_u(Objptr a, Objptr b, int sign)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 alen, blen, rlen;
     int                 cy;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t      *x;
 
 	x = aval;
 	aval = bval;
@@ -528,9 +537,11 @@ large_add_u(Objptr a, Objptr b, int sign)
     }
 
     /* Place to put result. */
-    rptr = rval =
+    rptr = rval = (uint32_t *) alloca((alen + 1) * sizeof(uint32_t));
 
-	(unsigned long *) alloca((alen + 1) * sizeof(unsigned long));
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
+
     cy = 0;
     /* Add B in */
     for (i = 0; i < blen; i++) {
@@ -562,23 +573,23 @@ large_add_u(Objptr a, Objptr b, int sign)
 static              Objptr
 large_sub_u(Objptr a, Objptr b, int sign)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 alen, blen, rlen;
     int                 cy;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t      *x;
 
 	x = aval;
 	aval = bval;
@@ -590,9 +601,11 @@ large_sub_u(Objptr a, Objptr b, int sign)
     }
 
     /* Place to put result. */
-    rptr = rval =
+    rptr = rval = (uint32_t *) alloca((alen + 1) * sizeof(uint32_t));
 
-	(unsigned long *) alloca((alen + 1) * sizeof(unsigned long));
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
+
     cy = 0;
     /* Subtract B in */
     for (i = 0; i < blen; i++) {
@@ -616,11 +629,11 @@ large_sub_u(Objptr a, Objptr b, int sign)
 
     /* Borrow out mean we need to negate result */
     if (cy) {
-	unsigned long      *rneg = rval;
+	uint32_t      *rneg = rval;
 
 	cy = 1;
 	while (rneg < rptr) {
-	    unsigned long       x;
+	    uint32_t       x;
 
 	    x = cy + ~*rneg;
 	    cy = (x < cy);
@@ -639,23 +652,23 @@ large_sub_u(Objptr a, Objptr b, int sign)
 static int
 large_cmp_u(Objptr a, Objptr b, int sign)
 {
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval, *rptr;
     int                 alen, blen, rlen;
     int                 cy;
     int                 i;
-    unsigned long       av, bv;
+    uint32_t            av, bv;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t      *x;
 
 	x = aval;
 	aval = bval;
@@ -667,9 +680,11 @@ large_cmp_u(Objptr a, Objptr b, int sign)
     }
 
     /* Place to put result. */
-    rptr = rval =
+    rptr = rval = (uint32_t *) alloca((alen + 1) * sizeof(uint32_t));
 
-	(unsigned long *) alloca((alen + 1) * sizeof(unsigned long));
+    /* Initialize result to zero */
+    memset(rval, 0, alen * sizeof(uint32_t));
+
     cy = 0;
     /* Subtract B in */
     for (i = 0; i < blen; i++) {
@@ -693,11 +708,11 @@ large_cmp_u(Objptr a, Objptr b, int sign)
 
     /* Borrow out mean we need to negate result */
     if (cy) {
-	unsigned long      *rneg = rval;
+	uint32_t      *rneg = rval;
 
 	cy = 1;
 	while (rneg <= rptr) {
-	    unsigned long       x;
+	    uint32_t       x;
 
 	    x = cy + ~*rneg;
 	    cy = (x < cy);
@@ -745,15 +760,19 @@ Objptr large_add(Objptr a, Objptr b)
     default:
     case 0:			/* a neg, b neg */
 	res = large_add_u(a, b, -1);
+        break;
 
     case 1:			/* a pos, b neg */
 	res = large_sub_u(a, b, 1);
+        break;
 
     case 2:			/* a neg, b pos */
 	res = large_sub_u(a, b, -1);
+        break;
 
     case 3:			/* a pos, b pos */
 	res = large_add_u(a, b, 1);
+        break;
     }
     return res;
 }
@@ -783,15 +802,19 @@ Objptr large_sub(Objptr a, Objptr b)
     default:
     case 0:			/* a neg, b neg */
 	res = large_sub_u(a, b, -1);
+        break;
 
     case 1:			/* a pos, b neg */
 	res = large_add_u(a, b, 1);
+        break;
 
     case 2:			/* a neg, b pos */
 	res = large_add_u(a, b, -1);
+        break;
 
     case 3:			/* a pos, b pos */
 	res = large_sub_u(a, b, 1);
+        break;
     }
     return res;
 }
@@ -825,15 +848,19 @@ large_cmp(Objptr a, Objptr b, int *success)
     default:
     case 0:			/* a neg, b neg */
 	res = large_cmp_u(a, b, -1);
+        break;
 
     case 1:			/* a pos, b neg */
 	res = 1;
+        break;
 
     case 2:			/* a neg, b pos */
 	res = -1;
+        break;
 
     case 3:			/* a pos, b pos */
 	res = large_cmp_u(a, b, 1);
+        break;
     }
     *success = TRUE;
     return res;
@@ -841,8 +868,8 @@ large_cmp(Objptr a, Objptr b, int *success)
 
 struct dbllong
 {
-    unsigned long       low;
-    unsigned long       high;
+    uint32_t       low;
+    uint32_t       high;
 };
 
 #define dbladd(s, l, h) \
@@ -856,17 +883,17 @@ struct dbllong
 /*
  * Multiply step.
  *
- * Take two unsigned long numbers x and y, multiply them together
+ * Take two uint32_t numbers x and y, multiply them together
  * storing result into sum after adding in carry.
  * Update carry out.
  */
 static INLINE void
-mult_step(unsigned long x, unsigned long y, int *carry,
+mult_step(uint32_t x, uint32_t y, int *carry,
 	  struct dbllong *sum)
 {
-    unsigned long       s;
+    uint32_t            s;
     int                 subcy;
-    unsigned long       lpart, hpart;
+    uint32_t            lpart, hpart;
 
     sum->low += *carry;
     subcy = sum->low < *carry;
@@ -895,10 +922,10 @@ Objptr small_mult(Objptr a, Objptr b)
 {
     int                 sign = 1;
     struct dbllong      sum;
-    long                aval, bval;
-    unsigned long       uaval, ubval;
-    unsigned long       rval[3];
-    unsigned long      *xptr = rval;
+    int32_t             aval, bval;
+    uint32_t            uaval, ubval;
+    uint32_t            rval[3];
+    uint32_t           *xptr = rval;
     int                 rlen;
     int                 cy;
 
@@ -944,8 +971,8 @@ Objptr large_mult(Objptr a, Objptr b)
     int                 sign = 1;
     Objptr              c;
     struct dbllong      sum;
-    unsigned long      *aval, *bval;
-    unsigned long      *rval, *rptr;
+    uint32_t           *aval, *bval;
+    uint32_t           *rval;
     int                 alen, blen, rlen;
     int                 cy;
     int                 i, j;
@@ -965,15 +992,15 @@ Objptr large_mult(Objptr a, Objptr b)
 	return NilPtr;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     /* Make sure A is longer */
     if (alen < blen) {
 	/* If not swap them */
-	unsigned long      *x;
+	uint32_t      *x;
 
 	x = aval;
 	aval = bval;
@@ -984,9 +1011,7 @@ Objptr large_mult(Objptr a, Objptr b)
     }
 
     /* Place to put result */
-    rptr = rval =
-
-	(unsigned long *) alloca((blen + alen) * sizeof(unsigned long));
+    rval = (uint32_t *) alloca((blen + alen) * sizeof(uint32_t));
     sum.low = 0;
     sum.high = 0;
 
@@ -1025,8 +1050,8 @@ Objptr large_mult(Objptr a, Objptr b)
  * Divide aval / n result to qval, rem
  */
 static INLINE void
-short_divide(unsigned long *aval, int alen, unsigned long n,
-	     unsigned long *qval, unsigned long *rem)
+short_divide(uint32_t *aval, int alen, uint32_t n,
+	     uint32_t *qval, uint32_t *rem)
 {
     int                 i;
     int                 r;
@@ -1038,7 +1063,7 @@ short_divide(unsigned long *aval, int alen, unsigned long n,
 	int                 carry;
 	struct dbllong      temp;
 	double              d;
-	unsigned long       qq;
+	uint32_t            qq;
 
 	/* Convert remainder and digit to double */
 	/* Cheap Portable 64 bit divide */
@@ -1046,7 +1071,7 @@ short_divide(unsigned long *aval, int alen, unsigned long n,
 	d = ((((double) r) * base) + ((double) (aval[i]))) / dem;
 
 	/* Extract quotient estimate */
-	qq = (unsigned long) d;
+	qq = (uint32_t) d;
 
 	/* The divide above could have lost bits, recover them */
 	temp.low = 0;
@@ -1084,13 +1109,13 @@ short_divide(unsigned long *aval, int alen, unsigned long n,
  *	}
  *	return qq;
  */
-static INLINE unsigned long
-divide_step(unsigned long qq, int blen, int j,
-	    unsigned long *bval, unsigned long *rval)
+static INLINE uint32_t
+divide_step(uint32_t qq, int blen, int j,
+	    uint32_t *bval, uint32_t *rval)
 {
-    unsigned long       borrow;
+    uint32_t            borrow;
     int                 i;
-    unsigned long       u;
+    uint32_t            u;
     struct dbllong      x;
     int                 carry;
 
@@ -1142,10 +1167,10 @@ divide_step(unsigned long qq, int blen, int j,
 }
 
 /* Compute trial quotient. */
-static INLINE unsigned long
-trial_quotent(unsigned long v1, unsigned long v2, unsigned long *u)
+static INLINE uint32_t
+trial_quotent(uint32_t v1, uint32_t v2, uint32_t *u)
 {
-    unsigned long       d;
+    uint32_t       d;
 
     /* Compute a seed quotent */
     if (u[2] == v1) {
@@ -1153,9 +1178,9 @@ trial_quotent(unsigned long v1, unsigned long v2, unsigned long *u)
 	d = 0xffffffff;
     } else {
 	/* No equal start at [u1,u2] / v1 */
-	unsigned long       x;
-	unsigned long       temp[3];
-	unsigned long       r[2];
+	uint32_t       x;
+	uint32_t       temp[3];
+	uint32_t       r[2];
 
 	x = u[0];
 	temp[0] = u[1];
@@ -1193,7 +1218,7 @@ trial_quotent(unsigned long v1, unsigned long v2, unsigned long *u)
      */
     while (1) {
 	struct dbllong      xtemp;
-	unsigned long       x1, x2, x3;
+	uint32_t            x1, x2, x3;
 	int                 cy;
 
 	/* Compute v1 * d -> x1, x2 */
@@ -1218,7 +1243,7 @@ trial_quotent(unsigned long v1, unsigned long v2, unsigned long *u)
 	 */
 	if (cy == 0) {
 	    /* Check if x3,x2,x1 > u3,u2,u1 */
-	    unsigned long       z;
+	    uint32_t       z;
 
 	    z = x1 - u[0];
 	    cy = (z > x1);
@@ -1249,10 +1274,9 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 {
     int                 sign = 1;
     Objptr              c;
-    unsigned long      *aval, *bval;
-    unsigned long      *qval, *rval;
-    unsigned long      *vval;
-    unsigned long       v1, v2, qq;
+    uint32_t           *aval, *bval;
+    uint32_t           *qval, *rval;
+    uint32_t            v1, v2, qq;
     int                 alen, blen, qlen, rlen;
     int                 i;
 
@@ -1271,10 +1295,10 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	return NilPtr;
 
     /* Grab sizes and pointer to actual data. */
-    aval = (unsigned long *) get_object_base(a);
-    bval = (unsigned long *) get_object_base(b);
-    alen = length_of(a) / sizeof(unsigned long);
-    blen = length_of(b) / sizeof(unsigned long);
+    aval = (uint32_t *) get_object_base(a);
+    bval = (uint32_t *) get_object_base(b);
+    alen = length_of(a) / sizeof(uint32_t);
+    blen = length_of(b) / sizeof(uint32_t);
 
     /* Check for zero divide */
     if (blen == 1) {
@@ -1283,34 +1307,34 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	    return NilPtr;
 	/* Handle large by single value differently. */
 	qlen = alen;
-	qval = (unsigned long *) alloca(qlen * (sizeof(unsigned long)));
+	qval = (uint32_t *) alloca(qlen * (sizeof(uint32_t)));
 
 	rlen = 1;
-	rval = (unsigned long *) alloca(rlen * (sizeof(unsigned long)));
+	rval = (uint32_t *) alloca(rlen * (sizeof(uint32_t)));
 
 	short_divide(aval, alen, *bval, qval, rval);
     } else if (alen < blen) {
 	/* If a smaller then b, then result is 0 with a as remainder */
 	qlen = 1;
-	qval = (unsigned long *) alloca(qlen * (sizeof(unsigned long)));
+	qval = (uint32_t *) alloca(qlen * (sizeof(uint32_t)));
 
 	rlen = alen;
-	rval = (unsigned long *) alloca(rlen * (sizeof(unsigned long)));
+	rval = (uint32_t *) alloca(rlen * (sizeof(uint32_t)));
 
 	*qval = 0;
 	for (i = 0; i < alen; i++)
 	    rval[i] = aval[i];
     } else {
 	double              base = 4.0 * (double) (0x40000000);
-	unsigned long       d;
+	uint32_t       d;
 
 	qlen = alen - blen + 1;
-	qval = (unsigned long *) alloca(qlen * sizeof(unsigned long));
+	qval = (uint32_t *) alloca(qlen * sizeof(uint32_t));
 
 	/* Create some temporary work registers */
 	rlen = alen + 1;
-	rval = (unsigned long *) alloca(rlen * sizeof(unsigned long));
-	vval = (unsigned long *) alloca(rlen * sizeof(unsigned long));
+	rval = (uint32_t *) alloca(rlen * sizeof(uint32_t));
+//	vval = (uint32_t *) alloca(rlen * sizeof(uint32_t));
 
 	/* Copy a to r */
 	for (i = 0; i < alen; i++)
@@ -1324,7 +1348,7 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	/* Convert remainder and digit to double */
 	/* Cheap Portable 64 bit divide */
 	/* DO NOT remove parens here, order is important */
-	d = (unsigned long)
+	d = (uint32_t)
 	    (((base * ((double) rval[rlen - 2])) + ((double) rval[rlen - 3]))
 	     / ((base * ((double) v1)) + ((double) v2)));
 
@@ -1338,20 +1362,20 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	    qval[i] = divide_step(qq, blen, i, bval, &(rval[i]));
 	}
 #if 0
-	unsigned long       d;
+	uint32_t       d;
 	double              base = 4.0 * (double) (0x40000000);
 	int                 ulen;
-	unsigned long      *uval;
+	uint32_t      *uval;
 	int                 cy;
 	struct dbllong      sum;
 
 	/* Ok, no short cut have to do long division */
 	/* Compute initial reciprical seed */
-	d = (unsigned long) (base / ((double) (bval[blen - 1] + 1)));
+	d = (uint32_t) (base / ((double) (bval[blen - 1] + 1)));
 
 	/* Multiply a * d result to u */
 	ulen = 1 + alen;
-	uval = (unsigned long *) alloca(ulen * sizeof(unsigned long));
+	uval = (uint32_t *) alloca(ulen * sizeof(uint32_t));
 
 	sum.low = 0;
 	sum.high = 0;
@@ -1369,7 +1393,7 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	/* Multiply b * d result to v */
 	vval =
 
-	    (unsigned long *) alloca((1 + blen) * sizeof(unsigned long));
+	    (uint32_t *) alloca((1 + blen) * sizeof(uint32_t));
 	sum.low = 0;
 	sum.high = 0;
 	/* Do partial products */
@@ -1387,7 +1411,7 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 	v1 = vval[blen - 1];
 	v2 = vval[blen - 2];
 	qlen = alen - blen + 1;
-	qval = (unsigned long *) alloca(qlen * sizeof(unsigned long));
+	qval = (uint32_t *) alloca(qlen * sizeof(uint32_t));
 
 	/* Do division loop */
 	for (i = alen - blen; i >= 0; i--) {
@@ -1404,7 +1428,7 @@ Objptr large_divide(Objptr a, Objptr b, int type)
 
 	/* Compute remainder. */
 	rlen = ulen;
-	rval = (unsigned long *) alloca(rlen * (sizeof(unsigned long)));
+	rval = (uint32_t *) alloca(rlen * (sizeof(uint32_t)));
 
 	short_divide(uval, ulen, d, rval, &qq);
 #endif

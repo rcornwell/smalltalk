@@ -224,10 +224,12 @@ grayItem: selection
 !
 
 unGrayItem: selection
-    listForm white: (0 @ (selection - 1 * lineHeight)
-                      extent: (listForm width @ lineHeight)).
-    (displayList at: selection) displayOn: listForm
-                                at: 0 @ (selection - 1 * lineHeight)
+    | temp off |
+    off <- 0 @ (selction - 1 * lineHeight).
+    listForm white: (off extent: (listForm width @ lineHeight)).
+    temp <- displayList at: selection.
+    printFlag ifTrue: [ temp <- temp printString ].
+    temp displayOn: listForm at: off
 ! !
 
 ! ListView methodsFor: 'controlling' !

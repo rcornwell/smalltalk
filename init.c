@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: init.c,v $
+ * Revision 1.10 2020/07/12 16:00:00  rich
+ * Support for 64 bit compiler.
+ *
  * Revision 1.9  2001/08/29 20:16:35  rich
  * Make sure we don't have any events waiting when we start a new image.
  *
@@ -69,13 +72,9 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: init.c,v 1.9 2001/08/29 20:16:35 rich Exp rich $";
-
-#endif
 
 /* System stuff */
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -188,6 +187,7 @@ create_classes()
     Objptr              op;
     struct _class_template *ct;
 
+    /* Create fix objects */
     for (i = 0; i < (sizeof(class_template) / sizeof(struct _class_template));
 
 	 i++) {
@@ -361,7 +361,7 @@ smallinit(int otsize)
 
    /*
     * Initialize kernel known classes and objects, these object's can't
-    *be moved without recompiling the system.
+    * be moved without recompiling the system.
     */
     create_classes();
     create_object(FalsePointer, 0, FalseClass, 0);

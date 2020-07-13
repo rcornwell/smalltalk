@@ -31,6 +31,9 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $Log: code.c,v $
+ * Revision 1.9  2020/07/12 16:00:00  rich
+ * Fix bug in determining store instance.
+ *
  * Revision 1.8  2001/08/18 16:17:00  rich
  * Moved error routines to system.h
  *
@@ -65,12 +68,7 @@
  *
  */
 
-#ifndef lint
-static char        *rcsid =
-	"$Id: code.c,v 1.8 2001/08/18 16:17:00 rich Exp $";
-
-#endif
-
+#include <stdint.h>
 #include "smalltalk.h"
 #include "object.h"
 #include "smallobjs.h"
@@ -434,7 +432,7 @@ isSetInst(Codestate cstate)
 	return -1;
     if ((cur = cur->next) == NULL)
 	return -1;
-    if (cur->type == Store && cur->type == Inst) {
+    if (cur->type == Store && cur->oper == Inst) {
         inst = cur->u.symbol->offset;
         if ((cur = cur->next) == NULL)
 	    return -1;
@@ -443,7 +441,7 @@ isSetInst(Codestate cstate)
     } else if (cur->type == Duplicate) {
         if ((cur = cur->next) == NULL)
 	    return -1;
-        if (cur->type == Store && cur->type == Inst) 
+        if (cur->type == Store && cur->oper == Inst) 
             inst = cur->u.symbol->offset;
 	else
 	    return -1;
